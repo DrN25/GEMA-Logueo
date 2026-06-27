@@ -305,7 +305,7 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
         for key in mandatory_lgg:
             v_san = sanitize_val(row_dict.get(key), str)
             if v_san is None:
-                registrar_lgg_error(key, None, "VACIO", "Campo obligatorio se encuentra vacío.")
+                registrar_lgg_error(key, None, "VACIO", f"El campo obligatorio '{key}' se encuentra vacío.")
 
         # Consistencia física LGG
         de = safe_float(sanitize_val(row_dict.get("de"), float))
@@ -319,19 +319,19 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
         resumen_celdas[celda_padre]["dist_celda"] = max(resumen_celdas[celda_padre]["dist_celda"], a)
 
         if perf <= 0:
-            registrar_lgg_error("a", a, "ALERTA", "Longitud de corrida perforada debe ser positiva.")
+            registrar_lgg_error("a", a, "ALERTA", f"Longitud de corrida perforada es no positiva (De: {de}m, A: {a}m, Avance: {perf}m). Debe ser > 0.")
         elif perf > 1.6:
-            registrar_lgg_error("a", a, "ALERTA", "Longitud de corrida perforada excede el límite crítico de 1.6m.")
+            registrar_lgg_error("a", a, "ALERTA", f"Longitud de corrida perforada excede el límite crítico de 1.6m (De: {de}m, A: {a}m, Avance: {perf}m).")
         
         if rec_m > perf:
-            registrar_lgg_error("rec_m", rec_m, "ALERTA", "Longitud recuperada es mayor que el avance perforado.")
+            registrar_lgg_error("rec_m", rec_m, "ALERTA", f"La longitud recuperada ({rec_m}m) es mayor que el avance perforado ({perf}m).")
             
         if rqd_m > rec_m:
-            registrar_lgg_error("rqd_m", rqd_m, "ALERTA", "Metraje RQD es mayor que la longitud recuperada.")
+            registrar_lgg_error("rqd_m", rqd_m, "ALERTA", f"El metraje RQD ({rqd_m}m) es mayor que la longitud recuperada ({rec_m}m).")
 
         sum_frags = round(rqd_m + lrf_m + small_frag_m, 2)
         if sum_frags > perf + 0.05:
-            registrar_lgg_error("rqd_m", rqd_m, "ALERTA", f"La suma de fragmentos ({sum_frags}m) supera el avance perforado ({perf}m).")
+            registrar_lgg_error("rqd_m", rqd_m, "ALERTA", f"La suma de fragmentos físicos (RQD: {rqd_m}m + LRF: {lrf_m}m + <10cm: {small_frag_m}m) es {sum_frags}m, superando el avance perforado ({perf}m).")
 
         # Conteo de fracturas
         frac_nat = safe_int(sanitize_val(row_dict.get("frac_nat"), int))
@@ -339,15 +339,15 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
         b60 = safe_int(sanitize_val(row_dict.get("frac_buz60"), int))
         b90 = safe_int(sanitize_val(row_dict.get("frac_buz90"), int))
         if b30 + b60 + b90 != frac_nat:
-            registrar_lgg_error("frac_nat", frac_nat, "ADVERTENCIA", f"La sumatoria de fracturas por buzamiento ({b30+b60+b90}) no coincide con el conteo general ({frac_nat}).")
+            registrar_lgg_error("frac_nat", frac_nat, "ADVERTENCIA", f"La sumatoria de fracturas por buzamiento (Buz <30°: {b30} + 30°-60°: {b60} + >60°: {b90}) da {b30+b60+b90}, no coincide con el conteo general ({frac_nat}).")
 
         # Abertura vs Relleno
         abertura = safe_float(sanitize_val(row_dict.get("abertura"), float))
         espesor = safe_float(sanitize_val(row_dict.get("espesor"), float))
         if espesor > 0 and abertura <= 0:
-            registrar_lgg_error("abertura", abertura, "ADVERTENCIA", "Se declaró espesor de relleno de junta pero la abertura es 0mm.")
+            registrar_lgg_error("abertura", abertura, "ADVERTENCIA", f"Se declaró espesor de relleno de junta ({espesor}mm) mayor a 0 pero la abertura es {abertura}mm.")
         elif espesor == 0 and abertura > 0:
-            registrar_lgg_error("espesor", espesor, "ADVERTENCIA", "La abertura de junta es mayor a 0mm pero no se ha registrado espesor de relleno.")
+            registrar_lgg_error("espesor", espesor, "ADVERTENCIA", f"La abertura de junta es {abertura}mm (> 0) pero no se ha registrado espesor de relleno (es 0 o no definido).")
 
         # Resistencia vs Intemperismo
         resistencia = safe_str(sanitize_val(row_dict.get("resistencia"), str))
@@ -355,7 +355,7 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
         if resistencia in WEATHERING_COMPATIBILITY:
             valid_w = WEATHERING_COMPATIBILITY[resistencia]
             if intemperismo and intemperismo not in valid_w:
-                registrar_lgg_error("intemperismo", intemperismo, "ADVERTENCIA", f"Incompatibilidad geológica (Resistencia {resistencia} vs Intemperismo {intemperismo} de corrida). Permitidos: {', '.join(valid_w)}.")
+                registrar_lgg_error("intemperismo", intemperismo, "ADVERTENCIA", f"Incompatibilidad geológica: Resistencia '{resistencia}' vs Intemperismo '{intemperismo}'. Valores permitidos para resistencia intacta {resistencia}: {', '.join(valid_w)}.")
 
         # Guardar en memoria para validaciones cruzadas
         lgg_runs.append({
@@ -419,7 +419,7 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
         for key in mandatory_est:
             v_san = sanitize_val(row_dict.get(key), str)
             if v_san is None:
-                registrar_est_error(key, None, "VACIO", "Campo obligatorio se encuentra vacío.")
+                registrar_est_error(key, None, "VACIO", f"El campo obligatorio '{key}' se encuentra vacío.")
 
         # Buscar corrida coincidente (VALIDACIÓN CRUZADA)
         matching_run = None
@@ -429,37 +429,37 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
                 break
 
         if matching_run is None:
-            registrar_est_error("profundidad", depth, "ALERTA", f"Profundidad huérfana ({depth}m) no corresponde a ningún tramo de corrida en LGG.")
+            registrar_est_error("profundidad", depth, "ALERTA", f"Profundidad huérfana ({depth}m) no corresponde a ningún tramo de corrida de LGG para el taladro '{taladro}'.")
         
         # Limites Alfa & Beta
         alfa = safe_float(sanitize_val(row_dict.get("alfa"), float), -1.0)
         if alfa != -1.0 and (alfa < 0.0 or alfa > 90.0):
-            registrar_est_error("alfa", alfa, "ALERTA", "El ángulo Alfa es inválido. Debe estar entre 0° y 90° o ser -1.")
+            registrar_est_error("alfa", alfa, "ALERTA", f"El ángulo Alfa es inválido ({alfa}°). Debe estar entre 0° y 90° o ser -1.")
 
         beta = safe_float(sanitize_val(row_dict.get("beta"), float), -1.0)
         if beta != -1.0 and (beta < 0.0 or beta > 360.0):
-            registrar_est_error("beta", beta, "ALERTA", "El ángulo Beta es inválido. Debe estar entre 0° y 360° o ser -1.")
+            registrar_est_error("beta", beta, "ALERTA", f"El ángulo Beta es inválido ({beta}°). Debe estar entre 0° y 360° o ser -1.")
 
         # JRC10
         jrc10 = safe_int(sanitize_val(row_dict.get("jrc10"), int), -1)
         if jrc10 != -1:
             if jrc10 > 20:
-                registrar_est_error("jrc10", jrc10, "ALERTA", "El valor de JRC10 es inválido. No se permiten valores mayores a 20.")
+                registrar_est_error("jrc10", jrc10, "ALERTA", f"El valor de JRC10 es inválido ({jrc10}). No se permiten valores mayores a 20.")
             elif jrc10 < 0:
-                registrar_est_error("jrc10", jrc10, "ADVERTENCIA", "El valor de JRC10 debe estar en el rango de 0 a 20.")
+                registrar_est_error("jrc10", jrc10, "ADVERTENCIA", f"El valor de JRC10 ({jrc10}) debe estar en el rango de 0 a 20.")
 
         # Espesor vs Abertura
         abertura = safe_float(sanitize_val(row_dict.get("abertura"), float))
         espesor = safe_float(sanitize_val(row_dict.get("espesor"), float))
         if espesor > abertura:
-            registrar_est_error("espesor", espesor, "ADVERTENCIA", "El espesor de relleno no puede ser mayor que la abertura de junta.")
+            registrar_est_error("espesor", espesor, "ADVERTENCIA", f"El espesor de relleno ({espesor}mm) no puede ser mayor que la abertura de junta ({abertura}mm).")
 
         # Consistencia Relleno
         relleno1 = safe_str(sanitize_val(row_dict.get("relleno1"), str))
         if espesor > 0 and (not relleno1 or relleno1 in ["cwf", "-1"]):
-            registrar_est_error("relleno1", relleno1, "ADVERTENCIA", "Se declaró espesor de relleno pero el tipo de relleno está sin definir.")
+            registrar_est_error("relleno1", relleno1, "ADVERTENCIA", f"Se declaró espesor de relleno ({espesor}mm) pero el tipo de relleno está sin definir (es '{relleno1}').")
         elif relleno1 and relleno1 not in ["cwf", "-1"] and abertura <= 0:
-            registrar_est_error("relleno1", relleno1, "ADVERTENCIA", "El tipo de relleno está definido pero la abertura de junta es 0mm.")
+            registrar_est_error("relleno1", relleno1, "ADVERTENCIA", f"El tipo de relleno está definido ('{relleno1}') pero la abertura de junta es {abertura}mm.")
 
         # Validación cruzada de resistencia (dureza de pared vs matriz)
         if matching_run:
@@ -470,13 +470,13 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
             r_levels = {"R0":0, "R1":1, "R2":2, "R3":3, "R4":4, "R5":5, "R6":6}
             if dureza_pared in r_levels and res_matriz in r_levels:
                 if r_levels[dureza_pared] > r_levels[res_matriz]:
-                    registrar_est_error("dureza_pared", dureza_pared, "ADVERTENCIA", f"Incompatibilidad geológica: Dureza de pared de junta ({dureza_pared}) supera la resistencia intacta de la corrida ({res_matriz}).")
+                    registrar_est_error("dureza_pared", dureza_pared, "ADVERTENCIA", f"Incompatibilidad geológica: Dureza de pared de junta ({dureza_pared}) supera la resistencia intacta de la corrida ({res_matriz}) en el tramo ({matching_run['de']}m - {matching_run['a']}m).")
 
             # Mismatch de litología
             lito_junta = safe_str(sanitize_val(row_dict.get("lito1"), str))
             run_litos = [matching_run["lito1"], matching_run.get("lito2"), matching_run.get("lito3")]
             if lito_junta and lito_junta not in run_litos:
-                registrar_est_error("lito1", lito_junta, "ADVERTENCIA", f"Incompatibilidad de litología entre la corrida ({matching_run['lito1']}) y la junta ({lito_junta}).")
+                registrar_est_error("lito1", lito_junta, "ADVERTENCIA", f"Incompatibilidad de litología: Junta tiene '{lito_junta}' pero la corrida ({matching_run['de']}m - {matching_run['a']}m) tiene litologías '{', '.join(filter(None, run_litos))}'.")
 
         if not row_has_errors:
             total_ok += 1

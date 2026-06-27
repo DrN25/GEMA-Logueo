@@ -157,7 +157,10 @@ export default function AnomaliesViewer({
                 <th className="py-3 px-3 text-xs">Módulo</th>
                 <th className="py-3 px-3 text-xs">Fila</th>
                 <th className="py-3 px-3 text-xs">Taladro / Muestra</th>
+                <th className="py-3 px-3 text-xs">Campaña</th>
+                <th className="py-3 px-3 text-xs">Geólogo</th>
                 <th className="py-3 px-3 text-xs">Campo (Columna)</th>
+                <th className="py-3 px-3 text-xs">Valor</th>
                 <th className="py-3 px-3 text-xs">Gravedad</th>
                 <th className="py-3 px-3 text-xs">Detalle de la Falla Hallada</th>
               </tr>
@@ -165,7 +168,7 @@ export default function AnomaliesViewer({
             <tbody>
               {incidencias.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-xs text-slate-500 italic font-semibold">
+                  <td colSpan={9} className="py-8 text-center text-xs text-slate-500 italic font-semibold">
                     No se encontraron anomalías con los filtros seleccionados actualmente.
                   </td>
                 </tr>
@@ -177,18 +180,35 @@ export default function AnomaliesViewer({
                       ? 'bg-orange-500/10 text-orange-400 border-orange-500/20'
                       : 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20';
 
+                  const rawVal = item.valor_actual;
+                  const displayVal = (rawVal === null || rawVal === undefined || String(rawVal).trim() === "" || String(rawVal) === "-1") 
+                    ? '—' 
+                    : String(rawVal);
+
                   return (
                     <tr key={idx} className="border-b border-navy-900/60 hover:bg-slate-900/30 transition-all">
+                      {/* Módulo (Negrita) */}
                       <td className="py-2.5 px-3 font-bold text-slate-400">{item.modulo}</td>
-                      <td className="py-2.5 px-3 font-mono font-bold text-slate-400">{item.fila_excel}</td>
-                      <td className="py-2.5 px-3 font-black text-slate-200">{item.celda_padre || item.celda_hija}</td>
+                      {/* Fila (No negrita) */}
+                      <td className="py-2.5 px-3 font-mono font-normal text-slate-400">{item.fila_excel}</td>
+                      {/* Taladro / Muestra (No negrita) */}
+                      <td className="py-2.5 px-3 font-normal text-slate-200">{item.celda_padre || item.celda_hija}</td>
+                      {/* Campaña (No negrita) */}
+                      <td className="py-2.5 px-3 font-normal text-slate-400">{item.campania || '—'}</td>
+                      {/* Geólogo (No negrita) */}
+                      <td className="py-2.5 px-3 font-normal text-slate-400">{item.geotecnico || '—'}</td>
+                      {/* Campo Columna (Negrita) */}
                       <td className="py-2.5 px-3 font-bold text-cyan-400 font-mono">{item.columna || 'General'}</td>
+                      {/* Valor (No negrita) */}
+                      <td className="py-2.5 px-3 font-mono font-normal text-slate-350">{displayVal}</td>
+                      {/* Gravedad (Negrita) */}
                       <td className="py-2.5 px-3">
                         <span className={`px-2 py-0.5 rounded text-xs font-black uppercase border ${severityBadge}`}>
                           {item.tipo_incidencia}
                         </span>
                       </td>
-                      <td className="py-2.5 px-3 text-slate-300 font-bold leading-relaxed">{item.mensaje}</td>
+                      {/* Mensaje Detalle (No negrita) */}
+                      <td className="py-2.5 px-3 text-slate-300 font-normal leading-relaxed">{item.mensaje}</td>
                     </tr>
                   );
                 })
