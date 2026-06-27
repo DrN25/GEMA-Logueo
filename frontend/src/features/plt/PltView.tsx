@@ -13,7 +13,7 @@ import {
   LITO2_OPTIONS,
   LITO3_OPTIONS
 } from '../../utils/catalogData';
-import LggImportModal from '../lgg/LggImportModal';
+import ExcelImportModal from '../../components/common/ExcelImportModal';
 import PltQaqcPanel from './PltQaqcPanel';
 import PltDashboardPanel from './PltDashboardPanel';
 
@@ -785,7 +785,7 @@ export default function PltView({
               </tbody>
             </table>
           </div>
-          <LggImportModal
+          <ExcelImportModal
             isOpen={isImportModalOpen}
             onClose={() => setIsImportModalOpen(false)}
             activeTaladroName={collar.name || ''}

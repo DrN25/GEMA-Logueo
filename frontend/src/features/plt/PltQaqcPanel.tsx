@@ -123,9 +123,9 @@ export default function PltQaqcPanel({
         const warningCount = pltAlerts.filter(a => a && a.type === 'WARNING').length;
 
         const handleAlertFix = (fieldId: string) => {
-            onSwitchTab('plt');
+            if (onSwitchTab) onSwitchTab('plt');
             setTimeout(() => {
-                onFocusField(fieldId);
+                if (onFocusField) onFocusField(fieldId);
             }, 100);
         };
 

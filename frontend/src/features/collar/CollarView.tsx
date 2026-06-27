@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Trash2, CheckCircle2, MapPin, Database, AlertTriangle, Upload } from 'lucide-react';
+import ExcelImportModal from '../../components/common/ExcelImportModal';
 import type { ValidationAlert } from '../../utils/qaqcValidator';
-import ExcelImportModal from '../lgg/LggImportModal';
 
 interface Survey {
   depth: number;
@@ -649,7 +649,7 @@ export default function CollarSurveyForm({
         onClose={() => setIsImportModalOpen(false)}
         activeTaladroName={safeCollar.name}
         importType="SURVEY"
-        onImport={(importedRows) => {
+        onImport={(importedRows: any[]) => {
           onSurveysChange(importedRows);
         }}
       />

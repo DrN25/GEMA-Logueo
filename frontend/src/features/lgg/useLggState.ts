@@ -233,6 +233,29 @@ export function useLggState({
     onCorridasChange(updated);
   }, [corridas, onCorridasChange]);
 
+  // 6.5. Inserción/Clonación de Fila
+  const insertCorridaRow = useCallback((index: number) => {
+    const original = corridas[index];
+    if (!original) return;
+
+    const cloned: Corrida = {
+      ...original,
+      corrida: index + 2,
+      de: original.a,
+      a: parseFloat((original.a + 1.5).toFixed(2))
+    };
+
+    const updated = [...corridas];
+    updated.splice(index + 1, 0, cloned);
+
+    const reindexed = updated.map((item, idx) => ({
+      ...item,
+      corrida: idx + 1
+    }));
+
+    onCorridasChange(reindexed);
+  }, [corridas, onCorridasChange]);
+
   // 7. Modificación de Celda con Validaciones de Negocio e Integridad Geomecánica
   const handleCellChange = useCallback((index: number, field: keyof Corrida, value: any) => {
     const updated = [...corridas];
@@ -341,6 +364,7 @@ export function useLggState({
     // Métodos de grilla
     addCorridaRow,
     deleteCorridaRow,
+    insertCorridaRow,
     handleCellChange
   };
 }

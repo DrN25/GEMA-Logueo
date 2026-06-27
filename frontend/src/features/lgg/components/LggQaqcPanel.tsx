@@ -12,8 +12,8 @@ import {
   MapPin,
   Tag
 } from 'lucide-react';
-import type { ValidationAlert } from '../../utils/qaqcValidator';
-import { calculateRowRmr } from '../../utils/formulaEngine';
+import type { ValidationAlert } from '../../../utils/qaqcValidator';
+import { calculateRowRmr } from '../../../utils/formulaEngine';
 
 interface Corrida {
   corrida: number;
@@ -63,7 +63,7 @@ export default function LggQaqcPanel({
   onFocusField,
   onSwitchTab,
   darkMode: _darkMode = true
-}: QaqcAnalysisPanelProps) {
+}: LggQaqcPanelProps) {
   try {
     const safeCorridas = Array.isArray(corridas) ? corridas : [];
     const safeAlerts = Array.isArray(alerts) ? alerts : [];
@@ -170,9 +170,9 @@ export default function LggQaqcPanel({
 
     // Jump to grid handler
     const handleAlertFix = (fieldId: string) => {
-      onSwitchTab('lgg');
+      if (onSwitchTab) onSwitchTab('lgg');
       setTimeout(() => {
-        onFocusField(fieldId);
+        if (onFocusField) onFocusField(fieldId);
       }, 80);
     };
 

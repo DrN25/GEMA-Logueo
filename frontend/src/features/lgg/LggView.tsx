@@ -1,9 +1,6 @@
-import React, { useRef, useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Plus,
-  Trash2,
-  Check,
-  X,
   Search,
   RotateCcw,
   FileSpreadsheet,
@@ -14,7 +11,7 @@ import {
   Ruler,
   Layers,
   Shield,
-  ShieldAlert
+  Filter
 } from 'lucide-react';
 import type { ValidationAlert } from '../../utils/qaqcValidator';
 import {
@@ -24,46 +21,13 @@ import {
   LITO3_OPTIONS,
   STRENGTH_CATALOG
 } from '../../utils/catalogData';
-import LggImportModal from './LggImportModal';
-import LggQaqcPanel from './LggQaqcPanel';
+import ExcelImportModal from '../../components/common/ExcelImportModal';
+import LggQaqcPanel from './components/LggQaqcPanel';
 import BaseEditableGrid, { type GridColumn } from '../../components/common/BaseEditableGrid';
-import { useLggState, type CorridaEnriquecida } from './useLggState';
+import { useLggState, type CorridaEnriquecida, type Corrida } from './useLggState';
 import { getLggColumns } from './lggColumns';
 import LggExportModal from './components/LggExportModal';
 import { CreateTaladroModal, RenameTaladroModal } from './components/CollarModals';
-
-export interface Corrida {
-  corrida: number;
-  de: number;
-  a: number;
-  rec_m: number;
-  rqd_m: number;
-  lrf_m: number;
-  small_frag_m: number;
-  mec_frac: number;
-  lito1: string;
-  lito2?: string;
-  lito3?: string;
-  resistencia: string;
-  orientacion: string;
-  offset?: number;
-  tipo_est1: string;
-  tipo_est2?: string;
-  frac_nat: number;
-  frac_buz30: number;
-  frac_buz60: number;
-  frac_buz90: number;
-  abertura: number;
-  rugosidad: number;
-  jrc10: number;
-  intemperismo: string;
-  relleno1: string;
-  relleno2?: string;
-  espesor: number;
-  agua_obs: string;
-  turno?: string;
-  comentarios?: string;
-}
 
 interface LggViewProps {
   corridas: Corrida[];
@@ -121,7 +85,6 @@ export default function LggView({
   defaultTurno = 'D'
 }: LggViewProps) {
 
-  const gridContainerRef = useRef<HTMLDivElement>(null);
 
   const panelWidthStyle = {
     position: 'sticky' as const,
@@ -132,6 +95,7 @@ export default function LggView({
 
   const [activeSubTab, setActiveSubTab] = useState<'lgg' | 'qaqc'>('lgg');
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
 
   const {
     filteredCorridas,
@@ -147,15 +111,16 @@ export default function LggView({
     handleClearFilters,
     addCorridaRow,
     deleteCorridaRow,
+    insertCorridaRow,
     handleCellChange
   } = useLggState({ corridas, onCorridasChange, waterTableM, defaultTurno });
 
-  const lastRowTaladroName = (idx: number) => activeTaladroName || "FEGT25-001";
-  const lastRowGeologo = (idx: number) => {
+  const lastRowTaladroName = (_idx: number) => activeTaladroName || "FEGT25-001";
+  const lastRowGeologo = (_idx: number) => {
     const parentEl = document.getElementById('geologo-header-val');
     return parentEl?.textContent || "RD/RB";
   };
-  const lastRowFecha = (idx: number) => {
+  const lastRowFecha = (_idx: number) => {
     const parentEl = document.getElementById('fecha-header-val');
     return parentEl?.textContent || new Date().toISOString().split('T')[0];
   };
@@ -168,9 +133,10 @@ export default function LggView({
       lastRowFecha,
       lastRowTaladroName,
       handleCellChange,
-      deleteCorridaRow
+      deleteCorridaRow,
+      insertCorridaRow
     });
-  }, [darkMode, handleCellChange, deleteCorridaRow, activeTaladroName]);
+  }, [darkMode, handleCellChange, deleteCorridaRow, insertCorridaRow, activeTaladroName]);
 
   const safeRowsKpi = corridas || [];
   const totalCorridasKpi = safeRowsKpi.length;
@@ -256,7 +222,7 @@ export default function LggView({
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto overflow-x-auto p-1 space-y-6 min-h-0 relative">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden p-1 space-y-6 min-h-0 relative">
         {activeSubTab === 'lgg' ? (
           <>
             <div
@@ -278,6 +244,18 @@ export default function LggView({
               </div>
 
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowFilters(!showFilters)}
+                  className={`flex items-center gap-1.5 border active:scale-95 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm ${showFilters
+                    ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20'
+                    : 'bg-navy-900 border-navy-800 text-slate-400 hover:bg-navy-850'
+                    }`}
+                  title={showFilters ? "Ocultar panel de filtros" : "Mostrar panel de filtros"}
+                >
+                  <Filter size={14} />
+                  <span>{showFilters ? "Ocultar Filtros" : "Mostrar Filtros"}</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => setIsImportModalOpen(true)}
@@ -351,90 +329,92 @@ export default function LggView({
               </div>
             </div>
 
-            <div
-              style={panelWidthStyle}
-              className="glass-panel p-4 rounded-xl border border-navy-800/40 bg-navy-900/10 space-y-4 shadow-lg shrink-0 transition-[width,max-width] duration-300"
-            >
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Litología 1</label>
-                  <select
-                    value={filterLito}
-                    onChange={(e) => setFilterLito(e.target.value)}
-                    className="w-full bg-navy-950 border border-navy-800 hover:border-navy-700 rounded-lg px-3 py-2 text-slate-200 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  >
-                    <option value="">TODAS</option>
-                    {LITO_OPTIONS.map(opt => (
-                      <option key={opt} value={opt}>{opt} - {LITHOLOGY_CATALOG[opt]?.name || opt}</option>
-                    ))}
-                  </select>
+            {showFilters && (
+              <div
+                style={panelWidthStyle}
+                className="glass-panel p-4 rounded-xl border border-navy-800/40 bg-navy-900/10 space-y-4 shadow-lg shrink-0 transition-[width,max-width] duration-300"
+              >
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Litología 1</label>
+                    <select
+                      value={filterLito}
+                      onChange={(e) => setFilterLito(e.target.value)}
+                      className="w-full bg-navy-950 border border-navy-800 hover:border-navy-700 rounded-lg px-3 py-2 text-slate-200 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="">TODAS</option>
+                      {LITO_OPTIONS.map(opt => (
+                        <option key={opt} value={opt}>{opt} - {LITHOLOGY_CATALOG[opt]?.name || opt}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Resistencia Máxima (ISRM)</label>
+                    <select
+                      value={filterResistencia}
+                      onChange={(e) => setFilterResistencia(e.target.value)}
+                      className="w-full bg-navy-950 border border-navy-800 hover:border-navy-700 rounded-lg px-3 py-2 text-slate-200 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="">TODAS</option>
+                      <option value="R0">R0 (Extremadamente Blanda)</option>
+                      <option value="R1">R1 (Muy Blanda)</option>
+                      <option value="R2">R2 (Blanda)</option>
+                      <option value="R3">R3 (Moderadamente Fuerte)</option>
+                      <option value="R4">R4 (Fuerte)</option>
+                      <option value="R5">R5 (Muy Fuerte)</option>
+                      <option value="R6">R6 (Extremadamente Fuerte)</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Clasificación RMR'89</label>
+                    <select
+                      value={filterRmrClass}
+                      onChange={(e) => setFilterRmrClass(e.target.value)}
+                      className="w-full bg-navy-950 border border-navy-800 hover:border-navy-700 rounded-lg px-3 py-2 text-slate-200 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="">TODAS</option>
+                      <option value="Muy Buena">Muy Buena (81 - 100)</option>
+                      <option value="Buena">Buena (61 - 80)</option>
+                      <option value="Regular">Regular (41 - 60)</option>
+                      <option value="Mala">Mala (21 - 40)</option>
+                      <option value="Muy Mala">Muy Mala (0 - 20)</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Logueador / Geólogo</label>
+                    <input
+                      type="text"
+                      placeholder="ej. RD/RB"
+                      value={filterGeotecnico}
+                      onChange={(e) => setFilterGeotecnico(e.target.value)}
+                      className="w-full bg-navy-950 border border-navy-800 hover:border-navy-700 rounded-lg px-3 py-2 text-slate-200 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-slate-600"
+                    />
+                  </div>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Resistencia Máxima (ISRM)</label>
-                  <select
-                    value={filterResistencia}
-                    onChange={(e) => setFilterResistencia(e.target.value)}
-                    className="w-full bg-navy-950 border border-navy-800 hover:border-navy-700 rounded-lg px-3 py-2 text-slate-200 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                <div className="flex justify-between items-center pt-2 border-t border-navy-850 dark:border-navy-800/40">
+                  <button
+                    type="button"
+                    onClick={handleClearFilters}
+                    className="flex items-center gap-1.5 text-slate-500 hover:text-slate-300 text-xs font-bold transition-colors"
                   >
-                    <option value="">TODAS</option>
-                    <option value="R0">R0 (Extremadamente Blanda)</option>
-                    <option value="R1">R1 (Muy Blanda)</option>
-                    <option value="R2">R2 (Blanda)</option>
-                    <option value="R3">R3 (Moderadamente Fuerte)</option>
-                    <option value="R4">R4 (Fuerte)</option>
-                    <option value="R5">R5 (Muy Fuerte)</option>
-                    <option value="R6">R6 (Extremadamente Fuerte)</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Clasificación RMR'89</label>
-                  <select
-                    value={filterRmrClass}
-                    onChange={(e) => setFilterRmrClass(e.target.value)}
-                    className="w-full bg-navy-950 border border-navy-800 hover:border-navy-700 rounded-lg px-3 py-2 text-slate-200 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    <RotateCcw size={13} />
+                    <span>Limpiar Filtros</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleApplyFilters}
+                    className="flex items-center gap-1.5 bg-navy-850 hover:bg-navy-800 border border-navy-800 text-slate-200 px-4 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
                   >
-                    <option value="">TODAS</option>
-                    <option value="Muy Buena">Muy Buena (81 - 100)</option>
-                    <option value="Buena">Buena (61 - 80)</option>
-                    <option value="Regular">Regular (41 - 60)</option>
-                    <option value="Mala">Mala (21 - 40)</option>
-                    <option value="Muy Mala">Muy Mala (0 - 20)</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Logueador / Geólogo</label>
-                  <input
-                    type="text"
-                    placeholder="ej. RD/RB"
-                    value={filterGeotecnico}
-                    onChange={(e) => setFilterGeotecnico(e.target.value)}
-                    className="w-full bg-navy-950 border border-navy-800 hover:border-navy-700 rounded-lg px-3 py-2 text-slate-200 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-slate-600"
-                  />
+                    <Search size={13} />
+                    <span>Aplicar Filtros</span>
+                  </button>
                 </div>
               </div>
-
-              <div className="flex justify-between items-center pt-2 border-t border-navy-850 dark:border-navy-800/40">
-                <button
-                  type="button"
-                  onClick={handleClearFilters}
-                  className="flex items-center gap-1.5 text-slate-500 hover:text-slate-300 text-xs font-bold transition-colors"
-                >
-                  <RotateCcw size={13} />
-                  <span>Limpiar Filtros</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleApplyFilters}
-                  className="flex items-center gap-1.5 bg-navy-850 hover:bg-navy-800 border border-navy-800 text-slate-200 px-4 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
-                >
-                  <Search size={13} />
-                  <span>Aplicar Filtros</span>
-                </button>
-              </div>
-            </div>
+            )}
 
             {/* Barra de Herramientas de la Grilla */}
             <div
@@ -458,44 +438,47 @@ export default function LggView({
                   <Edit size={15} className="text-cyan-400" />
                   <span>Renombrar Taladro</span>
                 </button>
+                <div className="flex items-center gap-1.5 bg-navy-950/80 dark:bg-navy-900/40 border border-navy-850 dark:border-navy-800/60 rounded-lg px-3 py-1.5 text-xs text-slate-400 shadow-sm ml-2">
+                  <Database size={13} className="text-blue-500 dark:text-cyan-400 shrink-0" />
+                  <span className="text-slate-700 dark:text-slate-300 font-bold">{filteredCorridas.length}</span>
+                  <span className="text-slate-500 dark:text-slate-400">{filteredCorridas.length === 1 ? 'registro' : 'registros'}</span>
+                </div>
               </div>
               <div className="text-xs text-slate-500 font-medium max-w-md text-right leading-relaxed">
                 * Navega con las <span className="font-bold text-slate-400">Teclas de Dirección</span>. Presiona <span className="font-bold text-slate-400">ENTER</span> para avanzar o crear corridas. Arrastra los bordes de cabecera para ajustar columnas.
               </div>
             </div>
 
-            <div className="border border-navy-800 rounded-xl bg-navy-950/65 shadow-2xl relative overflow-visible inline-block min-w-full">
-              <BaseEditableGrid<CorridaEnriquecida>
-                data={filteredCorridas}
-                columns={lggColumns}
-                selectedRowIndex={selectedRowIndex !== null ? filteredCorridas.findIndex(r => r.originalIndex === selectedRowIndex) : null}
-                onSelectRow={(idx) => {
-                  const origIdx = filteredCorridas[idx]?.originalIndex;
-                  if (origIdx !== undefined) {
-                    onSelectRow(origIdx);
-                  }
-                }}
-                onCellChange={(idx, field, value) => {
-                  const origIdx = filteredCorridas[idx]?.originalIndex;
-                  if (origIdx !== undefined) {
-                    handleCellChange(origIdx, field, value);
-                  }
-                }}
-                alerts={alerts}
-                idPrefix="lgg-cell"
-                onAddRow={addCorridaRow}
-                onDeleteRow={(idx) => {
-                  const origIdx = filteredCorridas[idx]?.originalIndex;
-                  if (origIdx !== undefined) {
-                    deleteCorridaRow(origIdx);
-                  }
-                }}
-                getRowKey={(row) => row.originalIndex}
-                editableFields={EDITABLE_COLS}
-                darkMode={darkMode}
-                minWidth="min-w-[3200px]"
-              />
-            </div>
+            <BaseEditableGrid<CorridaEnriquecida>
+              data={filteredCorridas}
+              columns={lggColumns}
+              selectedRowIndex={selectedRowIndex !== null ? filteredCorridas.findIndex(r => r.originalIndex === selectedRowIndex) : null}
+              onSelectRow={(idx) => {
+                const origIdx = filteredCorridas[idx]?.originalIndex;
+                if (origIdx !== undefined) {
+                  onSelectRow(origIdx);
+                }
+              }}
+              onCellChange={(idx, field, value) => {
+                const origIdx = filteredCorridas[idx]?.originalIndex;
+                if (origIdx !== undefined) {
+                  handleCellChange(origIdx, field as keyof Corrida, value);
+                }
+              }}
+              alerts={alerts}
+              idPrefix="lgg-cell"
+              onAddRow={addCorridaRow}
+              onDeleteRow={(idx) => {
+                const origIdx = filteredCorridas[idx]?.originalIndex;
+                if (origIdx !== undefined) {
+                  deleteCorridaRow(origIdx);
+                }
+              }}
+              getRowKey={(row) => row.originalIndex}
+              editableFields={EDITABLE_COLS}
+              darkMode={darkMode}
+              minWidth="3200px"
+            />
 
             <datalist id="lito1-options-list">
               {LITO1_OPTIONS.map(opt => (
@@ -551,10 +534,11 @@ export default function LggView({
         onRename={handleRenameSubmit}
       />
 
-      <LggImportModal
+      <ExcelImportModal
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
         activeTaladroName={activeTaladroName}
+        importType="LGG"
         onImport={(importedRows, createNewWithName) => {
           if (onImportExcel) {
             onImportExcel(importedRows, createNewWithName);

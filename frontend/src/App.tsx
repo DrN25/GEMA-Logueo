@@ -959,6 +959,9 @@ export default function App() {
             activeTaladroName={activeTaladro.name}
             alerts={activeAlerts}
             onImportExcel={handleImportStructExcelData}
+            darkMode={darkMode}
+            sidebarCollapsed={sidebarCollapsed}
+            onFocusField={handleFocusField}
           />
         );
       case 'rmr':

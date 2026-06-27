@@ -1,7 +1,6 @@
-import React from 'react';
-import { Trash2, Check, X } from 'lucide-react';
+import { Trash2, Check, X, Copy } from 'lucide-react';
 import type { GridColumn } from '../../components/common/BaseEditableGrid';
-import type { Corrida } from './DataGridLGG';
+import type { Corrida } from './useLggState';
 import type { CorridaEnriquecida } from './useLggState';
 import {
   LITHOLOGY_CATALOG,
@@ -123,6 +122,7 @@ interface LggColumnBuilderProps {
   lastRowTaladroName: (idx: number) => string;
   handleCellChange: (idx: number, field: keyof Corrida, val: any) => void;
   deleteCorridaRow: (idx: number) => void;
+  insertCorridaRow: (idx: number) => void;
 }
 
 export function getLggColumns({
@@ -131,7 +131,8 @@ export function getLggColumns({
   lastRowFecha,
   lastRowTaladroName,
   handleCellChange,
-  deleteCorridaRow
+  deleteCorridaRow,
+  insertCorridaRow
 }: LggColumnBuilderProps): GridColumn<CorridaEnriquecida>[] {
   const isDark = darkMode;
 
@@ -629,6 +630,8 @@ export function getLggColumns({
       label: "RMR'76",
       width: 'w-24',
       type: 'readonly',
+      isStickyRight: true,
+      stickyRight: 192,
       headerBgClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300',
       renderCell: (row) => {
         const score = row.rmr76Score;
@@ -649,6 +652,8 @@ export function getLggColumns({
       label: "RMR'89",
       width: 'w-24',
       type: 'readonly',
+      isStickyRight: true,
+      stickyRight: 96,
       headerBgClass: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-300',
       renderCell: (row) => {
         const score = row.rmr89Score;
@@ -667,10 +672,19 @@ export function getLggColumns({
     {
       key: 'accion' as any,
       label: 'Acciones',
-      width: 'w-20',
+      width: 'w-24',
       type: 'readonly',
+      isStickyRight: true,
+      stickyRight: 0,
       renderCell: (row) => (
-        <div className="flex justify-center items-center py-1.5">
+        <div className="flex justify-center items-center gap-1.5 py-1.5">
+          <button
+            onClick={() => insertCorridaRow(row.originalIndex)}
+            className="text-cyan-500 hover:text-cyan-400 p-1 hover:bg-cyan-500/10 rounded transition-colors"
+            title="Clonar esta corrida abajo"
+          >
+            <Copy size={15} />
+          </button>
           <button
             onClick={() => deleteCorridaRow(row.originalIndex)}
             className="text-red-500 hover:text-red-400 p-1 hover:bg-red-500/10 rounded transition-colors"

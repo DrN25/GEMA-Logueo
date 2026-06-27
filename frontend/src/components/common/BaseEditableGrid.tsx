@@ -1,5 +1,4 @@
 import React from 'react';
-import { ShieldAlert } from 'lucide-react';
 import type { ValidationAlert } from '../../utils/qaqcValidator';
 
 export interface GridColumn<T> {
@@ -11,7 +10,8 @@ export interface GridColumn<T> {
   step?: string;
   isSticky?: boolean;
   stickyLeft?: number;
-  stickyRight?: boolean;
+  isStickyRight?: boolean;
+  stickyRight?: number;
   headerBgClass?: string;
   renderCell?: (row: T, index: number, isSelected: boolean) => React.ReactNode;
 }
@@ -42,7 +42,6 @@ export default function BaseEditableGrid<T>({
   alerts,
   idPrefix,
   onAddRow,
-  onDeleteRow,
   getRowKey,
   editableFields,
   minWidth = '2000px'
@@ -115,15 +114,26 @@ export default function BaseEditableGrid<T>({
     }, 10);
   };
 
-  const getCellTdStyle = (index: number, colKey: string, isSticky: boolean, stickyLeft?: number, isSelected?: boolean) => {
+  const getCellTdStyle = (
+    index: number,
+    colKey: string,
+    isSticky: boolean,
+    stickyLeft?: number,
+    isStickyRight?: boolean,
+    stickyRight?: number,
+    isSelected?: boolean
+  ) => {
     // Buscar alertas QA/QC para esta celda
     const alert = alerts.find(a => a.field === `${idPrefix}-${colKey}-${index}`);
+
+    const actualStickyRight = isStickyRight || colKey === 'accion';
+    const isStickyAny = isSticky || actualStickyRight;
 
     let borderShadow = isSticky
       ? 'inset -1px 0 0 0 rgb(var(--navy-900)), inset 0 -1px 0 0 rgb(var(--navy-900)), 1px 0 0 0 rgb(var(--navy-900))'
       : undefined;
 
-    if (colKey === 'accion') {
+    if (actualStickyRight) {
       borderShadow = 'inset 1px 0 0 0 rgb(var(--navy-900)), inset 0 -1px 0 0 rgb(var(--navy-900)), -1px 0 0 0 rgb(var(--navy-900))';
     }
 
@@ -136,18 +146,18 @@ export default function BaseEditableGrid<T>({
         left: stickyLeft ?? 0,
         zIndex: 10
       };
-    } else if (colKey === 'accion') {
+    } else if (actualStickyRight) {
       stickyStyle = {
         position: 'sticky',
-        right: 0,
+        right: stickyRight ?? 0,
         zIndex: 10
       };
     }
 
-    // Capa de selección base
-    let baseBg = isSticky ? 'rgb(var(--navy-950))' : undefined;
+    // Capa de selección base con fondo sólido para evitar transparencias
+    let baseBg = isStickyAny ? 'rgb(var(--navy-950))' : undefined;
     if (isSelected) {
-      baseBg = isSticky
+      baseBg = isStickyAny
         ? 'linear-gradient(rgba(6, 182, 212, 0.08), rgba(6, 182, 212, 0.08)), rgb(var(--navy-950))'
         : 'rgba(6, 182, 212, 0.08)';
     }
@@ -158,7 +168,7 @@ export default function BaseEditableGrid<T>({
       const alertBg = isCritical ? 'rgba(239, 68, 68, 0.12)' : 'rgba(245, 158, 11, 0.12)';
       const alertBorder = isCritical ? 'inset 0 0 0 2px rgba(239, 68, 68, 0.6)' : 'inset 0 0 0 2px rgba(245, 158, 11, 0.5)';
 
-      if (isSticky) {
+      if (isStickyAny) {
         borderShadow = `${alertBorder}, ${borderShadow}`;
         background = `linear-gradient(${alertBg}, ${alertBg}), ${baseBg || 'rgb(var(--navy-950))'}`;
       } else {
@@ -194,11 +204,11 @@ export default function BaseEditableGrid<T>({
         left: col.stickyLeft ?? 0,
         zIndex: 30
       };
-    } else if (col.stickyRight || col.key === 'accion') {
+    } else if (col.isStickyRight || col.key === 'accion') {
       borderShadows = 'inset 1px 0 0 0 rgb(var(--navy-800)), inset 0 -1px 0 0 rgb(var(--navy-800)), -1px 0 0 0 rgb(var(--navy-800)), 0 1px 0 0 rgb(var(--navy-800))';
       stickyStyle = {
         position: 'sticky',
-        right: 0,
+        right: col.stickyRight ?? 0,
         zIndex: 30
       };
     }
@@ -241,17 +251,19 @@ export default function BaseEditableGrid<T>({
               >
                 {columns.map((col) => {
                   const isSticky = !!col.isSticky;
+                  const isStickyRight = !!col.isStickyRight;
                   const colKeyStr = String(col.key);
                   const isEditable = col.type !== 'readonly' && col.key !== 'id' && col.key !== 'accion';
                   const editableColIdx = isEditable ? editableFields.indexOf(col.key as keyof T) : -1;
+                  const isStickyAny = isSticky || isStickyRight || col.key === 'accion';
 
                   // Renderizador personalizado
                   if (col.renderCell) {
                     return (
                       <td
                         key={colKeyStr}
-                        className={isSticky ? 'bg-navy-950' : ''}
-                        style={getCellTdStyle(rowIndex, colKeyStr, isSticky, col.stickyLeft, isSelected)}
+                        className={isStickyAny ? 'bg-navy-950' : ''}
+                        style={getCellTdStyle(rowIndex, colKeyStr, isSticky, col.stickyLeft, isStickyRight, col.stickyRight, isSelected)}
                       >
                         {col.renderCell(row, rowIndex, isSelected)}
                       </td>
@@ -262,8 +274,8 @@ export default function BaseEditableGrid<T>({
                   return (
                     <td
                       key={colKeyStr}
-                      className={isSticky ? 'bg-navy-950 text-center' : 'px-1'}
-                      style={getCellTdStyle(rowIndex, colKeyStr, isSticky, col.stickyLeft, isSelected)}
+                      className={isStickyAny ? 'bg-navy-950 text-center' : 'px-1'}
+                      style={getCellTdStyle(rowIndex, colKeyStr, isSticky, col.stickyLeft, isStickyRight, col.stickyRight, isSelected)}
                     >
                       {col.type === 'readonly' ? (
                         <span className="text-slate-400 font-medium select-all block text-center truncate">

@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
 import {
   X,
-  RotateCcw,
   FileSpreadsheet,
   Download,
   Layers,
@@ -10,9 +9,8 @@ import {
   Ruler,
   Check
 } from 'lucide-react';
-import type { Corrida } from '../DataGridLGG';
+import type { Corrida } from '../useLggState';
 import { calculateRowRmr } from '../../../utils/formulaEngine';
-import { STRENGTH_CATALOG } from '../../../utils/catalogData';
 
 interface ExportField {
   key: string;
@@ -113,7 +111,7 @@ export default function LggExportModal({
   corridas,
   waterTableM,
   activeTaladroName,
-  darkMode
+  darkMode: _darkMode
 }: LggExportModalProps) {
   const [exportFieldsConfig, setExportFieldsConfig] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
@@ -135,7 +133,7 @@ export default function LggExportModal({
     return parentEl?.textContent || new Date().toISOString().split('T')[0];
   };
 
-  const getExportFieldValue = (row: Corrida, idx: number, key: string) => {
+  const getExportFieldValue = (row: Corrida, _idx: number, key: string) => {
     const perf = Number((row.a - row.de).toFixed(2));
 
     const clean = (val: any, isNumeric = false): any => {
@@ -269,7 +267,7 @@ export default function LggExportModal({
       return 1;
     };
 
-    const rmrRows = corridas.map((row, idx) => {
+    const rmrRows = corridas.map((row) => {
       const rmrRes = calculateRowRmr(row, waterTableM);
       const isErr = !!rmrRes.error;
       const sc = (rmrRes as any).scores || {};
