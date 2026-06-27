@@ -13,11 +13,11 @@ import {
   LITO2_OPTIONS,
   LITO3_OPTIONS
 } from '../../utils/catalogData';
-import ExcelImportModal from '../lgg/ExcelImportModal';
-import QaqcPltAnalysisPanel from './QaqcPltAnalysisPanel';
-import QaqcPltDashboardPanel from './QaqcPltDashboardPanel';
+import LggImportModal from '../lgg/LggImportModal';
+import PltQaqcPanel from './PltQaqcPanel';
+import PltDashboardPanel from './PltDashboardPanel';
 
-interface ReportsPltProps {
+interface PltViewProps {
   ensayos_plt: EnsayoPlt[];
   onEnsayosPltChange: (plts: EnsayoPlt[]) => void;
   corridas: any[];
@@ -67,7 +67,7 @@ const ALL_COL_KEYS = [
   ...DYNAMIC_COLUMNS.filter(c => c.editable).map(c => c.key)
 ];
 
-export default function ReportsPlt({
+export default function PltView({
   ensayos_plt,
   onEnsayosPltChange,
   corridas,
@@ -75,7 +75,7 @@ export default function ReportsPlt({
   alerts,
   darkMode = true,
   onImportExcel
-}: ReportsPltProps) {
+}: PltViewProps) {
   const gridContainerRef = useRef<HTMLDivElement>(null);
   const [activeSubTab, setActiveSubTab] = useState<'plt' | 'dashboard' | 'qaqc'>('plt');
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -785,7 +785,7 @@ export default function ReportsPlt({
               </tbody>
             </table>
           </div>
-          <ExcelImportModal
+          <LggImportModal
             isOpen={isImportModalOpen}
             onClose={() => setIsImportModalOpen(false)}
             activeTaladroName={collar.name || ''}
@@ -800,14 +800,14 @@ export default function ReportsPlt({
       ) : (
         <div className="flex-1 overflow-y-auto min-h-0 pr-1 scrollbar-thin">
           {activeSubTab === 'dashboard' ? (
-            <QaqcPltDashboardPanel
+            <PltDashboardPanel
               ensayos_plt={ensayos_plt}
               alerts={alerts}
               onSwitchTab={setActiveSubTab}
               darkMode={darkMode}
             />
           ) : (
-            <QaqcPltAnalysisPanel
+            <PltQaqcPanel
               ensayos_plt={ensayos_plt}
               alerts={alerts}
               onFocusField={handleAlertFix}

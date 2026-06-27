@@ -8,16 +8,16 @@ import {
 } from 'lucide-react';
 
 import Sidebar from './components/layout/Sidebar';
-import Dashboard from './features/dashboard/Dashboard';
-import CollarSurveyForm from './features/collar/CollarSurveyForm';
-import DataGridLGG from './features/lgg/DataGridLGG';
-import LogueoEstructuralForm from './features/structural/LogueoEstructuralForm';
+import MainDashboard from './features/dashboard/MainDashboard';
+import CollarView from './features/collar/CollarView';
+import LggView from './features/lgg/LggView';
+import StructuralView from './features/structural/StructuralView';
 import RmrAnalysis from './features/rmr/RmrAnalysis';
 import ValidationPanel from './components/common/ValidationPanel';
 import CatalogsModal from './components/common/CatalogsModal';
 import FormulasModal from './components/common/FormulasModal';
-import ReportsPlt from './features/plt/ReportsPlt';
-import DashboardRQD from './features/dashboard/DashboardRQD';
+import PltView from './features/plt/PltView';
+import RqdDashboard from './features/dashboard/RqdDashboard';
 import ReportsPdf from './features/reports/ReportsPdf';
 
 import { validateCollarAndSurvey, validateRowQAQC, validateStructuralQAQC, validatePltQAQC, type ValidationAlert } from './utils/qaqcValidator';
@@ -909,7 +909,7 @@ export default function App() {
   const renderActiveView = () => {
     if (!activeTaladro || currentView === 'dashboard' || currentView === 'list') {
       return (
-        <Dashboard
+        <MainDashboard
           taladros={taladros}
           onSelectTaladro={handleSelectTaladro}
           onCreateTaladro={handleCreateTaladro}
@@ -921,7 +921,7 @@ export default function App() {
     switch (currentView) {
       case 'collar':
         return (
-          <CollarSurveyForm
+          <CollarView
             collar={activeTaladro}
             surveys={activeTaladro.surveys}
             alerts={activeAlerts}
@@ -931,7 +931,7 @@ export default function App() {
         );
       case 'lgg':
         return (
-          <DataGridLGG
+          <LggView
             corridas={activeTaladro.corridas}
             alerts={activeAlerts}
             onCorridasChange={handleCorridasChange}
@@ -951,7 +951,7 @@ export default function App() {
         );
       case 'lgest':
         return (
-          <LogueoEstructuralForm
+          <StructuralView
             discontinuidades={activeTaladro.discontinuidades}
             corridas={activeTaladro.corridas}
             onDiscontinuidadesChange={handleDiscontinuidadesChange}
@@ -999,7 +999,7 @@ export default function App() {
         );
       case 'reports_plt':
         return (
-          <ReportsPlt
+          <PltView
             ensayos_plt={activeTaladro.ensayos_plt || []}
             onEnsayosPltChange={handleEnsayosPltChange}
             corridas={activeTaladro.corridas}
@@ -1010,7 +1010,7 @@ export default function App() {
         );
       case 'dashboard_rqd':
         return (
-          <DashboardRQD
+          <RqdDashboard
             activeTaladro={activeTaladro}
             taladros={taladros}
             onSelectTaladro={(name) => handleSelectTaladro(name, false)}

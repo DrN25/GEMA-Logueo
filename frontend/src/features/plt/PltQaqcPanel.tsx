@@ -15,11 +15,11 @@ import {
 import type { EnsayoPlt } from '../../App';
 import type { ValidationAlert } from '../../utils/qaqcValidator';
 
-interface QaqcPltAnalysisPanelProps {
+interface PltQaqcPanelProps {
     ensayos_plt: EnsayoPlt[];
     alerts: ValidationAlert[];
-    onFocusField: (fieldId: string) => void;
-    onSwitchTab: (tab: 'plt' | 'qaqc') => void;
+    onFocusField?: (fieldId: string) => void;
+    onSwitchTab?: (tab: 'plt' | 'qaqc') => void;
     darkMode?: boolean;
 }
 
@@ -28,13 +28,13 @@ const safeFloat = (val: any, fallback = 0.0): number => {
     return isNaN(parsed) || !isFinite(parsed) ? fallback : parsed;
 };
 
-export default function QaqcPltAnalysisPanel({
+export default function PltQaqcPanel({
     ensayos_plt = [],
     alerts = [],
     onFocusField,
     onSwitchTab,
     darkMode: _darkMode = true
-}: QaqcPltAnalysisPanelProps) {
+}: PltQaqcPanelProps) {
     try {
         const safePlts = Array.isArray(ensayos_plt) ? ensayos_plt : [];
         const safeAlerts = Array.isArray(alerts) ? alerts : [];

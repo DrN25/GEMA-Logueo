@@ -47,7 +47,7 @@ function InfoBanner({ title, description }: InfoBannerProps) {
   );
 }
 
-interface ExcelImportModalProps {
+interface LggImportModalProps {
   isOpen: boolean;
   onClose: () => void;
   activeTaladroName: string;
@@ -55,7 +55,7 @@ interface ExcelImportModalProps {
   onImport: (importedRows: any[], createNewWithName?: string) => void;
 }
 
-export default function ExcelImportModal({
+export default function LggImportModal({
   isOpen,
   onClose,
   activeTaladroName,

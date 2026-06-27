@@ -41,12 +41,12 @@ interface Corrida {
   comentarios?: string;
 }
 
-interface QaqcAnalysisPanelProps {
+interface LggQaqcPanelProps {
   corridas: Corrida[];
   alerts: ValidationAlert[];
   waterTableM: number;
-  onFocusField: (fieldId: string) => void;
-  onSwitchTab: (tab: 'lgg' | 'qaqc') => void;
+  onFocusField?: (fieldId: string) => void;
+  onSwitchTab?: (tab: 'lgg' | 'qaqc') => void;
   darkMode?: boolean;
 }
 
@@ -56,7 +56,7 @@ const safeFloat = (val: any, fallback = 0.0): number => {
   return isNaN(parsed) || !isFinite(parsed) ? fallback : parsed;
 };
 
-export default function QaqcAnalysisPanel({
+export default function LggQaqcPanel({
   corridas = [],
   alerts = [],
   waterTableM,
