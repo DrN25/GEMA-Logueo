@@ -1,9 +1,16 @@
 import React, { useState } from 'react';
 import { Plus, Trash2, ShieldAlert, Share2, Search, RotateCcw, Database, Upload, Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import type { ValidationAlert } from '../utils/qaqcValidator';
-import ExcelImportModal from './LggGrid/ExcelImportModal';
-import { LITHOLOGY_CATALOG } from '../utils/catalogData';
+import type { ValidationAlert } from '../../utils/qaqcValidator';
+import ExcelImportModal from '../lgg/ExcelImportModal';
+import {
+  LITHOLOGY_CATALOG,
+  ESTRUCTURA_OPTIONS,
+  RELLENO_OPTIONS,
+  INTEMPERISMO_OPTIONS,
+  RESISTENCIA_OPTIONS,
+  AGUA_OPTIONS
+} from '../../utils/catalogData';
 
 interface Discontinuidad {
   id: number;
@@ -53,11 +60,9 @@ interface LogueoEstructuralFormProps {
   onImportExcel?: (importedRows: any[]) => void;
 }
 
-const TIPO_ESTRUCTURA_OPTIONS = ["JN", "F-10", "SZ", "BED", "VN", "CON", "SE", "F+10", "RF", "Dq", "-1"];
-const RELLENO_OPTIONS = ["ca", "sand", "ch", "cl", "gy", "RXF", "FBX", "GOU", "PAT", "SIO", "QZ", "SU", "OX", "ep", "cwf", "-1"];
-const INTEMPERISMO_OPTIONS = ["UWF", "SWD", "MWM", "HWA", "CWC", "RS", "-1"];
-const DUREZA_OPTIONS = ["R0", "R1", "R2", "R3", "R4", "R5", "R6", "-1"];
-const AGUA_OPTIONS = ["CDC", "DPH", "WTM", "DGE", "FGF", "-1"];
+const TIPO_ESTRUCTURA_OPTIONS = ESTRUCTURA_OPTIONS;
+const DUREZA_OPTIONS = RESISTENCIA_OPTIONS;
+
 
 const FORMA_LABELS: Record<number, string> = {
   1: "1 - Plana Escalonada",

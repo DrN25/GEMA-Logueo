@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
-import { calculateRowRmr } from '../utils/formulaEngine';
+import { calculateRowRmr } from '../../utils/formulaEngine';
 import { TrendingUp, Search, RotateCcw, Database, Settings } from 'lucide-react';
-import { LITHOLOGY_CATALOG } from '../utils/catalogData';
+import { LITHOLOGY_CATALOG } from '../../utils/catalogData';
 import {
   ComposedChart, Scatter, Line, XAxis, YAxis, CartesianGrid,
   ResponsiveContainer, Label, Cell

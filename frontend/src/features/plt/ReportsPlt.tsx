@@ -8,9 +8,12 @@ import type { ValidationAlert } from '../../utils/qaqcValidator';
 import {
   LITHOLOGY_CATALOG,
   NOMINAL_DIAMETERS,
-  resolveLithologyCascade
+  resolveLithologyCascade,
+  LITO1_OPTIONS,
+  LITO2_OPTIONS,
+  LITO3_OPTIONS
 } from '../../utils/catalogData';
-import ExcelImportModal from '../LggGrid/ExcelImportModal';
+import ExcelImportModal from '../lgg/ExcelImportModal';
 import QaqcPltAnalysisPanel from './QaqcPltAnalysisPanel';
 import QaqcPltDashboardPanel from './QaqcPltDashboardPanel';
 
@@ -24,9 +27,7 @@ interface ReportsPltProps {
   onImportExcel?: (importedRows: any[]) => void;
 }
 
-const LITO1_OPTIONS = ['MZB', 'MBF1', 'MBF2', 'MZM', 'MZH', 'MZD', 'MZQ', 'AN', 'LMT', 'SHL', 'SND', 'TBX', 'HBX', 'MBX / varios'];
-const LITO2_OPTIONS = ['MZB', 'MBF', 'MZM', 'MZH', 'MZD', 'MZQ', 'AN', 'LMT', 'HFL', 'GSK', 'PSK', 'MSK', 'ESK', 'MBC', 'MBL', 'QZT', 'TBX', 'HBX', 'MBX', 'EPG', 'EGT'];
-const LITO3_OPTIONS = ['MZB_EQ', 'MZB_P', 'MBF1', 'MBF2', 'MBF_P', 'MZM_F', 'MZM_M', 'MZH_1', 'MZH_2', 'MZD', 'MZQ', 'LAM', 'LMT_M', 'LMT_MG', 'LMT_S', 'LMT_C', 'LMT_U', 'SHL_MA', '-', 'TBX', 'HBX', 'MBX'];
+
 
 const DYNAMIC_COLUMNS = [
   { key: 'nro_caja', label: 'Nro Caja', editable: true, type: 'number', defaultWidth: 90 },

@@ -20,11 +20,18 @@ import type { ValidationAlert } from '../../utils/qaqcValidator';
 import { calculateRowRmr } from '../../utils/formulaEngine';
 import {
   LITHOLOGY_CATALOG,
+  resolveLithologyCascade,
+  LITO1_OPTIONS,
+  LITO2_OPTIONS,
+  LITO3_OPTIONS,
+  RESISTENCIA_OPTIONS,
+  RELLENO_OPTIONS,
+  INTEMPERISMO_OPTIONS,
+  AGUA_OPTIONS,
+  ORIENTACION_OPTIONS,
+  ESTRUCTURA_OPTIONS,
   STRENGTH_CATALOG,
-  GROUNDWATER_CATALOG,
-  RELLENO_CATALOG,
-  STRUCTURE_CATALOG,
-  resolveLithologyCascade
+  GROUNDWATER_CATALOG
 } from '../../utils/catalogData';
 import ExcelImportModal from './ExcelImportModal';
 import QaqcAnalysisPanel from './QaqcAnalysisPanel';
@@ -81,9 +88,6 @@ interface DataGridLGGProps {
 }
 
 const LITO_OPTIONS = Object.keys(LITHOLOGY_CATALOG);
-const LITO1_OPTIONS = ['MZB', 'MBF1', 'MBF2', 'MZM', 'MZH', 'MZD', 'MZQ', 'AN', 'LMT', 'SHL', 'SND', 'TBX', 'HBX', 'MBX / varios'];
-const LITO2_OPTIONS = ['MZB', 'MBF', 'MZM', 'MZH', 'MZD', 'MZQ', 'AN', 'LMT', 'HFL', 'GSK', 'PSK', 'MSK', 'ESK', 'MBC', 'MBL', 'QZT', 'TBX', 'HBX', 'MBX', 'EPG', 'EGT'];
-const LITO3_OPTIONS = ['MZB_EQ', 'MZB_P', 'MBF1', 'MBF2', 'MBF_P', 'MZM_F', 'MZM_M', 'MZH_1', 'MZH_2', 'MZD', 'MZQ', 'LAM', 'LMT_M', 'LMT_MG', 'LMT_S', 'LMT_C', 'LMT_U', 'SHL_MA', '-', 'TBX', 'HBX', 'MBX'];
 
 const getLitoOptionLabel = (opt: string) => {
   if (opt === "-1" || opt === "-") return "Ninguna";
@@ -95,12 +99,7 @@ const getLitoOptionLabel = (opt: string) => {
   return opt;
 };
 
-const RESISTENCIA_OPTIONS = [...Object.keys(STRENGTH_CATALOG), "-1"];
-const RELLENO_OPTIONS = [...Object.keys(RELLENO_CATALOG), "-1"];
-const INTEMPERISMO_OPTIONS = ["UWF", "SWD", "MWM", "HWA", "CWC", "RS", "-1"];
-const AGUA_OPTIONS = Object.keys(GROUNDWATER_CATALOG);
-const ORIENTACION_OPTIONS = ["N", "S", "X"];
-const ESTRUCTURA_OPTIONS = [...Object.keys(STRUCTURE_CATALOG), "-1"];
+
 
 const EDITABLE_COLS: (keyof Corrida)[] = [
   'de', 'a', 'rec_m', 'rqd_m', 'lrf_m', 'small_frag_m', 'mec_frac',

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { X, BookOpen, Layers, Hammer, ShieldAlert, Sparkles, Palette, FileSpreadsheet, Compass } from 'lucide-react';
-import { LITHOLOGY_CATALOG } from '../utils/catalogData';
+import { LITHOLOGY_CATALOG } from '../../utils/catalogData';
 
 // ─── Catálogo Centralizado de Litología y Factor K (PLT) ─────────────────────
 

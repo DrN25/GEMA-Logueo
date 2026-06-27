@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Trash2, CheckCircle2, MapPin, Database, AlertTriangle, Upload } from 'lucide-react';
 import type { ValidationAlert } from '../../utils/qaqcValidator';
-import ExcelImportModal from '../LggGrid/ExcelImportModal';
+import ExcelImportModal from '../lgg/ExcelImportModal';
 
 interface Survey {
   depth: number;

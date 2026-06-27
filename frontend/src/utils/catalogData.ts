@@ -275,3 +275,16 @@ export function resolveLithologyCascade(
     k: finalMatch.k
   };
 }
+
+// Opciones de selección globales para Litologías
+export const LITO1_OPTIONS = ['MZB', 'MBF1', 'MBF2', 'MZM', 'MZH', 'MZD', 'MZQ', 'AN', 'LMT', 'SHL', 'SND', 'TBX', 'HBX', 'MBX / varios'];
+export const LITO2_OPTIONS = ['MZB', 'MBF', 'MZM', 'MZH', 'MZD', 'MZQ', 'AN', 'LMT', 'HFL', 'GSK', 'PSK', 'MSK', 'ESK', 'MBC', 'MBL', 'QZT', 'TBX', 'HBX', 'MBX', 'EPG', 'EGT'];
+export const LITO3_OPTIONS = ['MZB_EQ', 'MZB_P', 'MBF1', 'MBF2', 'MBF_P', 'MZM_F', 'MZM_M', 'MZH_1', 'MZH_2', 'MZD', 'MZQ', 'LAM', 'LMT_M', 'LMT_MG', 'LMT_S', 'LMT_C', 'LMT_U', 'SHL_MA', '-', 'TBX', 'HBX', 'MBX'];
+
+// Opciones de catálogos geotécnicos estructuradas
+export const RESISTENCIA_OPTIONS = [...Object.keys(STRENGTH_CATALOG), "-1"];
+export const RELLENO_OPTIONS = [...Object.keys(RELLENO_CATALOG), "-1"];
+export const INTEMPERISMO_OPTIONS = ["UWF", "SWD", "MWM", "HWA", "CWC", "RS", "-1"];
+export const AGUA_OPTIONS = Object.keys(GROUNDWATER_CATALOG);
+export const ORIENTACION_OPTIONS = ["N", "S", "X"];
+export const ESTRUCTURA_OPTIONS = [...Object.keys(STRUCTURE_CATALOG), "-1"];

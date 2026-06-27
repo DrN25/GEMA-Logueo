@@ -7,18 +7,18 @@ import {
   ArrowLeft
 } from 'lucide-react';
 
-import Sidebar from './components/Layout/Sidebar';
-import Dashboard from './components/Dashboard/Dashboard';
-import CollarSurveyForm from './components/CollarSurvey/CollarSurveyForm';
-import DataGridLGG from './components/LggGrid/DataGridLGG';
-import LogueoEstructuralForm from './components/LogueoEstructuralForm';
-import RmrAnalysis from './components/RmrAnalysis';
-import ValidationPanel from './components/Validation/ValidationPanel';
-import CatalogsModal from './components/CatalogsModal';
-import FormulasModal from './components/FormulasModal';
-import ReportsPlt from './components/Reports/ReportsPlt';
-import DashboardRQD from './components/Reports/DashboardRQD';
-import ReportsPdf from './components/Reports/ReportsPdf';
+import Sidebar from './components/layout/Sidebar';
+import Dashboard from './features/dashboard/Dashboard';
+import CollarSurveyForm from './features/collar/CollarSurveyForm';
+import DataGridLGG from './features/lgg/DataGridLGG';
+import LogueoEstructuralForm from './features/structural/LogueoEstructuralForm';
+import RmrAnalysis from './features/rmr/RmrAnalysis';
+import ValidationPanel from './components/common/ValidationPanel';
+import CatalogsModal from './components/common/CatalogsModal';
+import FormulasModal from './components/common/FormulasModal';
+import ReportsPlt from './features/plt/ReportsPlt';
+import DashboardRQD from './features/dashboard/DashboardRQD';
+import ReportsPdf from './features/reports/ReportsPdf';
 
 import { validateCollarAndSurvey, validateRowQAQC, validateStructuralQAQC, validatePltQAQC, type ValidationAlert } from './utils/qaqcValidator';
 import { resolveLithologyCascade } from './utils/catalogData';
