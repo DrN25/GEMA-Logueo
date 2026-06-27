@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import taladros, catalogs, calculations
+from app.routers import taladros, catalogs, calculations, auditoria
 
 app = FastAPI(
     title="Geolog Pro API",
@@ -22,6 +22,7 @@ app.add_middleware(
 app.include_router(taladros.router)
 app.include_router(catalogs.router)
 app.include_router(calculations.router)
+app.include_router(auditoria.router)
 
 @app.get("/")
 def read_root():

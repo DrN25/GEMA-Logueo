@@ -10,7 +10,8 @@ import {
   BarChart2,
   Moon,
   Sun,
-  Calculator
+  Calculator,
+  ShieldCheck
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -37,7 +38,7 @@ export default function Sidebar({
     { id: 'rmr', label: 'Validación RMR', icon: TrendingUp, category: 'CONTROL Y ANÁLISIS' },
     { id: 'catalogos', label: 'Catálogos Geomecánicos', icon: Database, category: 'CONTROL Y ANÁLISIS' },
     { id: 'formulas', label: 'Fórmulas de Cálculo', icon: Calculator, category: 'CONTROL Y ANÁLISIS' },
-    { id: 'import', label: 'Importación y exportación', icon: Database, category: 'CONTROL Y ANÁLISIS', isMock: true },
+    { id: 'auditoria', label: 'Auditoría de Excels', icon: ShieldCheck, category: 'CONTROL Y ANÁLISIS' },
     { id: 'dashboard_rqd', label: 'Validación Espaciamiento RQD% - FF/1', icon: BarChart2, category: 'REPORTES' },
     { id: 'reports_pdf', label: 'Reportes PDF', icon: FileText, category: 'REPORTES' },
     { id: 'reports_plt', label: 'Ensayos PLT', icon: BarChart2, category: 'ENSAYOS' },

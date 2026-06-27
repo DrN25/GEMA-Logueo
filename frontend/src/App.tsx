@@ -19,6 +19,7 @@ import FormulasModal from './components/common/FormulasModal';
 import PltView from './features/plt/PltView';
 import RqdDashboard from './features/dashboard/RqdDashboard';
 import ReportsPdf from './features/reports/ReportsPdf';
+import BulkAuditor from './features/auditor/BulkAuditor';
 
 import { validateCollarAndSurvey, validateRowQAQC, validateStructuralQAQC, validatePltQAQC, type ValidationAlert } from './utils/qaqcValidator';
 import { resolveLithologyCascade } from './utils/catalogData';
@@ -907,6 +908,10 @@ export default function App() {
 
   // Render proper sub-views
   const renderActiveView = () => {
+    if (currentView === 'auditoria') {
+      return <BulkAuditor apiBase={API_BASE} />;
+    }
+
     if (!activeTaladro || currentView === 'dashboard' || currentView === 'list') {
       return (
         <MainDashboard
