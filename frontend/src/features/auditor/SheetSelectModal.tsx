@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, FileSpreadsheet, AlertCircle } from 'lucide-react';
 
 interface SheetSelectModalProps {
@@ -18,6 +18,24 @@ export default function SheetSelectModal({
   const [estSheet, setEstSheet] = useState<string>('');
   const [error, setError] = useState<string>('');
 
+  useEffect(() => {
+    if (sheets && sheets.length > 0) {
+      // Buscar coincidencia inteligente para LGG
+      const lggMatch = sheets.find(s => {
+        const lower = s.toLowerCase();
+        return lower === 'bd lgg' || lower === 'lgg' || lower.includes('general') || lower.includes('logueo_general');
+      });
+      if (lggMatch) setLggSheet(lggMatch);
+
+      // Buscar coincidencia inteligente para Estructural
+      const estMatch = sheets.find(s => {
+        const lower = s.toLowerCase();
+        return lower === 'bd lg est. (2)' || lower === 'bd lg est' || lower === 'lg est' || lower.includes('estruc') || lower.includes('est. (2)');
+      });
+      if (estMatch) setEstSheet(estMatch);
+    }
+  }, [sheets]);
+
   if (!isOpen) return null;
 
   const handleConfirm = () => {
@@ -34,17 +52,17 @@ export default function SheetSelectModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/70 backdrop-blur-sm select-none">
-      <div className="glass-panel w-full max-w-md rounded-xl border border-navy-800 bg-[#090f1d]/95 p-6 shadow-2xl relative animate-fade-in text-slate-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-md select-none">
+      <div className="glass-panel w-full max-w-md rounded-xl border border-cyan-500/20 bg-[#090f1d]/95 p-6 shadow-2xl relative animate-fade-in text-slate-200 shadow-[0_0_50px_rgba(6,182,212,0.15)]">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:bg-navy-900 hover:text-slate-100 transition-colors"
+          className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:bg-slate-900 hover:text-slate-100 transition-colors"
         >
           <X size={16} />
         </button>
 
         <div className="flex items-center gap-3 mb-6">
-          <div className="p-2.5 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-lg">
+          <div className="p-2.5 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded-lg">
             <FileSpreadsheet size={20} />
           </div>
           <div>
@@ -76,7 +94,7 @@ export default function SheetSelectModal({
                 setLggSheet(e.target.value);
                 setError('');
               }}
-              className="w-full bg-slate-950 border border-slate-800 text-xs text-slate-200 font-bold px-3 py-2 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors"
+              className="w-full bg-slate-950 border border-slate-800 text-xs text-slate-200 font-bold px-3 py-2 rounded-lg focus:outline-none focus:border-cyan-500 transition-colors"
             >
               <option value="">-- Seleccionar Hoja --</option>
               {sheets.map((sheet) => (
@@ -98,7 +116,7 @@ export default function SheetSelectModal({
                 setEstSheet(e.target.value);
                 setError('');
               }}
-              className="w-full bg-slate-950 border border-slate-800 text-xs text-slate-200 font-bold px-3 py-2 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors"
+              className="w-full bg-slate-950 border border-slate-800 text-xs text-slate-200 font-bold px-3 py-2 rounded-lg focus:outline-none focus:border-cyan-500 transition-colors"
             >
               <option value="">-- Seleccionar Hoja --</option>
               {sheets.map((sheet) => (
@@ -113,13 +131,13 @@ export default function SheetSelectModal({
         <div className="flex gap-2.5 justify-end mt-6 pt-4 border-t border-slate-850">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-lg text-xs font-bold bg-navy-900 border border-navy-800 text-slate-400 hover:bg-navy-850 hover:text-slate-200 transition-colors"
+            className="px-4 py-2 rounded-lg text-xs font-bold bg-slate-900 border border-slate-800 text-slate-400 hover:bg-slate-850 hover:text-slate-200 transition-colors"
           >
             Cancelar
           </button>
           <button
             onClick={handleConfirm}
-            className="px-4 py-2 rounded-lg text-xs font-bold bg-indigo-500 hover:bg-indigo-600 border border-indigo-400/30 text-white transition-all shadow-[0_0_12px_rgba(99,102,241,0.2)] active:scale-95"
+            className="px-4 py-2 rounded-lg text-xs font-bold bg-cyan-500 hover:bg-cyan-600 border border-cyan-400/30 text-white transition-all shadow-[0_0_12px_rgba(6,182,212,0.2)] active:scale-95"
           >
             Confirmar Mapeo
           </button>

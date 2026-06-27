@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+Material/
+node_modules/
+venv/
+*.xlsx
+*.json
