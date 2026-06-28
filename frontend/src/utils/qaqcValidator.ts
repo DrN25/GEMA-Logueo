@@ -61,7 +61,7 @@ export function validateCollarAndSurvey(_collar: any, surveys: any[]): Validatio
 /**
  * Ejecuta validaciones reactivas por fila de LGG.
  */
-export function validateRowQAQC(row: any, index: number): ValidationAlert[] {
+export function validateRowQAQC(row: any, index: number, corridas?: any[]): ValidationAlert[] {
   const alerts: ValidationAlert[] = [];
 
   try {
@@ -98,6 +98,19 @@ export function validateRowQAQC(row: any, index: number): ValidationAlert[] {
 
     const aperture = parseFloat(row.abertura) || 0.0;
     const thickness = parseFloat(row.espesor) || 0.0;
+
+    // Regla: Continuidad Espacial de Corridas
+    if (corridas && index > 0) {
+      const prevA = parseFloat(corridas[index - 1].a) || 0.0;
+      if (Math.abs(de - prevA) > 0.001) {
+        alerts.push({
+          type: 'CRITICAL',
+          field: `de-${index}`,
+          message: `Fila ${row.corrida}: Ruptura de continuidad espacial detectada: el valor de 'de:' (${de}m) debe ser igual al 'a:' del tramo anterior (${prevA}m).`,
+          corridaIndex: index
+        });
+      }
+    }
 
     // 1. Longitud de Corrida
     if (perf <= 0) {
@@ -136,6 +149,16 @@ export function validateRowQAQC(row: any, index: number): ValidationAlert[] {
       });
     }
 
+    // 3b. LRF vs Recuperación (Reglas_Tablas.md)
+    if (lrf_m > rec_m) {
+      alerts.push({
+        type: 'CRITICAL',
+        field: `lrf_m-${index}`,
+        message: `Fila ${row.corrida}: Longitud de roca fracturada LRF (${lrf_m}m) es mayor que la longitud recuperada (${rec_m}m).`,
+        corridaIndex: index
+      });
+    }
+
     // 4. Balance Físico del Testigo
     const rqd_val = rqd_m < 0 ? 0.0 : rqd_m;
     const lrf_val = lrf_m < 0 ? 0.0 : lrf_m;
@@ -165,7 +188,19 @@ export function validateRowQAQC(row: any, index: number): ValidationAlert[] {
       });
     }
 
-    // 6. Relleno vs Abertura
+    // 6. Relleno vs Abertura (Reglas_Tablas.md espesor <= abertura exceptions)
+    const exceptions = ["F", "RF", "VN", "SZ", "F+10", "BED"];
+    const tipo_est1 = row.tipo_est1 || "";
+    const tipo_est2 = row.tipo_est2 || "";
+    if (thickness > aperture && !exceptions.includes(tipo_est1) && !exceptions.includes(tipo_est2)) {
+      alerts.push({
+        type: 'CRITICAL',
+        field: `espesor-${index}`,
+        message: `Fila ${row.corrida}: El espesor de relleno (${thickness}mm) no puede ser mayor que la abertura (${aperture}mm), excepto para estructuras F, RF, VN, SZ, F+10, BED.`,
+        corridaIndex: index
+      });
+    }
+
     if (thickness > 0 && aperture <= 0) {
       alerts.push({
         type: 'WARNING',
@@ -234,6 +269,27 @@ export function validateStructuralQAQC(discontinuidades: any[], corridas: any[])
         });
       }
 
+      // 1b. Validación de Corrida Exacta (de/a)
+      const estDe = parseFloat(d.de);
+      const estA = parseFloat(d.a);
+      if (!isNaN(estDe) && !isNaN(estA)) {
+        const hasExactRun = corridas.some(c => Math.abs(c.de - estDe) < 0.001 && Math.abs(c.a - estA) < 0.001);
+        if (!hasExactRun) {
+          alerts.push({
+            type: 'CRITICAL',
+            field: `struct-de-${idx}`,
+            message: `Fila ${idStr}: La corrida asociada de: ${estDe}m y a: ${estA}m no coincide exactamente con ninguna corrida registrada en LGG.`
+          });
+        }
+        if (depth < estDe || depth > estA) {
+          alerts.push({
+            type: 'CRITICAL',
+            field: `struct-profundidad-${idx}`,
+            message: `Fila ${idStr}: La profundidad (${depth}m) está fuera del intervalo especificado para la corrida (de: ${estDe}m, a: ${estA}m).`
+          });
+        }
+      }
+
       // 2. Límites de Ángulo Alfa y Beta
       const alfa = parseFloat(d.alfa);
       if (!isNaN(alfa)) {
@@ -257,6 +313,28 @@ export function validateStructuralQAQC(discontinuidades: any[], corridas: any[])
         }
       }
 
+      const dip = parseFloat(d.dip);
+      if (!isNaN(dip)) {
+        if (dip < 0 || dip > 90) {
+          alerts.push({
+            type: 'CRITICAL',
+            field: `struct-dip-${idx}`,
+            message: `Fila ${idStr}: El ángulo Dip (${dip}°) es inválido. Debe estar entre 0° y 90°.`
+          });
+        }
+      }
+
+      const azimuth = parseFloat(d.azimuth);
+      if (!isNaN(azimuth)) {
+        if (azimuth < 0 || azimuth > 360) {
+          alerts.push({
+            type: 'CRITICAL',
+            field: `struct-azimuth-${idx}`,
+            message: `Fila ${idStr}: El ángulo Azimut (${azimuth}°) es inválido. Debe estar entre 0° y 360°.`
+          });
+        }
+      }
+
       // 3. Límites de JRC10
       const jrc10 = parseInt(d.jrc10);
       if (!isNaN(jrc10)) {
@@ -268,23 +346,25 @@ export function validateStructuralQAQC(discontinuidades: any[], corridas: any[])
           });
         } else if (jrc10 < 0) {
           alerts.push({
-            type: 'WARNING',
+            type: 'CRITICAL',
             field: `struct-jrc10-${idx}`,
-            message: `Fila ${idStr}: El valor de JRC10 (${jrc10}) debe estar en el rango de 0 a 20.`
+            message: `Fila ${idStr}: El valor de JRC10 (${jrc10}) no puede ser negativo.`
           });
         }
       }
 
-      // 4. Espesor Relleno vs Abertura Junta
+      // 4. Espesor Relleno vs Abertura Junta (Reglas_Tablas.md)
       const abertura = parseFloat(d.abertura) || 0.0;
       const espesor = parseFloat(d.espesor) || 0.0;
       const relleno1 = d.relleno1 || 'cwf';
+      const tipo_est = d.tipo_estructura || "";
 
-      if (espesor > abertura) {
+      const exceptions = ["F", "RF", "VN", "SZ", "F+10", "BED"];
+      if (espesor > abertura && !exceptions.includes(tipo_est)) {
         alerts.push({
-          type: 'WARNING',
+          type: 'CRITICAL',
           field: `struct-espesor-${idx}`,
-          message: `Fila ${idStr}: El espesor de relleno (${espesor}mm) no puede ser mayor que la abertura de junta (${abertura}mm).`
+          message: `Fila ${idStr}: El espesor de relleno (${espesor}mm) no puede ser mayor que la abertura de junta (${abertura}mm), excepto para estructuras F, RF, VN, SZ, F+10, BED.`
         });
       }
 

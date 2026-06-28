@@ -28,50 +28,115 @@ os.makedirs(temp_dir, exist_ok=True)
 # Helper to normalize/clean error messages for grouping
 def simplify_message(msg):
     msg_clean = str(msg or "").strip()
-    # Check matching rules in Master Error Rules catalog
-    rule = get_rule_by_msg(msg_clean)
-    if rule:
-        return rule["msg"]
-    # Fallback checking keywords
     msg_up = msg_clean.upper()
-    if "CORRIDA PERFORADA" in msg_up or "LIMITE CRÍTICO" in msg_up:
+    if "RUPTURA DE CONTINUIDAD" in msg_up:
+        return "Ruptura de continuidad espacial detectada."
+    if "LÍMITE CRÍTICO DE 1.6M" in msg_up or "LIMITE CRITICO DE 1.6M" in msg_up:
         return "Longitud de corrida perforada excede el límite crítico de 1.6m."
-    if "POSITIVA" in msg_up:
+    if "POSITIVA" in msg_up or "DEBE SER MAYOR A 0" in msg_up:
         return "Longitud de corrida perforada debe ser positiva."
     if "RECUPERADA" in msg_up and "AVANCE" in msg_up:
-        return "Longitud recuperada es mayor que el avance perforado."
+        return "La longitud recuperada es mayor que el avance perforado."
     if "RQD" in msg_up and "RECUPERADA" in msg_up:
         return "Metraje RQD es mayor que la longitud recuperada."
+    if "ROCA FRACTURADA LRF" in msg_up and "RECUPERADA" in msg_up:
+        return "La longitud de roca fracturada LRF es mayor que la longitud recuperada."
     if "SUMA DE FRAGMENTOS" in msg_up:
-        return "La suma de fragmentos supera el avance perforado."
+        return "La suma de fragmentos físicos supera el avance perforado."
     if "BUZAMIENTO" in msg_up and "COINCIDE" in msg_up:
         return "La sumatoria de fracturas por buzamiento no coincide con el conteo general."
-    if "ESPESOR DE RELLENO" in msg_up and "0MM" in msg_up:
+    if "ESPESOR DE RELLENO" in msg_up and ("ABERTURA ES 0MM" in msg_up or "ABERTURA ES 0 MM" in msg_up or "LA ABERTURA ES 0" in msg_up):
         return "Se declaró espesor de relleno de junta pero la abertura es 0mm."
-    if "ABERTURA" in msg_up and "REGISTRADO" in msg_up:
+    if "ABERTURA DE JUNTA" in msg_up and "ESPESOR DE RELLENO ES 0" in msg_up:
         return "La abertura de junta es mayor a 0mm pero no se ha registrado espesor de relleno."
-    if "INCOMPATIBILIDAD GEOLÓGICA" in msg_up:
-        if "PARED" in msg_up:
-            return "Incompatibilidad geológica (Dureza de pared de junta supera la resistencia intacta de la corrida)."
-        return "Incompatibilidad geológica (Resistencia vs Intemperismo de corrida)."
-    if "HUÉRFANA" in msg_up or "HUERFANA" in msg_up:
-        return "Profundidad huérfana de junta no corresponde a ningún tramo de corrida en LGG."
-    if "ALFA" in msg_up:
-        return "El ángulo Alfa es inválido. Debe estar entre 0° y 90° o ser -1."
-    if "BETA" in msg_up:
-        return "El ángulo Beta es inválido. Debe estar entre 0° y 360° o ser -1."
-    if "JRC10" in msg_up:
+    if "RESISTENCIA ISRM NO VÁLIDO" in msg_up or "RESISTENCIA ISRM NO VALIDO" in msg_up:
+        return "Código de Resistencia ISRM no válido."
+    if "METEORIZACIÓN NO VÁLIDO" in msg_up or "METEORIZACION NO VALIDO" in msg_up:
+        return "Código de Meteorización no válido."
+    if "TIPO DE RELLENO NO VÁLIDO" in msg_up or "TIPO DE RELLENO NO VALIDO" in msg_up:
+        return "Código de Tipo de Relleno no válido."
+    if "PRESENCIA DE AGUA NO VÁLIDO" in msg_up or "PRESENCIA DE AGUA NO VALIDO" in msg_up:
+        return "Código de Presencia de Agua no válido."
+    if "ESTRUCTURA 1 NO VÁLIDO" in msg_up or "ESTRUCTURA 1 NO VALIDO" in msg_up:
+        return "Código de estructura 1 no válido."
+    if "ESTRUCTURA 2 NO VÁLIDO" in msg_up or "ESTRUCTURA 2 NO VALIDO" in msg_up:
+        return "Código de estructura 2 no válido."
+    if "RUGOSIDAD NO VÁLIDO" in msg_up or "RUGOSIDAD NO VALIDO" in msg_up:
+        return "Código de Rugosidad no válido."
+    if "JRC10" in msg_up and "RANGO" in msg_up:
         return "El valor de JRC10 es inválido. No se permiten valores mayores a 20."
-    if "ESPESOR DE RELLENO" in msg_up and "MAYOR" in msg_up:
+    if "JRC10" in msg_up and "NEGATIVO" in msg_up:
+        return "El valor de JRC10 no puede ser negativo."
+    if "FORMA DE JUNTA NO VÁLIDA" in msg_up or "FORMA DE JUNTA NO VALIDA" in msg_up:
+        return "Forma de junta no válida. Permitidos: Plano (1) a Irregular (6)."
+    if "ESPESOR DE RELLENO" in msg_up and ("MAYOR" in msg_up or "SUPERA" in msg_up):
+        if "EXCEPTO" in msg_up or "ESTRUCTURAS" in msg_up:
+            return "El espesor de relleno no puede ser mayor que la abertura de junta excepto en estructuras F, RF, VN, SZ, F+10 o BED."
         return "El espesor de relleno no puede ser mayor que la abertura de junta."
-    if "DEFINIR" in msg_up or "RELLENO ESTÁ SIN" in msg_up:
+    if "SIN DEFINIR" in msg_up:
         return "Se declaró espesor de relleno pero el tipo de relleno está sin definir."
-    if "DEFINIDO" in msg_up and "0MM" in msg_up:
+    if "TIPO DE RELLENO" in msg_up and ("ABERTURA DE JUNTA ES 0" in msg_up or "ABERTURA ES 0" in msg_up):
         return "El tipo de relleno está definido pero la abertura de junta es 0mm."
+    if "DUREZA DE PARED" in msg_up and ("SUPERA" in msg_up or "INCOMPATIBILIDAD GEOLÓGICA" in msg_up or "INCOMPATIBILIDAD GEOLOGICA" in msg_up):
+        return "Incompatibilidad geológica (Dureza de pared de junta supera la resistencia intacta de la corrida)."
     if "LITOLOGÍA" in msg_up or "LITOLOGIA" in msg_up:
         return "Incompatibilidad de litología entre la corrida y la junta."
     if "VACÍO" in msg_up or "VACIO" in msg_up:
         return "Campo obligatorio se encuentra vacío."
+    if "HUÉRFANA" in msg_up or "HUERFANA" in msg_up:
+        return "Profundidad huérfana de junta no corresponde a ningún tramo de corrida en LGG."
+    if "NO EXISTE DE FORMA EXACTA" in msg_up or "PAR DE CORRIDA" in msg_up or "COINCIDE EXACTAMENTE" in msg_up or "CORRIDA ASOCIADA" in msg_up:
+        return "La corrida asociada (de/a) no existe de forma exacta en las corridas de LGG para el taladro."
+    if "FUERA DEL TRAMO" in msg_up or "TRAMO DE CORRIDA ESPECIFICADO" in msg_up:
+        return "La profundidad se encuentra fuera del tramo de corrida especificado."
+    if "ALFA" in msg_up and ("INVÁLIDO" in msg_up or "INVALIDO" in msg_up):
+        return "El ángulo Alfa es inválido. Debe estar entre 0° y 90° o ser -1."
+    if "ALFA" in msg_up and "ENTERO" in msg_up:
+        return "El ángulo Alfa debería ser un número entero."
+    if "BETA" in msg_up and ("INVÁLIDO" in msg_up or "INVALIDO" in msg_up):
+        return "El ángulo Beta es inválido. Debe estar entre 0° y 360° o ser -1."
+    if "BETA" in msg_up and "ENTERO" in msg_up:
+        return "El ángulo Beta debería ser un número entero."
+    if "DIP" in msg_up:
+        return "El ángulo Dip es inválido. Debe estar entre 0° y 90°."
+    if "AZIMUT" in msg_up or "AZIMUTH" in msg_up:
+        return "El ángulo Azimut es inválido. Debe estar entre 0° y 360°."
+    if "FRF" in msg_up and ("NEGATIVO" in msg_up or "ENTERO" in msg_up or "FÓRMULA" in msg_up or "FORMULA" in msg_up):
+        if "NEGATIVO" in msg_up:
+            return "El valor de FRF no puede ser negativo."
+        if "ENTERO" in msg_up:
+            return "El valor de FRF debe ser un número entero."
+        return "El valor de FRF no coincide con el calculado por la fórmula."
+    if "ENTERO" in msg_up:
+        return "El valor del campo debe ser un número entero."
+    if "NEGATIV" in msg_up:
+        if "DE:" in msg_up or "DE " in msg_up:
+            return "El valor de 'de:' no puede ser negativo."
+        if "A:" in msg_up or "A " in msg_up:
+            return "El valor de 'a:' no puede ser negativo."
+        if "RECUPERADA" in msg_up:
+            return "La longitud recuperada no puede ser negativa."
+        if "RQD" in msg_up:
+            return "El metraje RQD no puede ser negativo."
+        if "LRF" in msg_up or "ROCA FRACTURADA" in msg_up:
+            return "La longitud de roca fracturada LRF no puede ser negativa."
+        if "FRAGMENTOS <10CM" in msg_up or "<10CM" in msg_up:
+            return "El metraje de fragmentos <10cm no puede ser negativo."
+        if "FRACTURAS NATURALES" in msg_up:
+            return "El número de fracturas naturales no puede ser negativo."
+        if "BUZ<30" in msg_up or "BUZ <30" in msg_up:
+            return "El número de fracturas en Buz<30° no puede ser negativo."
+        if "30°-60°" in msg_up or "30-60" in msg_up:
+            return "El número de fracturas en 30°-60° no puede ser negativo."
+        if "BUZ>60" in msg_up or "BUZ >60" in msg_up:
+            return "El número de fracturas en Buz>60° no puede ser negativo."
+        if "ABERTURA" in msg_up:
+            return "La abertura no puede ser negativa."
+        if "ESPESOR" in msg_up:
+            return "El espesor de relleno no puede ser negativo."
+        if "CAMPAÑA" in msg_up or "CAMPANA" in msg_up:
+            return "El año de campaña no puede ser negativo."
+        return "El valor no puede ser negativo."
     return msg_clean
 
 def get_safe_sheet_name(title, index):
@@ -363,13 +428,28 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
         incidencias_por_error[msg_simplificado].append(inc)
 
     catalog_frequencies = []
+    processed_msgs = set()
     for rule in MASTER_ERROR_RULES:
         rule_msg = rule["msg"]
-        matches = incidencias_por_error[rule_msg]
+        if rule_msg in processed_msgs:
+            continue
+        processed_msgs.add(rule_msg)
+        matches = incidencias_por_error.get(rule_msg, [])
         catalog_frequencies.append({
             "msg": rule_msg, "severity": rule["severity"], "matches": matches, "count": len(matches)
         })
         
+    # Safety net: add any incident msg that wasn't declared in MASTER_ERROR_RULES
+    for msg_simplificado, matches in incidencias_por_error.items():
+        if msg_simplificado not in processed_msgs:
+            severity = "ALERTA"
+            if matches:
+                severity = matches[0].get("tipo_incidencia", "ALERTA")
+            catalog_frequencies.append({
+                "msg": msg_simplificado, "severity": severity, "matches": matches, "count": len(matches)
+            })
+            processed_msgs.add(msg_simplificado)
+
     catalog_frequencies = sorted(catalog_frequencies, key=lambda x: x["count"], reverse=True)
 
     r_cat = 6
@@ -991,7 +1071,7 @@ def obtener_resumen_ligero(audit_id: str = None, years: str = None):
         incidencias = [i for i in incidencias if str(i.get("campania")) in years_list]
         resumen_celdas_raw = diag.get("resumen_por_celda_padre", {})
         resumen_celdas = {k: v for k, v in resumen_celdas_raw.items() if str(v.get("campania")) in years_list}
-        total_filas = len(incidencias)
+        total_filas = sum(safe_int(diag.get("distribucion_filas_campana", {}).get(y, 0)) for y in years_list)
     else:
         resumen_celdas = diag.get("resumen_por_celda_padre", {})
         total_filas = diag.get("total_filas_procesadas", 0)

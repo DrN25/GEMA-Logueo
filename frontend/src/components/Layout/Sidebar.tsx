@@ -6,7 +6,6 @@ import {
   Share2,
   TrendingUp,
   Settings,
-  Database,
   BarChart2,
   Moon,
   Sun,
@@ -36,17 +35,24 @@ export default function Sidebar({
     { id: 'lgg', label: 'Logueo General (LGG)', icon: FileText, category: 'REGISTRO DE CAMPO' },
     { id: 'lgest', label: 'Logueo estructural', icon: Share2, category: 'REGISTRO DE CAMPO' },
     { id: 'rmr', label: 'Validación RMR', icon: TrendingUp, category: 'CONTROL Y ANÁLISIS' },
-    { id: 'catalogos', label: 'Catálogos Geomecánicos', icon: Database, category: 'CONTROL Y ANÁLISIS' },
     { id: 'formulas', label: 'Fórmulas de Cálculo', icon: Calculator, category: 'CONTROL Y ANÁLISIS' },
-    { id: 'auditoria', label: 'Auditoría de Excels', icon: ShieldCheck, category: 'CONTROL Y ANÁLISIS' },
     { id: 'dashboard_rqd', label: 'Validación Espaciamiento RQD% - FF/1', icon: BarChart2, category: 'REPORTES' },
     { id: 'reports_pdf', label: 'Reportes PDF', icon: FileText, category: 'REPORTES' },
     { id: 'reports_plt', label: 'Ensayos PLT', icon: BarChart2, category: 'ENSAYOS' },
     { id: 'config', label: 'Parámetros del Sistema', icon: Settings, category: 'CONFIGURACIÓN' },
+    { id: 'auditoria', label: 'Carga para Revisión', icon: ShieldCheck, category: 'REVISION GENERAL' },
   ];
 
   // Agrupar por categoría
-  const categories = ['GENERAL', 'REGISTRO DE CAMPO', 'CONTROL Y ANÁLISIS', 'REPORTES', 'ENSAYOS', 'CONFIGURACIÓN'];
+  const categories = [
+    'GENERAL',
+    'REGISTRO DE CAMPO',
+    'CONTROL Y ANÁLISIS',
+    'REPORTES',
+    'ENSAYOS',
+    'CONFIGURACIÓN',
+    'REVISION GENERAL'
+  ];
 
   return (
     <aside className="dark w-64 glass-panel chrome-dark border-r border-navy-800 flex flex-col h-screen text-slate-300 select-none">
