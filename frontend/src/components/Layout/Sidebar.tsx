@@ -39,8 +39,8 @@ export default function Sidebar({
     { id: 'dashboard_rqd', label: 'Validación Espaciamiento RQD% - FF/1', icon: BarChart2, category: 'REPORTES' },
     { id: 'reports_pdf', label: 'Reportes PDF', icon: FileText, category: 'REPORTES' },
     { id: 'reports_plt', label: 'Ensayos PLT', icon: BarChart2, category: 'ENSAYOS' },
-    { id: 'config', label: 'Parámetros del Sistema', icon: Settings, category: 'CONFIGURACIÓN' },
     { id: 'auditoria', label: 'Carga para Revisión', icon: ShieldCheck, category: 'REVISION GENERAL' },
+    { id: 'config', label: 'Parámetros del Sistema', icon: Settings, category: 'CONFIGURACIÓN' },
   ];
 
   // Agrupar por categoría
@@ -50,8 +50,8 @@ export default function Sidebar({
     'CONTROL Y ANÁLISIS',
     'REPORTES',
     'ENSAYOS',
+    'REVISION GENERAL',
     'CONFIGURACIÓN',
-    'REVISION GENERAL'
   ];
 
   return (

@@ -332,6 +332,7 @@ export default function StructuralView({
               alerts={alerts}
               idPrefix="struct-cell"
               getRowKey={(row, idx) => row.disc.id || idx}
+              getAlertRowIndex={(row) => row.originalIndex}
               editableFields={EDITABLE_COLS as any}
               darkMode={darkMode}
               minWidth="3000px"

@@ -785,7 +785,7 @@ export default function App() {
             };
             const colIdx = colMap[field];
             if (colIdx !== undefined) {
-              element = document.getElementById(`cell-${index}-${colIdx}`);
+              element = document.getElementById(`lgg-cell-${index}-${colIdx}`);
               setSelectedRowIndex(index);
             }
           }
@@ -1127,8 +1127,8 @@ export default function App() {
           {renderActiveView()}
         </div>
 
-        {/* Floating validation bottom-right QA/QC panel */}
-        {activeTaladro && (
+        {/* Floating validation bottom-right QA/QC panel — hidden on Carga para Revisión */}
+        {activeTaladro && currentView !== 'auditoria' && (
           <div className="fixed bottom-6 right-6 z-40">
             <ValidationPanel
               alerts={activeAlerts}

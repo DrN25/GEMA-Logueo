@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import {
   Plus,
   Search,
@@ -137,6 +137,36 @@ export default function LggView({
       insertCorridaRow
     });
   }, [darkMode, handleCellChange, deleteCorridaRow, insertCorridaRow, activeTaladroName]);
+
+  // --- NAVEGACIÓN INTERNA: click en alerta → foco en celda del grid (filter-aware) ---
+  const handleInternalFocus = useCallback((fieldId: string) => {
+    // Parse LGG field format: "de-3", "rec_m-5", etc.
+    const match = fieldId.match(/^([a-z0-9_]+)-(\d+)$/);
+    if (!match) return;
+    const [, colKey, indexStr] = match;
+    const alertRowIndex = parseInt(indexStr);
+
+    // Find display index accounting for active filters
+    const displayIdx = filteredCorridas.findIndex(r => r.originalIndex === alertRowIndex);
+    if (displayIdx < 0) return;
+
+    // Map column key to editable column index
+    const colIdx = EDITABLE_COLS.indexOf(colKey as keyof Corrida);
+    if (colIdx < 0) return;
+
+    // Select the row
+    onSelectRow(filteredCorridas[displayIdx].originalIndex);
+
+    // Scroll and focus the cell
+    setTimeout(() => {
+      const el = document.getElementById(`lgg-cell-${displayIdx}-${colIdx}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+        el.focus();
+        if (el.tagName === 'INPUT') (el as HTMLInputElement).select();
+      }
+    }, 80);
+  }, [filteredCorridas, onSelectRow]);
 
   const safeRowsKpi = corridas || [];
   const totalCorridasKpi = safeRowsKpi.length;
@@ -475,6 +505,7 @@ export default function LggView({
                 }
               }}
               getRowKey={(row) => row.originalIndex}
+              getAlertRowIndex={(row) => row.originalIndex}
               editableFields={EDITABLE_COLS}
               darkMode={darkMode}
               minWidth="3200px"
@@ -506,7 +537,13 @@ export default function LggView({
           </>
         ) : (
           <div style={panelWidthStyle} className="transition-[width,max-width] duration-300">
-            <LggQaqcPanel corridas={corridas} waterTableM={waterTableM} alerts={alerts} />
+            <LggQaqcPanel
+              corridas={corridas}
+              waterTableM={waterTableM}
+              alerts={alerts}
+              onFocusField={handleInternalFocus}
+              onSwitchTab={setActiveSubTab}
+            />
           </div>
         )}
       </div>

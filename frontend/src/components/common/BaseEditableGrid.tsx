@@ -27,10 +27,11 @@ interface BaseEditableGridProps<T> {
   onAddRow?: () => void;
   onDeleteRow?: (index: number) => void;
   getRowKey: (row: T, index: number) => string | number;
-  // Permite saber qué campos son editables para la navegación por teclado
   editableFields: (keyof T)[];
   darkMode?: boolean;
   minWidth?: string;
+  /** Maps a display row to its original array index (for alert matching when filters are active) */
+  getAlertRowIndex?: (row: T, displayIndex: number) => number;
 }
 
 export default function BaseEditableGrid<T>({
@@ -44,7 +45,8 @@ export default function BaseEditableGrid<T>({
   onAddRow,
   getRowKey,
   editableFields,
-  minWidth = '2000px'
+  minWidth = '2000px',
+  getAlertRowIndex
 }: BaseEditableGridProps<T>) {
 
   const handleKeyDown = (
@@ -121,10 +123,28 @@ export default function BaseEditableGrid<T>({
     stickyLeft?: number,
     isStickyRight?: boolean,
     stickyRight?: number,
-    isSelected?: boolean
+    isSelected?: boolean,
+    alertRowIndex?: number
   ) => {
-    // Buscar alertas QA/QC para esta celda
-    const alert = alerts.find(a => a.field === `${idPrefix}-${colKey}-${index}`);
+    // Resolve the alert array index (may differ from display index when filters are active)
+    const effectiveAlertIdx = alertRowIndex ?? index;
+
+    // Match alert field using the format emitted by qaqcValidator.ts:
+    //   LGG grid (idPrefix='lgg-cell'):       field = "colKey-rowIndex"
+    //   Structural grid (idPrefix='struct-cell'): field = "struct-colKey-rowIndex"
+    //   Survey / PLT / others:                 field = "prefix-colKey-rowIndex"
+    let alert: ValidationAlert | undefined;
+    if (idPrefix === 'lgg-cell') {
+      alert = alerts.find(a => a.field === `${colKey}-${effectiveAlertIdx}`);
+    } else if (idPrefix === 'struct-cell') {
+      alert = alerts.find(a => a.field === `struct-${colKey}-${effectiveAlertIdx}`);
+    } else {
+      // Generic fallback — try both full-prefix and bare formats
+      alert = alerts.find(a =>
+        a.field === `${idPrefix}-${colKey}-${effectiveAlertIdx}` ||
+        a.field === `${colKey}-${effectiveAlertIdx}`
+      );
+    }
 
     const actualStickyRight = isStickyRight || colKey === 'accion';
     const isStickyAny = isSticky || actualStickyRight;
@@ -249,7 +269,11 @@ export default function BaseEditableGrid<T>({
                   isSelected ? 'bg-cyan-500/5' : ''
                 }`}
               >
-                {columns.map((col) => {
+                {(() => {
+                  // Resolve alert row index once per row (filter-aware)
+                  const alertRowIndex = getAlertRowIndex ? getAlertRowIndex(row, rowIndex) : rowIndex;
+
+                  return columns.map((col) => {
                   const isSticky = !!col.isSticky;
                   const isStickyRight = !!col.isStickyRight;
                   const colKeyStr = String(col.key);
@@ -263,7 +287,7 @@ export default function BaseEditableGrid<T>({
                       <td
                         key={colKeyStr}
                         className={isStickyAny ? 'bg-navy-950' : ''}
-                        style={getCellTdStyle(rowIndex, colKeyStr, isSticky, col.stickyLeft, isStickyRight, col.stickyRight, isSelected)}
+                        style={getCellTdStyle(rowIndex, colKeyStr, isSticky, col.stickyLeft, isStickyRight, col.stickyRight, isSelected, alertRowIndex)}
                       >
                         {col.renderCell(row, rowIndex, isSelected)}
                       </td>
@@ -275,7 +299,7 @@ export default function BaseEditableGrid<T>({
                     <td
                       key={colKeyStr}
                       className={isStickyAny ? 'bg-navy-950 text-center' : 'px-1'}
-                      style={getCellTdStyle(rowIndex, colKeyStr, isSticky, col.stickyLeft, isStickyRight, col.stickyRight, isSelected)}
+                      style={getCellTdStyle(rowIndex, colKeyStr, isSticky, col.stickyLeft, isStickyRight, col.stickyRight, isSelected, alertRowIndex)}
                     >
                       {col.type === 'readonly' ? (
                         <span className="text-slate-400 font-medium select-all block text-center truncate">
@@ -318,7 +342,8 @@ export default function BaseEditableGrid<T>({
                       )}
                     </td>
                   );
-                })}
+                  });
+                })()}
               </tr>
             );
           })}
