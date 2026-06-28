@@ -19,17 +19,17 @@ interface BulkAuditorProps {
 
 export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
   const [file, setFile] = useState<File | null>(null);
-  
+
   // Lifted state initialized from localStorage for persistence
   const [status, setStatus] = useState<'idle' | 'uploading' | 'processing' | 'loaded' | 'error'>(() => {
     const saved = localStorage.getItem('geolog_bulk_auditor_status');
     return (saved as any) || 'idle';
   });
-  
+
   const [message, setMessage] = useState<string>(() => {
     return localStorage.getItem('geolog_bulk_auditor_message') || '';
   });
-  
+
   const [selectedAuditId, setSelectedAuditId] = useState<string>(() => {
     return localStorage.getItem('geolog_bulk_auditor_audit_id') || '';
   });
@@ -70,6 +70,8 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
     return localStorage.getItem('geolog_bulk_auditor_processing_id') || '';
   });
   const [showProgressToast, setShowProgressToast] = useState<string>('');
+
+  const [loadingTable, setLoadingTable] = useState<boolean>(false);
 
   const pollingRef = useRef<any>(null);
   const excelPollingRef = useRef<any>(null);
@@ -130,7 +132,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
 
   const startProcessingPolling = (auditId: string) => {
     stopProcessingPolling();
-    
+
     // Poll immediately
     pollResumen(auditId);
 
@@ -156,7 +158,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
           return;
         }
         const data = await res.json();
-        
+
         // Background process finished!
         setProcessingAuditId('');
         stopProcessingPolling();
@@ -225,6 +227,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
   };
 
   const fetchKpisAndIncidencias = async () => {
+    setLoadingTable(true);
     try {
       const yearParam = selectedYears.length > 0 ? selectedYears.join(",") : "TODOS";
       const kpiUrl = `${apiBase}/api/logueo/resumen-ligero?audit_id=${selectedAuditId}&years=${yearParam}`;
@@ -234,13 +237,15 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
         const data = await resKpi.json();
         setKpis(data);
       }
-      fetchPaginatedIncidencias(1);
+      await fetchPaginatedIncidencias(1);
     } catch (e) {
       console.error("Error cargando estadísticas cruzadas:", e);
+      setLoadingTable(false);
     }
   };
 
   const fetchPaginatedIncidencias = async (currentPage: number) => {
+    setLoadingTable(true);
     try {
       const queryParams = new URLSearchParams();
       queryParams.append('page', String(currentPage));
@@ -268,6 +273,8 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
       }
     } catch (e) {
       console.error("Error cargando grilla paginada:", e);
+    } finally {
+      setLoadingTable(false);
     }
   };
 
@@ -404,12 +411,12 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
 
   const coreObservationTypes = kpis?.consolidado_observaciones
     ? Array.from(
-        new Set(
-          Object.values(kpis.consolidado_observaciones).flatMap((yearData: any) =>
-            Object.keys(yearData).filter(k => k !== 'severity' && k !== 'total_incidents')
-          )
+      new Set(
+        Object.values(kpis.consolidado_observaciones).flatMap((yearData: any) =>
+          Object.keys(yearData).filter(k => k !== 'severity' && k !== 'total_incidents')
         )
-      ).sort()
+      )
+    ).sort()
     : [];
 
   const uniqueYears = kpis?.consolidado_observaciones
@@ -422,7 +429,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
 
   return (
     <div className="space-y-6 text-left animate-fade-in text-slate-200 min-h-screen p-4 bg-navy-950/20 backdrop-blur-md">
-      
+
       {/* Modales */}
       <SheetSelectModal
         isOpen={isModalOpen}
@@ -487,7 +494,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
         <div className="rounded-2xl border border-cyan-500/15 p-10 space-y-8 max-w-xl mx-auto bg-gradient-to-b from-[#0e172a]/60 to-[#090f1d]/90 shadow-2xl mt-12 relative overflow-hidden backdrop-blur-md shadow-[0_0_50px_rgba(6,182,212,0.05)]">
           <div className="absolute -top-24 -left-24 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl"></div>
           <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl"></div>
-          
+
           <div className="text-center space-y-3 relative z-10">
             <div className="p-4 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded-2xl w-16 h-16 flex items-center justify-center mx-auto shadow-lg shadow-cyan-500/5 animate-pulse">
               <Database size={28} />
@@ -544,7 +551,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
               <span>{status === 'uploading' ? 'Cargando Base de Datos...' : 'Auditoría Geotécnica en Ejecución'}</span>
             </p>
             <p className="text-xs text-slate-350 leading-relaxed font-semibold">
-              {status === 'uploading' 
+              {status === 'uploading'
                 ? 'Estamos subiendo y pre-analizando el archivo Excel en el servidor...'
                 : 'Analizando las reglas de consistencia física y cruzada entre LGG y Estructural. Esto puede tomar hasta 5 minutos para planillas muy grandes.'
               }
@@ -595,9 +602,8 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                   <span className="text-xs font-extrabold text-slate-500 uppercase tracking-widest px-2">Campañas:</span>
                   <button
                     onClick={() => setSelectedYears([])}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all ${
-                      selectedYears.length === 0 ? 'bg-cyan-500 text-slate-950 shadow-[0_0_10px_rgba(6,182,212,0.2)]' : 'bg-navy-900/60 text-slate-400 hover:text-slate-200'
-                    }`}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all ${selectedYears.length === 0 ? 'bg-cyan-500 text-slate-950 shadow-[0_0_10px_rgba(6,182,212,0.2)]' : 'bg-navy-900/60 text-slate-400 hover:text-slate-200'
+                      }`}
                   >
                     Todas
                   </button>
@@ -611,9 +617,8 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
                             prev.includes(yr) ? prev.filter(y => y !== yr) : [...prev, yr]
                           );
                         }}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all ${
-                          isSelected ? 'bg-cyan-500 text-slate-950 shadow-[0_0_10px_rgba(6,182,212,0.2)]' : 'bg-navy-900/60 text-slate-400 hover:text-slate-200'
-                        }`}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all ${isSelected ? 'bg-cyan-500 text-slate-950 shadow-[0_0_10px_rgba(6,182,212,0.2)]' : 'bg-navy-900/60 text-slate-400 hover:text-slate-200'
+                          }`}
                       >
                         {yr}
                       </button>
@@ -644,11 +649,10 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
               <button
                 disabled={!excelReady}
                 onClick={handleExportExcel}
-                className={`flex items-center gap-1.5 border px-4 py-2 rounded-lg text-xs font-black transition-all shadow-md active:scale-95 relative group ${
-                  excelReady
-                    ? 'bg-cyan-500 hover:bg-cyan-600 border-cyan-400/30 text-slate-950 shadow-[0_0_15px_rgba(6,182,212,0.2)]'
-                    : 'bg-[#0f172a]/50 border-navy-850 text-slate-500 cursor-not-allowed opacity-60'
-                }`}
+                className={`flex items-center gap-1.5 border px-4 py-2 rounded-lg text-xs font-black transition-all shadow-md active:scale-95 relative group ${excelReady
+                  ? 'bg-cyan-500 hover:bg-cyan-600 border-cyan-400/30 text-slate-950 shadow-[0_0_15px_rgba(6,182,212,0.2)]'
+                  : 'bg-[#0f172a]/50 border-navy-850 text-slate-500 cursor-not-allowed opacity-60'
+                  }`}
                 title={!excelReady ? 'El reporte de excel se está pregenerando en segundo plano' : 'Descargar reporte completo'}
               >
                 {!excelReady ? (
@@ -712,6 +716,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
               fetchPaginatedIncidencias(newPage);
             }}
             kpis={kpis}
+            isLoading={loadingTable}
           />
 
         </div>

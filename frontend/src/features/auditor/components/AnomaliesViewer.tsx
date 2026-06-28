@@ -1,4 +1,4 @@
-import { AlertTriangle, Settings, FileText, Search, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { AlertTriangle, Settings, FileText, Search, X, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 
 interface AnomaliesViewerProps {
   incidencias: any[];
@@ -9,6 +9,7 @@ interface AnomaliesViewerProps {
   totalPages: number;
   onPageChange: (newPage: number) => void;
   kpis: any;
+  isLoading?: boolean; // Prop de carga reactivo
 }
 
 export default function AnomaliesViewer({
@@ -20,6 +21,7 @@ export default function AnomaliesViewer({
   totalPages,
   onPageChange,
   kpis,
+  isLoading = false, // Valor por defecto
 }: AnomaliesViewerProps) {
   if (!kpis) return null;
 
@@ -39,7 +41,7 @@ export default function AnomaliesViewer({
     <div className="space-y-6">
       {/* TOP ERRORES DETALLADOS */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* ALERTAS CRITICAS */}
+        {/* ALERTAS CRÍTICAS */}
         <div className="rounded-xl border border-navy-800 bg-[#090f1d]/30 p-5 space-y-4 shadow-lg">
           <h3 className="text-xs font-black uppercase tracking-wider text-slate-350 border-b border-navy-850 pb-2 flex items-center gap-2">
             <AlertTriangle size={14} className="text-red-400" />
@@ -52,11 +54,10 @@ export default function AnomaliesViewer({
                 <button
                   key={idx}
                   onClick={() => onFilterSearch(isFiltered ? '' : item.mensaje)}
-                  className={`w-full flex flex-col md:flex-row md:items-center justify-between p-3 rounded-xl border text-left transition-all ${
-                    isFiltered
+                  className={`w-full flex flex-col md:flex-row md:items-center justify-between p-3 rounded-xl border text-left transition-all ${isFiltered
                       ? 'bg-red-500/10 border-red-500 shadow-md ring-1 ring-red-500/30'
                       : 'bg-[#0f172a]/30 border-navy-800 hover:bg-slate-900/30 hover:border-slate-700'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <span className={getAlertRankStyle(idx)}>{idx + 1}</span>
@@ -91,11 +92,10 @@ export default function AnomaliesViewer({
                 <button
                   key={idx}
                   onClick={() => onFilterSearch(isFiltered ? '' : item.mensaje)}
-                  className={`w-full flex flex-col md:flex-row md:items-center justify-between p-3 rounded-xl border text-left transition-all ${
-                    isFiltered
+                  className={`w-full flex flex-col md:flex-row md:items-center justify-between p-3 rounded-xl border text-left transition-all ${isFiltered
                       ? 'bg-orange-500/10 border-orange-500 shadow-md ring-1 ring-orange-500/30'
                       : 'bg-[#0f172a]/30 border-navy-800 hover:bg-slate-900/30 hover:border-slate-700'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <span className={getWarningRankStyle(idx)}>{idx + 1}</span>
@@ -125,9 +125,16 @@ export default function AnomaliesViewer({
             <h3 className="text-xs font-black uppercase tracking-wider text-slate-200 flex items-center gap-2">
               <FileText size={14} className="text-cyan-400" />
               <span>Buscador y Monitor de Anomalías Paginado</span>
+              {isLoading && (
+                <Loader2 size={14} className="animate-spin text-cyan-400 ml-1.5" />
+              )}
             </h3>
             <p className="text-xs text-slate-400 mt-1 font-semibold">
-              Mostrando **{totalRecords.toLocaleString()}** registros que coinciden con las consultas.
+              {isLoading ? (
+                <span className="text-cyan-400 animate-pulse">Cargando registros filtrados...</span>
+              ) : (
+                <>Mostrando **{totalRecords.toLocaleString()}** registros que coinciden con las consultas.</>
+              )}
             </p>
           </div>
 
@@ -150,7 +157,8 @@ export default function AnomaliesViewer({
         </div>
 
         {/* GRILLA TABULAR */}
-        <div className="overflow-x-auto rounded-xl border border-navy-850 bg-[#090f1d]/20">
+        <div className={`overflow-x-auto rounded-xl border border-navy-850 bg-[#090f1d]/20 transition-all duration-300 ${isLoading ? 'opacity-40 pointer-events-none' : ''
+          }`}>
           <table className="w-full text-xs text-left border-collapse">
             <thead>
               <tr className="bg-slate-950 text-slate-400 font-extrabold uppercase border-b border-navy-850 tracking-wider text-xs">
@@ -181,8 +189,8 @@ export default function AnomaliesViewer({
                       : 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20';
 
                   const rawVal = item.valor_actual;
-                  const displayVal = (rawVal === null || rawVal === undefined || String(rawVal).trim() === "" || String(rawVal) === "-1") 
-                    ? '—' 
+                  const displayVal = (rawVal === null || rawVal === undefined || String(rawVal).trim() === "" || String(rawVal) === "-1")
+                    ? '—'
                     : String(rawVal);
 
                   return (
@@ -207,7 +215,7 @@ export default function AnomaliesViewer({
                           {item.tipo_incidencia}
                         </span>
                       </td>
-                      {/* Mensaje Detalle (No negrita) */}
+                      {/* Detalle de la Falla Hallada (No negrita) */}
                       <td className="py-2.5 px-3 text-slate-300 font-normal leading-relaxed">{item.mensaje}</td>
                     </tr>
                   );
@@ -225,14 +233,14 @@ export default function AnomaliesViewer({
 
           <div className="flex gap-2">
             <button
-              disabled={page <= 1}
+              disabled={page <= 1 || isLoading}
               onClick={() => onPageChange(page - 1)}
               className="p-1.5 rounded-lg bg-[#090f1d] hover:bg-slate-900 border border-navy-800 disabled:opacity-30 disabled:cursor-not-allowed text-slate-200"
             >
               <ChevronLeft size={16} />
             </button>
             <button
-              disabled={page >= totalPages}
+              disabled={page >= totalPages || isLoading}
               onClick={() => onPageChange(page + 1)}
               className="p-1.5 rounded-lg bg-[#090f1d] hover:bg-slate-900 border border-navy-800 disabled:opacity-30 disabled:cursor-not-allowed text-slate-200"
             >

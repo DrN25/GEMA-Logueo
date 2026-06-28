@@ -1173,6 +1173,7 @@ def obtener_incidencias_paginadas(
         incidencias = [
             i for i in incidencias 
             if search_lower in str(i.get("mensaje", "")).lower() 
+            or search_lower in simplify_message(i.get("mensaje", "")).lower()
             or search_lower in str(i.get("columna", "")).lower()
             or search_lower in str(i.get("celda_padre", "")).lower()
             or search_lower in str(i.get("celda_hija", "")).lower()
