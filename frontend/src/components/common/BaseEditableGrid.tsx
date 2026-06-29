@@ -38,6 +38,22 @@ interface BaseEditableGridProps<T> {
 
 const EMPTY_ALERTS: ValidationAlert[] = [];
 
+// Ayudante estable para enfocar y colocar el cursor al final de la celda
+const focusAndCursorAtEnd = (el: HTMLInputElement | HTMLSelectElement) => {
+  el.focus();
+  if (el.tagName === 'INPUT') {
+    const input = el as HTMLInputElement;
+    const len = input.value?.length || 0;
+    try {
+      // setSelectionRange solo se soporta en ciertos tipos de input. Lo envolvemos en un catch para inputs numéricos
+      input.setSelectionRange(len, len);
+    } catch (e) {
+      // Fallback seguro de enfoque si el navegador no permite mover la selección en tipos numéricos
+    }
+  }
+};
+
+// Generador de estilos de celdas con bordes sutiles y soporte sticky
 function getCellTdStyle(
   colKey: string,
   isSticky: boolean,
@@ -64,20 +80,17 @@ function getCellTdStyle(
   const actualStickyRight = isStickyRight || colKey === 'accion';
   const isStickyAny = isSticky || actualStickyRight;
 
-  let borderShadow: string | undefined = isSticky
-    ? 'inset -1px 0 0 0 rgb(var(--navy-900)), inset 0 -1px 0 0 rgb(var(--navy-900)), 1px 0 0 0 rgb(var(--navy-900))'
-    : undefined;
+  // DISEÑO: Bordes interiores sutiles para evitar sensación de celdas combinadas
+  let borderShadow = 'inset -1px 0 0 0 rgba(255, 255, 255, 0.04), inset 0 -1px 0 0 rgba(255, 255, 255, 0.04)';
 
-  if (actualStickyRight) {
-    borderShadow = 'inset 1px 0 0 0 rgb(var(--navy-900)), inset 0 -1px 0 0 rgb(var(--navy-900)), -1px 0 0 0 rgb(var(--navy-900))';
-  }
-
-  let background: string | undefined;
   const stickyStyle: React.CSSProperties = {};
+  let background: string | undefined;
 
   if (isSticky) {
+    borderShadow = 'inset -1px 0 0 0 rgba(255, 255, 255, 0.08), inset 0 -1px 0 0 rgba(255, 255, 255, 0.04), 1px 0 0 0 rgba(255, 255, 255, 0.08)';
     Object.assign(stickyStyle, { position: 'sticky', left: stickyLeft ?? 0, zIndex: 10 });
   } else if (actualStickyRight) {
+    borderShadow = 'inset 1px 0 0 0 rgba(255, 255, 255, 0.08), inset 0 -1px 0 0 rgba(255, 255, 255, 0.04), -1px 0 0 0 rgba(255, 255, 255, 0.08)';
     Object.assign(stickyStyle, { position: 'sticky', right: stickyRight ?? 0, zIndex: 10 });
   }
 
@@ -95,13 +108,8 @@ function getCellTdStyle(
       ? 'inset 0 0 0 2px rgba(239, 68, 68, 0.6)'
       : 'inset 0 0 0 2px rgba(245, 158, 11, 0.5)';
 
-    if (isStickyAny) {
-      borderShadow = `${alertBorder}, ${borderShadow}`;
-      background = `linear-gradient(${alertBg}, ${alertBg}), ${baseBg || 'rgb(var(--navy-950))'}`;
-    } else {
-      borderShadow = alertBorder;
-      background = baseBg ? `linear-gradient(${alertBg}, ${alertBg}), ${baseBg}` : alertBg;
-    }
+    borderShadow = `${alertBorder}, ${borderShadow}`;
+    background = baseBg ? `linear-gradient(${alertBg}, ${alertBg}), ${baseBg}` : alertBg;
   } else if (baseBg) {
     background = baseBg;
   }
@@ -240,7 +248,7 @@ function GridRowInner<T>({
           onAddRow();
           setTimeout(() => {
             const nextEl = document.getElementById(`${idPrefix}-${totalRows}-0`);
-            if (nextEl) nextEl.focus();
+            if (nextEl) focusAndCursorAtEnd(nextEl as HTMLInputElement);
           }, 100);
         }
         return;
@@ -249,7 +257,7 @@ function GridRowInner<T>({
       const nextId = `${idPrefix}-${targetRow}-${targetColIndex}`;
       setTimeout(() => {
         const el = document.getElementById(nextId) as HTMLInputElement | null;
-        if (el) { el.focus(); if (el.tagName === 'INPUT') el.select(); }
+        if (el) focusAndCursorAtEnd(el);
       }, 10);
       return;
     }
@@ -262,7 +270,7 @@ function GridRowInner<T>({
     const nextId = `${idPrefix}-${targetRow}-${targetColIndex}`;
     setTimeout(() => {
       const el = document.getElementById(nextId) as HTMLInputElement | null;
-      if (el) { el.focus(); if (el.tagName === 'INPUT') el.select(); }
+      if (el) focusAndCursorAtEnd(el);
     }, 10);
   }, [editableFields, rowIndex, totalRows, onAddRow, idPrefix, commitField]);
 
@@ -299,19 +307,13 @@ function GridRowInner<T>({
             className={`${isStickyAny ? 'bg-navy-950 text-center' : 'px-1'} ${col.cellClassName || ''}`}
             style={cellStyle}
             onClick={() => {
-              // Si el usuario hace clic en una celda de una fila inactiva, la selecciona
-              // y enfoca el input correspondiente una vez renderizado
               if (!isSelected && colIdx !== -1) {
                 onSelect(rowIndex);
                 setTimeout(() => {
                   const inputId = `${idPrefix}-${rowIndex}-${colIdx}`;
                   const inputEl = document.getElementById(inputId);
-                  if (inputEl) {
-                    inputEl.focus();
-                    if (inputEl.tagName === 'INPUT') {
-                      (inputEl as HTMLInputElement).select();
-                    }
-                  }
+                  // MEJORA: Enfoca la celda colocando el cursor al final de forma sutil
+                  if (inputEl) focusAndCursorAtEnd(inputEl as HTMLInputElement);
                 }, 40);
               }
             }}
@@ -321,8 +323,6 @@ function GridRowInner<T>({
                 {String(row[col.key as keyof T] ?? '')}
               </span>
             ) : !isSelected ? (
-              // EXCEL OPTIMIZATION: Si la fila no está activa, renderizamos texto plano ligero (span)
-              // Esto limpia el 90% del DOM de inputs inactivos
               <span className="text-slate-200 block text-center truncate py-0.5 font-semibold select-all">
                 {String(row[col.key as keyof T] ?? '') === '-1' ? '-' : String(row[col.key as keyof T] ?? '')}
               </span>
@@ -332,11 +332,11 @@ function GridRowInner<T>({
                 value={String(row[col.key as keyof T] ?? '-1')}
                 onChange={(e) => onCellChange(rowIndex, col.key as keyof T, e.target.value)}
                 onKeyDown={(e) => handleKeyDown(e, col.key as keyof T)}
-                className={`w-full bg-transparent border-0 text-center focus:outline-none focus:ring-1 focus:ring-blue-500 rounded py-0.5 ${isSelected ? 'text-cyan-200 font-bold' : 'text-slate-200'
+                className={`w-full bg-transparent border-0 text-center focus:outline-none focus:ring-1 focus:ring-blue-500 rounded py-0.5 ${isSelected ? 'text-cyan-200 font-bold text-xs' : 'text-slate-200 text-xs'
                   }`}
               >
                 {(col.options || []).map((opt) => (
-                  <option key={opt} value={opt} className="bg-navy-950 text-slate-200">{opt}</option>
+                  <option key={opt} value={opt} className="bg-navy-950 text-slate-200 text-xs">{opt}</option>
                 ))}
               </select>
             ) : (
@@ -415,31 +415,58 @@ export default function BaseEditableGrid<T>({
 
   // --- MOTOR DE RENDIMIENTO: RENDERIZADO PROGRESIVO EN LOTES ---
   const [renderLimit, setRenderLimit] = useState(() => {
-    // Si hay una fila seleccionada mayor a 40, inicializamos el límite para que la incluya de golpe
     const initialLimit = selectedRowIndex !== null ? Math.max(40, selectedRowIndex + 10) : 40;
     return Math.min(data.length, initialLimit);
   });
 
-  // Resetear el límite progresivo al cargar un taladro o array de datos diferente
   useEffect(() => {
     const initialLimit = selectedRowIndex !== null ? Math.max(40, selectedRowIndex + 10) : 40;
     setRenderLimit(Math.min(data.length, initialLimit));
   }, [data]);
 
-  // Incrementar progresivamente el límite de renderizado cediendo el control al navegador
   useEffect(() => {
     if (renderLimit < data.length) {
       const timer = setTimeout(() => {
         setRenderLimit(prev => Math.min(data.length, prev + 40));
-      }, 20); // Ventana de 20ms que permite al navegador pintar y responder a clics
+      }, 20);
       return () => clearTimeout(timer);
     }
   }, [renderLimit, data.length]);
 
-  // Array rebanado según el límite de carga progresivo actual
   const visibleData = useMemo(() => {
     return data.slice(0, renderLimit);
   }, [data, renderLimit]);
+
+  // --- MEJORA: MOTOR DE REDIMENSIONAMIENTO DE COLUMNAS ARRISTRABLES (COL-RESIZE) ---
+  const [colWidths, setColWidths] = useState<Record<string, number>>({});
+  const activeColRef = useRef<{ key: string; startX: number; startWidth: number } | null>(null);
+
+  const handleResizeStart = useCallback((e: React.MouseEvent, colKey: string) => {
+    e.preventDefault();
+    const thEl = e.currentTarget.parentElement;
+    if (!thEl) return;
+    const startWidth = thEl.getBoundingClientRect().width;
+    activeColRef.current = { key: colKey, startX: e.clientX, startWidth };
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!activeColRef.current) return;
+      const deltaX = moveEvent.clientX - activeColRef.current.startX;
+      const newWidth = Math.max(45, activeColRef.current.startWidth + deltaX);
+      setColWidths(prev => ({
+        ...prev,
+        [activeColRef.current!.key]: newWidth
+      }));
+    };
+
+    const handleMouseUp = () => {
+      activeColRef.current = null;
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, []);
 
   const alertsByRow = useMemo(() => {
     const map = new Map<number, ValidationAlert[]>();
@@ -462,15 +489,39 @@ export default function BaseEditableGrid<T>({
   return (
     <div className="flex-1 overflow-auto border border-navy-800/80 rounded-xl bg-navy-950/65 shadow-2xl relative min-h-[350px]">
       <table className="w-full border-separate text-xs text-left table-fixed" style={{ borderSpacing: 0, minWidth }}>
+
+        {/* Colgroup para inyectar los anchos adaptable de manera unificada */}
+        <colgroup>
+          {columns.map((col) => {
+            const customWidth = colWidths[String(col.key)];
+            return (
+              <col
+                key={String(col.key)}
+                style={customWidth ? { width: `${customWidth}px` } : undefined}
+                className={customWidth ? undefined : col.width}
+              />
+            );
+          })}
+        </colgroup>
+
         <thead className="sticky top-0 z-20 text-slate-400 dark:text-slate-300 font-bold uppercase tracking-wider text-center select-none text-xs">
           <tr>
             {columns.map((col, colIdx) => (
               <th
                 key={String(col.key)}
-                className={`py-3.5 ${col.width} ${col.headerBgClass || ''}`}
+                className={`py-2 relative ${col.headerBgClass || ''}`}
                 style={headerStyles[colIdx]}
               >
-                {col.label}
+                <div className="px-2 truncate">{col.label}</div>
+
+                {/* Divisor interactivo sutil para arrastrar columnas (Resizer) */}
+                {col.key !== 'accion' && (
+                  <div
+                    onMouseDown={(e) => handleResizeStart(e, String(col.key))}
+                    className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-cyan-500/50 bg-navy-800/40 z-30 transition-colors"
+                    title="Arrastrar para ajustar ancho"
+                  />
+                )}
               </th>
             ))}
           </tr>
