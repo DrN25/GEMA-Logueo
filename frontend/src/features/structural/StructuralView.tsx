@@ -410,9 +410,9 @@ export default function StructuralView({
                 selectedRowIndex={selectedRowIndex !== null ? filteredDiscontinuidades.findIndex(fd => fd.originalIndex === selectedRowIndex) : null}
                 onSelectRow={(idx) => {
                   if (filteredDiscontinuidades[idx]) {
-                    setSelectedRowIndex(filteredDiscontinuidades[idx].originalIndex);
+                    onSelectRow(filteredDiscontinuidades[idx].originalIndex);
                   } else {
-                    setSelectedRowIndex(null);
+                    onSelectRow(null);
                   }
                 }}
                 onCellChange={() => { }}

@@ -70,6 +70,9 @@ function getCellTdStyle(
     alert = rowAlerts.find(a => a.field === `${colKey}-${alertRowIndex}`);
   } else if (idPrefix === 'struct-cell') {
     alert = rowAlerts.find(a => a.field === `struct-${colKey}-${alertRowIndex}`);
+  } else if (idPrefix === 'plt-cell') {
+    // RESOLUCIÓN EXPLICITA: Asocia el prefijo "plt-" con el nombre de campo y el índice de fila de PLT
+    alert = rowAlerts.find(a => a.field === `plt-${colKey}-${alertRowIndex}`);
   } else {
     alert = rowAlerts.find(a =>
       a.field === `${idPrefix}-${colKey}-${alertRowIndex}` ||
@@ -108,8 +111,6 @@ function getCellTdStyle(
     const alertColor = isCritical ? 'rgba(239, 68, 68, 0.85)' : 'rgba(245, 158, 11, 0.75)';
     const alertBg = isCritical ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.12)';
 
-    // MEJORA CSS: outline con offset negativo para forzar a que el contorno
-    // se pinte POR ENCIMA de los divs de colores de litologías o intemperismo
     style.outline = `2px solid ${alertColor}`;
     style.outlineOffset = '-2px';
     background = baseBg ? `linear-gradient(${alertBg}, ${alertBg}), ${baseBg}` : alertBg;

@@ -96,17 +96,84 @@ export default function PltView({
 
   const handleAlertFix = (fieldId: string) => {
     setActiveSubTab('plt');
+
+    // Extraer índice y nombre de campo de e.g. "plt-from_m-0"
+    const parts = fieldId.split('-');
+    let index: number | null = null;
+    let fieldName = '';
+
+    if (parts.length >= 2) {
+      const lastPart = parts[parts.length - 1];
+      const parsedIndex = parseInt(lastPart, 10);
+      if (!isNaN(parsedIndex)) {
+        index = parsedIndex;
+        fieldName = parts[1]; // e.g. "from_m"
+      }
+    }
+
+    if (index !== null) {
+      onSelectRow(index); // Asegurar que la fila se seleccione en App.tsx
+    }
+
     setTimeout(() => {
-      const el = document.getElementById(fieldId);
+      let el: HTMLElement | null = null;
+
+      if (index !== null && fieldName) {
+        // Campos con renderCell personalizado en pltColumns.tsx
+        const customFields = ['fecha', 'nro_muestra', 'litologia_1', 'litologia_2', 'litologia_3'];
+        if (customFields.includes(fieldName)) {
+          el = document.getElementById(`plt-cell-${index}-${fieldName}`);
+        } else {
+          // Campos estándar renderizados por BaseEditableGrid
+          const pltColMap: Record<string, number> = {
+            'fecha': 0, 'nro_muestra': 1, 'nro_caja': 2, 'corrida_desde': 3, 'corrida_hasta': 4,
+            'from_m': 5, 'to_m': 6, 'este_m': 7, 'norte_m': 8, 'elevacion_msnm': 9,
+            'tipo_de_ensayo': 10, 'diametro_taladro_nominacion': 11, 'litologia_1': 12,
+            'litologia_2': 13, 'litologia_3': 14, 'd_mm': 15, 'p_instr_kn': 16,
+            'tipo_rotura_code': 17, 'direccion_rotura_code': 18, 'ejecutadoPor': 19,
+            'observaciones': 20
+          };
+          const colIdx = pltColMap[fieldName];
+          if (colIdx !== undefined) {
+            el = document.getElementById(`plt-cell-${index}-${colIdx}`);
+          }
+        }
+      }
+
+      // Fallback a buscar por el fieldId original si existe en DOM
+      if (!el) {
+        el = document.getElementById(fieldId);
+      }
+
+      // Si aún no se ha renderizado el input, forzamos un click en el elemento TD
+      if (!el && index !== null && fieldName) {
+        const pltColMap: Record<string, number> = {
+          'fecha': 0, 'nro_muestra': 1, 'nro_caja': 2, 'corrida_desde': 3, 'corrida_hasta': 4,
+          'from_m': 5, 'to_m': 6, 'este_m': 7, 'norte_m': 8, 'elevacion_msnm': 9,
+          'tipo_de_ensayo': 10, 'diametro_taladro_nominacion': 11, 'litologia_1': 12,
+          'litologia_2': 13, 'litologia_3': 14, 'd_mm': 15, 'p_instr_kn': 16,
+          'tipo_rotura_code': 17, 'direccion_rotura_code': 18, 'ejecutadoPor': 19,
+          'observaciones': 20
+        };
+        const colIdx = pltColMap[fieldName];
+        if (colIdx !== undefined) {
+          const tdEl = document.getElementById(`plt-cell-td-${index}-${colIdx}`);
+          if (tdEl) {
+            tdEl.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+            tdEl.click();
+            return;
+          }
+        }
+      }
+
       if (el) {
-        // MEJORA: inline: 'center' centra horizontalmente también la celda de PLT
         el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
         el.focus();
         if (el.tagName === 'INPUT') {
           (el as HTMLInputElement).select();
         }
       }
-    }, 100);
+    }, 120);
   };
 
   return (

@@ -289,6 +289,7 @@ export function getLggColumns({
         return (
           <div className="w-full h-full flex items-center justify-center px-1" style={style}>
             <select
+              id={`lgg-cell-${row.originalIndex}-8`}
               value={row.lito1}
               onChange={(e) => handleCellChange(row.originalIndex, 'lito1', e.target.value)}
               className="w-full bg-transparent border-0 py-1 text-center font-bold focus:outline-none cursor-pointer text-xs"
@@ -324,6 +325,7 @@ export function getLggColumns({
         return (
           <div className="w-full h-full flex items-center justify-center px-1" style={style}>
             <select
+              id={`lgg-cell-${row.originalIndex}-9`}
               value={row.lito2 || '-1'}
               onChange={(e) => handleCellChange(row.originalIndex, 'lito2', e.target.value)}
               className="w-full bg-transparent border-0 py-1 text-center font-bold focus:outline-none cursor-pointer text-xs"
@@ -360,6 +362,7 @@ export function getLggColumns({
         return (
           <div className="w-full h-full flex items-center justify-center px-1" style={style}>
             <select
+              id={`lgg-cell-${row.originalIndex}-10`}
               value={row.lito3 || '-1'}
               onChange={(e) => handleCellChange(row.originalIndex, 'lito3', e.target.value)}
               className="w-full bg-transparent border-0 py-1 text-center font-bold focus:outline-none cursor-pointer text-xs"
@@ -396,6 +399,7 @@ export function getLggColumns({
         return (
           <div className="w-full h-full flex items-center justify-center px-1" style={style}>
             <select
+              id={`lgg-cell-${row.originalIndex}-11`}
               value={row.resistencia}
               onChange={(e) => handleCellChange(row.originalIndex, 'resistencia', e.target.value)}
               className="w-full bg-transparent border-0 py-1 text-center font-bold focus:outline-none cursor-pointer text-xs"
@@ -535,6 +539,7 @@ export function getLggColumns({
         return (
           <div className="w-full h-full flex items-center justify-center px-1" style={style}>
             <select
+              id={`lgg-cell-${row.originalIndex}-22`}
               value={row.intemperismo}
               onChange={(e) => handleCellChange(row.originalIndex, 'intemperismo', e.target.value)}
               className="w-full bg-transparent border-0 py-1 text-center font-bold focus:outline-none cursor-pointer text-xs"
@@ -573,6 +578,7 @@ export function getLggColumns({
         }
         return (
           <select
+            id={`lgg-cell-${row.originalIndex}-24`}
             value={row.relleno2 || '-1'}
             onChange={(e) => handleCellChange(row.originalIndex, 'relleno2', e.target.value)}
             className="w-full bg-transparent border-0 px-1 py-1 text-center text-slate-300 focus:outline-none cursor-pointer focus:ring-1 focus:ring-blue-500 rounded text-xs"
@@ -634,6 +640,7 @@ export function getLggColumns({
         return (
           <div className="w-full h-full flex items-center justify-center px-1" style={style}>
             <select
+              id={`lgg-cell-${row.originalIndex}-26`}
               value={row.agua_obs}
               onChange={(e) => handleCellChange(row.originalIndex, 'agua_obs', e.target.value)}
               className="w-full bg-transparent border-0 py-1 text-center font-bold focus:outline-none cursor-pointer text-xs"
@@ -679,6 +686,7 @@ export function getLggColumns({
         }
         return (
           <select
+            id={`lgg-cell-${row.originalIndex}-27`}
             value={row.turno || 'D'}
             onChange={(e) => handleCellChange(row.originalIndex, 'turno', e.target.value)}
             className="w-full bg-transparent border-0 py-1 text-center text-slate-300 focus:outline-none cursor-pointer focus:ring-1 focus:ring-blue-500 rounded text-xs"

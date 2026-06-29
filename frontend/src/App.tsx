@@ -783,7 +783,6 @@ export default function App() {
     let field = '';
 
     if (parts.length >= 2) {
-      // El último segmento siempre será el índice numérico de la fila
       const lastPart = parts[parts.length - 1];
       const parsedIndex = parseInt(lastPart, 10);
 
@@ -797,58 +796,66 @@ export default function App() {
       }
     }
 
-    // Si es LGG, podemos disparar la selección global de inmediato
-    if (index !== null && !isStruct && !isPlt) {
+    // Sincronizar la selección global de fila de inmediato para habilitar los inputs correspondientes
+    if (index !== null) {
       setSelectedRowIndex(index);
     }
 
     // 3. Esperar al renderizado y enfocar mediante clic programático
     setTimeout(() => {
       let element = document.getElementById(fieldId);
+      let colIdx: number | undefined;
 
-      // Si el elemento interactivo directo no existe en el DOM, resolvemos y pulsamos su celda TD
-      if (!element && index !== null) {
-        let colIdx: number | undefined;
-
-        if (isStruct) {
-          const structColMap: Record<string, number> = {
-            'profundidad': 0, 'tipo_estructura': 1, 'alfa': 2, 'beta': 3,
-            'forma': 4, 'rugosidad': 5, 'jrc10': 6, 'abertura': 7,
-            'weathering': 8, 'espesor': 9, 'relleno1': 10, 'relleno2': 11,
-            'dureza_pared': 12, 'agua': 13, 'geotecnico': 14, 'comentario': 15,
-            'tipo': 16
-          };
-          colIdx = structColMap[field];
-        } else if (isPlt) {
+      if (isStruct) {
+        const structColMap: Record<string, number> = {
+          'profundidad': 0, 'tipo_estructura': 1, 'alfa': 2, 'beta': 3,
+          'forma': 4, 'rugosidad': 5, 'jrc10': 6, 'abertura': 7,
+          'weathering': 8, 'espesor': 9, 'relleno1': 10, 'relleno2': 11,
+          'dureza_pared': 12, 'agua': 13, 'geotecnico': 14, 'comentario': 15,
+          'tipo': 16
+        };
+        colIdx = structColMap[field];
+      } else if (isPlt) {
+        // En PLT, campos específicos tienen renderizado personalizado de inputs
+        const customPltFields = ['fecha', 'nro_muestra', 'litologia_1', 'litologia_2', 'litologia_3'];
+        if (index !== null && customPltFields.includes(field)) {
+          element = document.getElementById(`plt-cell-${index}-${field}`);
+        } else {
           const pltColMap: Record<string, number> = {
-            'fecha': 0, 'nro_muestra': 1, 'nro_caja': 2, 'from_m': 5, 'to_m': 6,
-            'este_m': 7, 'norte_m': 8, 'elevacion_msnm': 9,
-            'tipo_de_ensayo': 10, 'diametro_taladro_nominacion': 11, 'd_mm': 15,
-            'p_instr_kn': 16, 'tipo_rotura_code': 17, 'direccion_rotura_code': 18,
-            'ejecutadoPor': 19, 'observaciones': 20
+            'fecha': 0, 'nro_muestra': 1, 'nro_caja': 2, 'corrida_desde': 3, 'corrida_hasta': 4,
+            'from_m': 5, 'to_m': 6, 'este_m': 7, 'norte_m': 8, 'elevacion_msnm': 9,
+            'tipo_de_ensayo': 10, 'diametro_taladro_nominacion': 11, 'litologia_1': 12,
+            'litologia_2': 13, 'litologia_3': 14, 'd_mm': 15, 'p_instr_kn': 16,
+            'tipo_rotura_code': 17, 'direccion_rotura_code': 18, 'ejecutadoPor': 19,
+            'observaciones': 20
           };
           colIdx = pltColMap[field];
-        } else {
-          const colMap: Record<string, number> = {
-            'de': 0, 'a': 1, 'rec_m': 2, 'rqd_m': 3, 'lrf_m': 4, 'small_frag_m': 5,
-            'mec_frac': 6, 'frac_nat': 7, 'lito1': 8, 'lito2': 9, 'lito3': 10,
-            'resistencia': 11, 'orientacion': 12, 'offset': 13, 'tipo_est1': 14,
-            'tipo_est2': 15, 'frac_buz30': 16, 'frac_buz60': 17, 'frac_buz90': 18,
-            'abertura': 19, 'rugosidad': 20, 'jrc10': 21, 'intemperismo': 22,
-            'relleno1': 23, 'relleno2': 24, 'espesor': 25, 'agua_obs': 26,
-            'turno': 27, 'comentarios': 28
-          };
-          colIdx = colMap[field];
         }
+      } else {
+        const colMap: Record<string, number> = {
+          'de': 0, 'a': 1, 'rec_m': 2, 'rqd_m': 3, 'lrf_m': 4, 'small_frag_m': 5,
+          'mec_frac': 6, 'frac_nat': 7, 'lito1': 8, 'lito2': 9, 'lito3': 10,
+          'resistencia': 11, 'orientacion': 12, 'offset': 13, 'tipo_est1': 14,
+          'tipo_est2': 15, 'frac_buz30': 16, 'frac_buz60': 17, 'frac_buz90': 18,
+          'abertura': 19, 'rugosidad': 20, 'jrc10': 21, 'intemperismo': 22,
+          'relleno1': 23, 'relleno2': 24, 'espesor': 25, 'agua_obs': 26,
+          'turno': 27, 'comentarios': 28
+        };
+        colIdx = colMap[field];
+      }
 
-        if (colIdx !== undefined) {
-          // Buscamos la celda física TD que SIEMPRE existe con el ID de la advertencia estable (index)
-          const tdElement = document.getElementById(`${idPrefix}-td-${index}-${colIdx}`);
-          if (tdElement) {
-            tdElement.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
-            tdElement.click(); // Activa la fila y enfoca automáticamente
-            return;
-          }
+      // Si no encontramos el elemento con fieldId original, intentamos resolver usando el ID estándar de BaseEditableGrid
+      if (!element && index !== null && colIdx !== undefined) {
+        element = document.getElementById(`${idPrefix}-${index}-${colIdx}`);
+      }
+
+      // Si el elemento interactivo directo todavía no existe en el DOM, localizamos y pulsamos su celda TD
+      if (!element && index !== null && colIdx !== undefined) {
+        const tdElement = document.getElementById(`${idPrefix}-td-${index}-${colIdx}`);
+        if (tdElement) {
+          tdElement.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+          tdElement.click(); // Activa la fila y enfoca automáticamente la celda
+          return;
         }
       }
 
@@ -859,7 +866,7 @@ export default function App() {
           (element as HTMLInputElement).select();
         }
       }
-    }, 150);
+    }, 120);
   };
 
   const handleCollarChange = (updatedCollar: Collar) => {
@@ -1383,14 +1390,12 @@ export default function App() {
           )}
         </div>
 
-        {/* Floating validation bottom-right QA/QC panel — hidden on Carga para Revisión */}
+        {/* Floating validation QA/QC panel (handles its own positioning left/right) — hidden on Carga para Revisión */}
         {activeTaladro && currentView !== 'auditoria' && (
-          <div className="fixed bottom-6 right-6 z-40">
-            <ValidationPanel
-              alerts={activeAlerts}
-              onFocusField={handleFocusField}
-            />
-          </div>
+          <ValidationPanel
+            alerts={activeAlerts}
+            onFocusField={handleFocusField}
+          />
         )}
 
       </main>
