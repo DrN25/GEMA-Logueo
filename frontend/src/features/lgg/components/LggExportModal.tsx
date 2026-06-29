@@ -102,6 +102,8 @@ interface LggExportModalProps {
   corridas: Corrida[];
   waterTableM: number;
   activeTaladroName: string;
+  activeTaladroGeologo?: string; // NUEVO PROP RECIBIDO DE FORMA SEGURA
+  activeTaladroFecha?: string;   // NUEVO PROP RECIBIDO DE FORMA SEGURA
   darkMode: boolean;
 }
 
@@ -111,6 +113,8 @@ export default function LggExportModal({
   corridas,
   waterTableM,
   activeTaladroName,
+  activeTaladroGeologo,
+  activeTaladroFecha,
   darkMode: _darkMode
 }: LggExportModalProps) {
   const [exportFieldsConfig, setExportFieldsConfig] = useState<Record<string, boolean>>(() => {
@@ -124,14 +128,8 @@ export default function LggExportModal({
   if (!isOpen) return null;
 
   const lastRowTaladroName = () => activeTaladroName || "FEGT25-001";
-  const lastRowGeologo = () => {
-    const parentEl = document.getElementById('geologo-header-val');
-    return parentEl?.textContent || "RD/RB";
-  };
-  const lastRowFecha = () => {
-    const parentEl = document.getElementById('fecha-header-val');
-    return parentEl?.textContent || new Date().toISOString().split('T')[0];
-  };
+  const lastRowGeologo = () => activeTaladroGeologo || "RD/RB";
+  const lastRowFecha = () => activeTaladroFecha || new Date().toISOString().split('T')[0];
 
   const getExportFieldValue = (row: Corrida, _idx: number, key: string) => {
     const perf = Number((row.a - row.de).toFixed(2));
@@ -370,7 +368,7 @@ export default function LggExportModal({
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-navy-950 border border-navy-800 w-full max-w-4xl rounded-2xl shadow-2xl flex flex-col max-h-[85vh] animate-in fade-in zoom-in-95 duration-200">
-        
+
         {/* Header */}
         <div className="flex justify-between items-center px-6 py-4 border-b border-navy-800 shrink-0">
           <div className="flex items-center gap-3">
@@ -421,17 +419,15 @@ export default function LggExportModal({
                           key={f.key}
                           type="button"
                           onClick={() => toggleField(f.key)}
-                          className={`flex items-center gap-2 p-2 rounded-lg text-[11px] font-medium border text-left transition-all ${
-                            active
+                          className={`flex items-center gap-2 p-2 rounded-lg text-[11px] font-medium border text-left transition-all ${active
                               ? 'bg-blue-600/10 border-blue-500/30 text-blue-400'
                               : 'bg-navy-950/30 border-navy-800/50 text-slate-500 hover:text-slate-300'
-                          }`}
+                            }`}
                         >
-                          <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all ${
-                            active
+                          <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all ${active
                               ? 'border-blue-500 bg-blue-600 text-slate-100'
                               : 'border-navy-700 bg-navy-950/80'
-                          }`}>
+                            }`}>
                             {active && <Check size={10} strokeWidth={3} />}
                           </div>
                           <span className="truncate">{f.label}</span>

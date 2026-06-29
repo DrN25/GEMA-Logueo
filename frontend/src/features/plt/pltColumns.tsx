@@ -96,17 +96,26 @@ export function getPltColumns({
       isSticky: true,
       stickyLeft: 128,
       headerBgClass: 'bg-navy-900',
-      renderCell: (row, idx) => (
-        <div className="w-full h-full p-0">
-          <input
-            id={`plt-cell-${idx}-fecha`}
-            type="date"
-            value={row.fecha || ''}
-            onChange={(e) => handleCellChange(idx, 'fecha', e.target.value)}
-            className="w-full h-full px-2 bg-transparent border-0 text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          />
-        </div>
-      )
+      renderCell: (row, idx, isSelected) => {
+        if (!isSelected) {
+          return (
+            <span className="text-slate-300 block text-center truncate py-1.5 font-semibold select-all">
+              {row.fecha || ''}
+            </span>
+          );
+        }
+        return (
+          <div className="w-full h-full p-0 bg-transparent">
+            <input
+              id={`plt-cell-${idx}-fecha`}
+              type="date"
+              value={row.fecha || ''}
+              onChange={(e) => handleCellChange(idx, 'fecha', e.target.value)}
+              className="w-full h-full px-2 bg-transparent border-0 text-cyan-200 font-bold text-center focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs"
+            />
+          </div>
+        );
+      }
     },
     {
       key: 'taladro' as any,
@@ -130,17 +139,26 @@ export function getPltColumns({
       isSticky: true,
       stickyLeft: 334,
       headerBgClass: 'bg-navy-900 text-center',
-      renderCell: (row, idx) => (
-        <div className="w-full h-full p-0">
-          <input
-            id={`plt-cell-${idx}-nro_muestra`}
-            type="text"
-            value={row.nro_muestra || ''}
-            onChange={(e) => handleCellChange(idx, 'nro_muestra', e.target.value)}
-            className="w-full h-full px-2 bg-transparent border-0 text-slate-100 font-bold text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
-          />
-        </div>
-      )
+      renderCell: (row, idx, isSelected) => {
+        if (!isSelected) {
+          return (
+            <span className="text-slate-100 block text-center truncate font-bold py-1.5 select-all">
+              {row.nro_muestra || ''}
+            </span>
+          );
+        }
+        return (
+          <div className="w-full h-full p-0 bg-transparent">
+            <input
+              id={`plt-cell-${idx}-nro_muestra`}
+              type="text"
+              value={row.nro_muestra || ''}
+              onChange={(e) => handleCellChange(idx, 'nro_muestra', e.target.value)}
+              className="w-full h-full px-2 bg-transparent border-0 text-cyan-200 font-bold text-center focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs"
+            />
+          </div>
+        );
+      }
     },
     {
       key: 'nro_caja',
@@ -255,15 +273,22 @@ export function getPltColumns({
       options: LITO1_OPTIONS,
       headerBgClass: 'bg-purple-500/10 text-purple-600 dark:text-purple-300 border-purple-500/20',
       cellClassName: getCellSectionClass('litologia_1'),
-      renderCell: (row, idx) => {
+      renderCell: (row, idx, isSelected) => {
         const style = getLithologyStyle(row.litologia_1 || '', isDark);
+        if (!isSelected) {
+          return (
+            <div className="w-full h-full flex items-center justify-center p-1" style={style}>
+              <span className="font-bold py-1.5 truncate text-center select-all">{row.litologia_1 || '-'}</span>
+            </div>
+          );
+        }
         return (
           <div className="w-full h-full flex items-center p-1" style={style}>
             <select
               id={`plt-cell-${idx}-litologia_1`}
               value={row.litologia_1 === undefined || row.litologia_1 === null || row.litologia_1 === '-1' || row.litologia_1 === '' ? '-1' : String(row.litologia_1)}
               onChange={(e) => handleCellChange(idx, 'litologia_1', e.target.value)}
-              className="w-full h-full bg-transparent px-2 text-current border-0 focus:outline-none focus:ring-1 focus:ring-blue-500 font-bold text-center cursor-pointer"
+              className="w-full h-full bg-transparent px-2 text-current border-0 focus:outline-none focus:ring-1 focus:ring-blue-500 font-bold text-center cursor-pointer text-xs"
               style={{ color: style.color }}
             >
               <option value="-1" className={isDark ? "bg-navy-950 text-slate-500" : "bg-white text-slate-400"}>S/D</option>
@@ -283,15 +308,24 @@ export function getPltColumns({
       options: LITO2_OPTIONS,
       headerBgClass: 'bg-purple-500/10 text-purple-600 dark:text-purple-300 border-purple-500/20',
       cellClassName: getCellSectionClass('litologia_2'),
-      renderCell: (row, idx) => {
+      renderCell: (row, idx, isSelected) => {
         const style = getLithologyStyle(row.litologia_2 || '', isDark);
+        if (!isSelected) {
+          return (
+            <div className="w-full h-full flex items-center justify-center p-1" style={style}>
+              <span className="font-bold py-1.5 truncate text-center select-all">
+                {row.litologia_2 === undefined || row.litologia_2 === null || row.litologia_2 === '-1' || row.litologia_2 === '' ? '-' : String(row.litologia_2)}
+              </span>
+            </div>
+          );
+        }
         return (
           <div className="w-full h-full flex items-center p-1" style={style}>
             <select
               id={`plt-cell-${idx}-litologia_2`}
               value={row.litologia_2 === undefined || row.litologia_2 === null || row.litologia_2 === '-1' || row.litologia_2 === '' ? '-1' : String(row.litologia_2)}
               onChange={(e) => handleCellChange(idx, 'litologia_2', e.target.value)}
-              className="w-full h-full bg-transparent px-2 text-current border-0 focus:outline-none focus:ring-1 focus:ring-blue-500 font-bold text-center cursor-pointer"
+              className="w-full h-full bg-transparent px-2 text-current border-0 focus:outline-none focus:ring-1 focus:ring-blue-500 font-bold text-center cursor-pointer text-xs"
               style={{ color: style.color }}
             >
               <option value="-1" className={isDark ? "bg-navy-950 text-slate-500" : "bg-white text-slate-400"}>S/D</option>
@@ -311,15 +345,24 @@ export function getPltColumns({
       options: LITO3_OPTIONS,
       headerBgClass: 'bg-purple-500/10 text-purple-600 dark:text-purple-300 border-purple-500/20',
       cellClassName: getCellSectionClass('litologia_3'),
-      renderCell: (row, idx) => {
+      renderCell: (row, idx, isSelected) => {
         const style = getLithologyStyle(row.litologia_3 || '', isDark);
+        if (!isSelected) {
+          return (
+            <div className="w-full h-full flex items-center justify-center p-1" style={style}>
+              <span className="font-bold py-1.5 truncate text-center select-all">
+                {row.litologia_3 === undefined || row.litologia_3 === null || row.litologia_3 === '-1' || row.litologia_3 === '' ? '-' : String(row.litologia_3)}
+              </span>
+            </div>
+          );
+        }
         return (
           <div className="w-full h-full flex items-center p-1" style={style}>
             <select
               id={`plt-cell-${idx}-litologia_3`}
               value={row.litologia_3 === undefined || row.litologia_3 === null || row.litologia_3 === '-1' || row.litologia_3 === '' ? '-1' : String(row.litologia_3)}
               onChange={(e) => handleCellChange(idx, 'litologia_3', e.target.value)}
-              className="w-full h-full bg-transparent px-2 text-current border-0 focus:outline-none focus:ring-1 focus:ring-blue-500 font-bold text-center cursor-pointer"
+              className="w-full h-full bg-transparent px-2 text-current border-0 focus:outline-none focus:ring-1 focus:ring-blue-500 font-bold text-center cursor-pointer text-xs"
               style={{ color: style.color }}
             >
               <option value="-1" className={isDark ? "bg-navy-950 text-slate-500" : "bg-white text-slate-400"}>S/D</option>
@@ -416,7 +459,7 @@ export function getPltColumns({
       headerBgClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border-emerald-500/20',
       cellClassName: getCellSectionClass('fact_corr'),
       renderCell: (row) => (
-        <div className="text-center text-slate-400 py-1.5 font-medium">
+        <div className="text-center text-slate-400 py-1.5 font-medium font-mono select-all">
           {typeof row.fact_corr === 'number' ? row.fact_corr.toFixed(3) : row.fact_corr}
         </div>
       )
@@ -456,7 +499,7 @@ export function getPltColumns({
         const val = row.isrm_indice_r;
         const isStrong = ['R4', 'R5', 'R6'].includes(String(val));
         return (
-          <div className={`text-center py-1.5 font-bold truncate px-1 ${isStrong ? 'text-orange-400 font-black' : 'text-slate-400'}`}>
+          <div className={`text-center py-1.5 font-bold truncate px-1 select-all ${isStrong ? 'text-orange-400 font-black' : 'text-slate-400'}`}>
             {val}
           </div>
         );
@@ -476,17 +519,22 @@ export function getPltColumns({
       isStickyRight: true,
       stickyRight: 0,
       headerBgClass: 'bg-navy-900 text-center',
-      renderCell: (_, idx) => (
-        <div className="flex justify-center items-center py-1.5">
-          <button
-            onClick={() => deleteRow(idx)}
-            className="p-1.5 rounded-lg border border-red-200 dark:border-red-500/20 bg-red-50 dark:bg-red-500/5 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/15 hover:text-red-700 dark:hover:text-red-300 transition-all duration-200 shadow-sm active:scale-90 flex items-center justify-center mx-auto"
-            title="Eliminar Ensayo"
-          >
-            <Trash2 size={14} />
-          </button>
-        </div>
-      )
+      renderCell: (_, idx, isSelected) => {
+        if (!isSelected) {
+          return null; // Oculta botones de acción en filas inactivas para máxima ligereza
+        }
+        return (
+          <div className="flex justify-center items-center py-1.5 bg-navy-950/95">
+            <button
+              onClick={() => deleteRow(idx)}
+              className="p-1.5 rounded-lg border border-red-200 dark:border-red-500/20 bg-red-50 dark:bg-red-500/5 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/15 hover:text-red-700 dark:hover:text-red-300 transition-all duration-200 shadow-sm active:scale-90 flex items-center justify-center mx-auto"
+              title="Eliminar Ensayo"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+        );
+      }
     }
   ];
 }

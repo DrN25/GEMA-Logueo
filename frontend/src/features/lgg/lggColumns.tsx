@@ -17,7 +17,6 @@ import {
   GROUNDWATER_CATALOG
 } from '../../utils/catalogData';
 
-// --- ESTILOS DE CELDA ---
 export const getLithologyStyle = (val: string, darkMode: boolean) => {
   const code = (val || '').toUpperCase();
   const item = LITHOLOGY_CATALOG[code];
@@ -277,14 +276,22 @@ export function getLggColumns({
       width: 'w-28',
       type: 'select',
       options: LITO1_OPTIONS,
-      renderCell: (row) => {
+      renderCell: (row, _idx, isSelected) => {
         const style = getLithologyStyleNullable(row.lito1, isDark);
+        // PERFORMANCE: Si la fila no está activa, renderizar un elemento de texto plano ultra liviano
+        if (!isSelected) {
+          return (
+            <div className="w-full h-full flex items-center justify-center px-1" style={style}>
+              <span className="font-bold py-1.5 truncate text-center select-all">{row.lito1}</span>
+            </div>
+          );
+        }
         return (
           <div className="w-full h-full flex items-center justify-center px-1" style={style}>
             <select
               value={row.lito1}
               onChange={(e) => handleCellChange(row.originalIndex, 'lito1', e.target.value)}
-              className="w-full bg-transparent border-0 py-1 text-center font-bold focus:outline-none cursor-pointer"
+              className="w-full bg-transparent border-0 py-1 text-center font-bold focus:outline-none cursor-pointer text-xs"
               style={{ color: style.color }}
             >
               {LITO1_OPTIONS.map(opt => (
@@ -303,14 +310,23 @@ export function getLggColumns({
       width: 'w-28',
       type: 'select',
       options: LITO2_OPTIONS,
-      renderCell: (row) => {
+      renderCell: (row, _idx, isSelected) => {
         const style = getLithologyStyleNullable(row.lito2, isDark);
+        if (!isSelected) {
+          return (
+            <div className="w-full h-full flex items-center justify-center px-1" style={style}>
+              <span className="font-bold py-1.5 truncate text-center select-all">
+                {(!row.lito2 || row.lito2 === "-1") ? "-" : row.lito2}
+              </span>
+            </div>
+          );
+        }
         return (
           <div className="w-full h-full flex items-center justify-center px-1" style={style}>
             <select
               value={row.lito2 || '-1'}
               onChange={(e) => handleCellChange(row.originalIndex, 'lito2', e.target.value)}
-              className="w-full bg-transparent border-0 py-1 text-center font-bold focus:outline-none cursor-pointer"
+              className="w-full bg-transparent border-0 py-1 text-center font-bold focus:outline-none cursor-pointer text-xs"
               style={{ color: style.color }}
             >
               <option value="-1" className={isDark ? "bg-navy-950 text-slate-500" : "bg-white text-slate-400"}>S/D</option>
@@ -330,14 +346,23 @@ export function getLggColumns({
       width: 'w-28',
       type: 'select',
       options: LITO3_OPTIONS,
-      renderCell: (row) => {
+      renderCell: (row, _idx, isSelected) => {
         const style = getLithologyStyleNullable(row.lito3, isDark);
+        if (!isSelected) {
+          return (
+            <div className="w-full h-full flex items-center justify-center px-1" style={style}>
+              <span className="font-bold py-1.5 truncate text-center select-all">
+                {(!row.lito3 || row.lito3 === "-1") ? "-" : row.lito3}
+              </span>
+            </div>
+          );
+        }
         return (
           <div className="w-full h-full flex items-center justify-center px-1" style={style}>
             <select
               value={row.lito3 || '-1'}
               onChange={(e) => handleCellChange(row.originalIndex, 'lito3', e.target.value)}
-              className="w-full bg-transparent border-0 py-1 text-center font-bold focus:outline-none cursor-pointer"
+              className="w-full bg-transparent border-0 py-1 text-center font-bold focus:outline-none cursor-pointer text-xs"
               style={{ color: style.color }}
             >
               <option value="-1" className={isDark ? "bg-navy-950 text-slate-500" : "bg-white text-slate-400"}>S/D</option>
@@ -357,14 +382,23 @@ export function getLggColumns({
       width: 'w-28',
       type: 'select',
       options: RESISTENCIA_OPTIONS,
-      renderCell: (row) => {
+      renderCell: (row, _idx, isSelected) => {
         const style = getResistenciaStyle(row.resistencia, isDark);
+        if (!isSelected) {
+          return (
+            <div className="w-full h-full flex items-center justify-center px-1" style={style}>
+              <span className="font-bold py-1.5 truncate text-center select-all">
+                {(!row.resistencia || row.resistencia === "-1") ? "-" : row.resistencia}
+              </span>
+            </div>
+          );
+        }
         return (
           <div className="w-full h-full flex items-center justify-center px-1" style={style}>
             <select
               value={row.resistencia}
               onChange={(e) => handleCellChange(row.originalIndex, 'resistencia', e.target.value)}
-              className="w-full bg-transparent border-0 py-1 text-center font-bold focus:outline-none cursor-pointer"
+              className="w-full bg-transparent border-0 py-1 text-center font-bold focus:outline-none cursor-pointer text-xs"
               style={{ color: style.color }}
             >
               {RESISTENCIA_OPTIONS.map(opt => (
@@ -487,14 +521,23 @@ export function getLggColumns({
       width: 'w-28',
       type: 'select',
       options: INTEMPERISMO_OPTIONS,
-      renderCell: (row) => {
+      renderCell: (row, _idx, isSelected) => {
         const style = getIntemperismoStyle(row.intemperismo, isDark);
+        if (!isSelected) {
+          return (
+            <div className="w-full h-full flex items-center justify-center px-1" style={style}>
+              <span className="font-bold py-1.5 truncate text-center select-all">
+                {(!row.intemperismo || row.intemperismo === "-1") ? "-" : row.intemperismo}
+              </span>
+            </div>
+          );
+        }
         return (
           <div className="w-full h-full flex items-center justify-center px-1" style={style}>
             <select
               value={row.intemperismo}
               onChange={(e) => handleCellChange(row.originalIndex, 'intemperismo', e.target.value)}
-              className="w-full bg-transparent border-0 py-1 text-center font-bold focus:outline-none cursor-pointer"
+              className="w-full bg-transparent border-0 py-1 text-center font-bold focus:outline-none cursor-pointer text-xs"
               style={{ color: style.color }}
             >
               {INTEMPERISMO_OPTIONS.map(opt => (
@@ -520,18 +563,27 @@ export function getLggColumns({
       width: 'w-28',
       type: 'select',
       options: RELLENO_OPTIONS,
-      renderCell: (row) => (
-        <select
-          value={row.relleno2 || '-1'}
-          onChange={(e) => handleCellChange(row.originalIndex, 'relleno2', e.target.value)}
-          className="w-full bg-transparent border-0 px-1 py-1 text-center text-slate-300 focus:outline-none cursor-pointer focus:ring-1 focus:ring-blue-500 rounded"
-        >
-          <option value="-1" className={isDark ? "bg-navy-950 text-slate-500" : "bg-white text-slate-400"}>Ninguno</option>
-          {RELLENO_OPTIONS.filter(o => o !== "-1").map(opt => (
-            <option key={opt} value={opt} className={isDark ? "bg-navy-950 text-slate-300" : "bg-white text-slate-800"}>{opt}</option>
-          ))}
-        </select>
-      )
+      renderCell: (row, _idx, isSelected) => {
+        if (!isSelected) {
+          return (
+            <span className="text-slate-300 block text-center truncate py-1.5 font-semibold select-all">
+              {(!row.relleno2 || row.relleno2 === "-1") ? "-" : row.relleno2}
+            </span>
+          );
+        }
+        return (
+          <select
+            value={row.relleno2 || '-1'}
+            onChange={(e) => handleCellChange(row.originalIndex, 'relleno2', e.target.value)}
+            className="w-full bg-transparent border-0 px-1 py-1 text-center text-slate-300 focus:outline-none cursor-pointer focus:ring-1 focus:ring-blue-500 rounded text-xs"
+          >
+            <option value="-1" className={isDark ? "bg-navy-950 text-slate-500" : "bg-white text-slate-400"}>Ninguno</option>
+            {RELLENO_OPTIONS.filter(o => o !== "-1").map(opt => (
+              <option key={opt} value={opt} className={isDark ? "bg-navy-950 text-slate-300" : "bg-white text-slate-800"}>{opt}</option>
+            ))}
+          </select>
+        );
+      }
     },
     {
       key: 'espesor',
@@ -568,14 +620,23 @@ export function getLggColumns({
       width: 'w-28',
       type: 'select',
       options: AGUA_OPTIONS,
-      renderCell: (row) => {
+      renderCell: (row, _idx, isSelected) => {
         const style = getAguaStyle(row.agua_obs, isDark);
+        if (!isSelected) {
+          return (
+            <div className="w-full h-full flex items-center justify-center px-1" style={style}>
+              <span className="font-bold py-1.5 truncate text-center select-all">
+                {(!row.agua_obs || row.agua_obs === "-1") ? "-" : row.agua_obs}
+              </span>
+            </div>
+          );
+        }
         return (
           <div className="w-full h-full flex items-center justify-center px-1" style={style}>
             <select
               value={row.agua_obs}
               onChange={(e) => handleCellChange(row.originalIndex, 'agua_obs', e.target.value)}
-              className="w-full bg-transparent border-0 py-1 text-center font-bold focus:outline-none cursor-pointer"
+              className="w-full bg-transparent border-0 py-1 text-center font-bold focus:outline-none cursor-pointer text-xs"
               style={{ color: style.color }}
             >
               {AGUA_OPTIONS.map(opt => (
@@ -608,16 +669,25 @@ export function getLggColumns({
       width: 'w-24',
       type: 'select',
       options: ['D', 'N'],
-      renderCell: (row) => (
-        <select
-          value={row.turno || 'D'}
-          onChange={(e) => handleCellChange(row.originalIndex, 'turno', e.target.value)}
-          className="w-full bg-transparent border-0 py-1 text-center text-slate-300 focus:outline-none cursor-pointer focus:ring-1 focus:ring-blue-500 rounded"
-        >
-          <option value="D" className={isDark ? "bg-navy-950 text-slate-300" : "bg-white text-slate-800"}>Día</option>
-          <option value="N" className={isDark ? "bg-navy-950 text-slate-300" : "bg-white text-slate-800"}>Noche</option>
-        </select>
-      )
+      renderCell: (row, _idx, isSelected) => {
+        if (!isSelected) {
+          return (
+            <span className="text-slate-300 block text-center truncate py-1.5 font-semibold select-all">
+              {row.turno || 'D'}
+            </span>
+          );
+        }
+        return (
+          <select
+            value={row.turno || 'D'}
+            onChange={(e) => handleCellChange(row.originalIndex, 'turno', e.target.value)}
+            className="w-full bg-transparent border-0 py-1 text-center text-slate-300 focus:outline-none cursor-pointer focus:ring-1 focus:ring-blue-500 rounded text-xs"
+          >
+            <option value="D" className={isDark ? "bg-navy-950 text-slate-300" : "bg-white text-slate-800"}>Día</option>
+            <option value="N" className={isDark ? "bg-navy-950 text-slate-300" : "bg-white text-slate-800"}>Noche</option>
+          </select>
+        );
+      }
     },
     {
       key: 'comentarios',
@@ -676,24 +746,31 @@ export function getLggColumns({
       type: 'readonly',
       isStickyRight: true,
       stickyRight: 0,
-      renderCell: (row) => (
-        <div className="flex justify-center items-center gap-1.5 py-1.5">
-          <button
-            onClick={() => insertCorridaRow(row.originalIndex)}
-            className="text-cyan-500 hover:text-cyan-400 p-1 hover:bg-cyan-500/10 rounded transition-colors"
-            title="Clonar esta corrida abajo"
-          >
-            <Copy size={15} />
-          </button>
-          <button
-            onClick={() => deleteCorridaRow(row.originalIndex)}
-            className="text-red-500 hover:text-red-400 p-1 hover:bg-red-500/10 rounded transition-colors"
-            title="Eliminar esta corrida"
-          >
-            <Trash2 size={15} />
-          </button>
-        </div>
-      )
+      renderCell: (row, _idx, isSelected) => {
+        // PERFORMANCE: Solo mostramos botones de acción en la fila actualmente seleccionada
+        // Esto limpia visualmente la tabla de ruidos y acelera el renderizado del scroll.
+        if (!isSelected) {
+          return null;
+        }
+        return (
+          <div className="flex justify-center items-center gap-1.5 py-1.5 bg-navy-950/95">
+            <button
+              onClick={() => insertCorridaRow(row.originalIndex)}
+              className="text-cyan-500 hover:text-cyan-400 p-1 hover:bg-cyan-500/10 rounded transition-colors"
+              title="Clonar esta corrida abajo"
+            >
+              <Copy size={15} />
+            </button>
+            <button
+              onClick={() => deleteCorridaRow(row.originalIndex)}
+              className="text-red-500 hover:text-red-400 p-1 hover:bg-red-500/10 rounded transition-colors"
+              title="Eliminar esta corrida"
+            >
+              <Trash2 size={15} />
+            </button>
+          </div>
+        );
+      }
     }
   ];
 }

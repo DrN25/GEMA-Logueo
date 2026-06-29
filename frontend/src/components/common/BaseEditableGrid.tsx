@@ -8,9 +8,7 @@ export interface GridColumn<T> {
   type: 'text' | 'number' | 'select' | 'readonly';
   options?: string[];
   step?: string;
-  /** Rango mínimo: se aplica en tiempo real via onInput sin tocar React state */
   min?: number;
-  /** Rango máximo: se aplica en tiempo real via onInput sin tocar React state */
   max?: number;
   isSticky?: boolean;
   stickyLeft?: number;
@@ -18,7 +16,7 @@ export interface GridColumn<T> {
   stickyRight?: number;
   headerBgClass?: string;
   cellClassName?: string;
-  renderCell?: (row: T, index: number, isSelected: boolean) => React.ReactNode;
+  renderCell?: (row: T, index: number, isSelected: boolean) => React.RefNode | React.ReactNode;
 }
 
 interface BaseEditableGridProps<T> {
@@ -38,10 +36,7 @@ interface BaseEditableGridProps<T> {
   getAlertRowIndex?: (row: T, displayIndex: number) => number;
 }
 
-// Array vacío estable — evita crear nuevas referencias para filas sin alertas.
 const EMPTY_ALERTS: ValidationAlert[] = [];
-
-// ─── Helpers de estilo (fuera del componente — constantes, nunca se recrean) ──
 
 function getCellTdStyle(
   colKey: string,
@@ -132,22 +127,6 @@ function getHeaderStyle<T>(col: GridColumn<T>): React.CSSProperties {
   return { background: 'rgb(var(--navy-900))', boxShadow: borderShadows, ...stickyStyle };
 }
 
-// ─── Sub-componente de Fila con Estado Local (patrón Excel) ───────────────────
-//
-// PATRÓN "LOCAL-FIRST, COMMIT-ON-BLUR" (igual que Excel):
-// --------------------------------------------------------
-// Mientras el usuario tipea, los inputs manejan su propio valor local
-// (useState en la fila). El estado global de React (activeTaladro) NO se
-// actualiza en cada keystroke — solo cuando:
-//   1. El input pierde el foco (onBlur)
-//   2. El usuario presiona Enter o flechas de navegación
-//
-// Resultado: solo esta fila re-renderiza durante el tipeo.
-// Las otras 199 filas permanecen congeladas — React.memo nunca las toca.
-//
-// Los límites de rango (min/max) se aplican en tiempo real via onInput,
-// manipulando directamente el DOM sin tocar el estado de React.
-
 interface GridRowProps<T> {
   row: T;
   rowIndex: number;
@@ -178,27 +157,14 @@ function GridRowInner<T>({
   onAddRow,
 }: GridRowProps<T>) {
 
-  // ── Estado local de edición ──────────────────────────────────────────────
-  // Mapa de { fieldKey → stringValue } de los campos que el usuario está editando.
-  // Mientras el usuario tipea, SOLO este mapa cambia (no el estado global).
-  // Cuando onBlur/Enter ocurre, el valor se "commit" al estado global.
   const [editing, setEditing] = useState<Record<string, string>>({});
-
-  // Ref para acceso estable al editing actual dentro de callbacks
   const editingRef = useRef(editing);
   editingRef.current = editing;
 
-  // ── Sincronización con el padre ──────────────────────────────────────────
-  // Cuando la fila en el estado global cambia (después de un commit o import
-  // masivo), limpiamos los overrides locales para que los inputs reflejen
-  // los valores oficiales del estado global.
   useEffect(() => {
     setEditing({});
   }, [row]);
 
-  // ── Helpers de display ───────────────────────────────────────────────────
-  // Devuelve el valor a mostrar en el input: override local primero,
-  // luego el valor oficial de la fila (desde el estado global).
   const getDisplayVal = (field: keyof T): string => {
     const k = String(field);
     if (k in editing) return editing[k];
@@ -206,19 +172,14 @@ function GridRowInner<T>({
     return val !== undefined && val !== null ? String(val) : '';
   };
 
-  // ── Commit de campo ──────────────────────────────────────────────────────
-  // Envía el valor actual al estado global. Solo se llama en onBlur o
-  // al navegar con teclado — nunca durante el tipeo activo.
   const commitField = useCallback((field: keyof T, domValueOverride?: string) => {
     const k = String(field);
-    // Prioridad: valor del DOM (si viene de teclado) > local override > nada
     const strVal = domValueOverride !== undefined
       ? domValueOverride
       : k in editingRef.current
         ? editingRef.current[k]
         : null;
 
-    // Si el usuario nunca editó este campo, no hay nada que commitear
     if (strVal === null) return;
 
     const colDef = columns.find(c => c.key === field);
@@ -229,7 +190,6 @@ function GridRowInner<T>({
     onCellChange(rowIndex, field, parsed);
   }, [rowIndex, onCellChange, columns]);
 
-  // ── Navegación por teclado + commit antes de moverse ────────────────────
   const handleKeyDown = useCallback((
     e: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>,
     field: keyof T
@@ -257,7 +217,7 @@ function GridRowInner<T>({
         if (colIndex <= 0) return;
         targetColIndex = colIndex - 1;
       } else {
-        return; // cursor moviéndose dentro del texto
+        return;
       }
     } else if (e.key === 'ArrowRight') {
       const target = e.target as HTMLInputElement;
@@ -266,18 +226,16 @@ function GridRowInner<T>({
         if (colIndex >= editableFields.length - 1) return;
         targetColIndex = colIndex + 1;
       } else {
-        return; // cursor moviéndose dentro del texto
+        return;
       }
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      // Commit del campo actual antes de avanzar
       const currentVal = e.currentTarget.tagName === 'INPUT'
         ? (e.currentTarget as HTMLInputElement).value
         : undefined;
       commitField(field, currentVal);
 
       if (colIndex === editableFields.length - 1) {
-        // Última columna: agregar nueva fila
         if (onAddRow) {
           onAddRow();
           setTimeout(() => {
@@ -288,7 +246,6 @@ function GridRowInner<T>({
         return;
       }
       targetColIndex = colIndex + 1;
-      // Commit ya fue hecho arriba; navegar sin hacer otro commit
       const nextId = `${idPrefix}-${targetRow}-${targetColIndex}`;
       setTimeout(() => {
         const el = document.getElementById(nextId) as HTMLInputElement | null;
@@ -297,7 +254,6 @@ function GridRowInner<T>({
       return;
     }
 
-    // Para Arrow keys: commit el valor actual del DOM antes de navegar
     const currentDomVal = e.currentTarget.tagName === 'INPUT'
       ? (e.currentTarget as HTMLInputElement).value
       : undefined;
@@ -314,9 +270,8 @@ function GridRowInner<T>({
     <tr
       onClick={() => onSelect(rowIndex)}
       onFocus={() => onSelect(rowIndex)}
-      className={`geotech-table-row border-b border-navy-900/60 hover:bg-cyan-500/15 transition-all text-slate-100 font-medium h-10 ${
-        isSelected ? 'bg-cyan-500/5' : ''
-      }`}
+      className={`geotech-table-row border-b border-navy-900/60 hover:bg-cyan-500/15 transition-all text-slate-100 font-medium h-8 ${isSelected ? 'bg-cyan-500/5' : ''
+        }`}
     >
       {columns.map((col) => {
         const colKeyStr = String(col.key);
@@ -330,7 +285,6 @@ function GridRowInner<T>({
           isSelected, rowAlerts, alertRowIndex, idPrefix
         );
 
-        // Renderizador personalizado (ej: botones de acción)
         if (col.renderCell) {
           return (
             <td key={colKeyStr} className={`${isStickyAny ? 'bg-navy-950' : ''} ${col.cellClassName || ''}`} style={cellStyle}>
@@ -340,53 +294,66 @@ function GridRowInner<T>({
         }
 
         return (
-          <td key={colKeyStr} className={`${isStickyAny ? 'bg-navy-950 text-center' : 'px-1'} ${col.cellClassName || ''}`} style={cellStyle}>
-
+          <td
+            key={colKeyStr}
+            className={`${isStickyAny ? 'bg-navy-950 text-center' : 'px-1'} ${col.cellClassName || ''}`}
+            style={cellStyle}
+            onClick={() => {
+              // Si el usuario hace clic en una celda de una fila inactiva, la selecciona
+              // y enfoca el input correspondiente una vez renderizado
+              if (!isSelected && colIdx !== -1) {
+                onSelect(rowIndex);
+                setTimeout(() => {
+                  const inputId = `${idPrefix}-${rowIndex}-${colIdx}`;
+                  const inputEl = document.getElementById(inputId);
+                  if (inputEl) {
+                    inputEl.focus();
+                    if (inputEl.tagName === 'INPUT') {
+                      (inputEl as HTMLInputElement).select();
+                    }
+                  }
+                }, 40);
+              }
+            }}
+          >
             {col.type === 'readonly' ? (
-              // Solo lectura: siempre muestra el valor oficial
               <span className="text-slate-400 font-medium select-all block text-center truncate">
                 {String(row[col.key as keyof T] ?? '')}
               </span>
-
+            ) : !isSelected ? (
+              // EXCEL OPTIMIZATION: Si la fila no está activa, renderizamos texto plano ligero (span)
+              // Esto limpia el 90% del DOM de inputs inactivos
+              <span className="text-slate-200 block text-center truncate py-0.5 font-semibold select-all">
+                {String(row[col.key as keyof T] ?? '') === '-1' ? '-' : String(row[col.key as keyof T] ?? '')}
+              </span>
             ) : col.type === 'select' ? (
-              // Selects: commit instantáneo (seleccionar un option es siempre una acción completa)
-              // Usan el valor del estado global directamente (no override local necesario)
               <select
                 id={`${idPrefix}-${rowIndex}-${colIdx}`}
                 value={String(row[col.key as keyof T] ?? '-1')}
                 onChange={(e) => onCellChange(rowIndex, col.key as keyof T, e.target.value)}
                 onKeyDown={(e) => handleKeyDown(e, col.key as keyof T)}
-                className={`w-full bg-transparent border-0 text-center focus:outline-none focus:ring-1 focus:ring-blue-500 rounded py-1 ${
-                  isSelected ? 'text-cyan-200' : 'text-slate-200'
-                }`}
+                className={`w-full bg-transparent border-0 text-center focus:outline-none focus:ring-1 focus:ring-blue-500 rounded py-0.5 ${isSelected ? 'text-cyan-200 font-bold' : 'text-slate-200'
+                  }`}
               >
                 {(col.options || []).map((opt) => (
                   <option key={opt} value={opt} className="bg-navy-950 text-slate-200">{opt}</option>
                 ))}
               </select>
-
             ) : (
-              // Text / Number: estado LOCAL durante el tipeo, commit en blur o teclado.
-              // onCellChange (estado global) NO se llama mientras el usuario tipea.
               <input
                 id={`${idPrefix}-${rowIndex}-${colIdx}`}
                 type={col.type}
                 step={col.step}
                 min={col.min}
                 max={col.max}
-                // Controlado con el estado LOCAL de la fila (no el global)
                 value={getDisplayVal(col.key as keyof T)}
                 onChange={(e) => {
-                  // Solo actualiza el estado LOCAL de esta fila — sin tocar activeTaladro
                   setEditing(prev => ({ ...prev, [colKeyStr]: e.target.value }));
                 }}
                 onBlur={() => {
-                  // Pierde el foco → commit al estado global
                   commitField(col.key as keyof T);
                 }}
                 onInput={(e) => {
-                  // Límites de rango: manipulación directa del DOM (sin React state)
-                  // El usuario NUNCA puede escribir un valor fuera de [min, max]
                   if (col.type === 'number' && (col.min !== undefined || col.max !== undefined)) {
                     const v = parseFloat(e.currentTarget.value);
                     if (!isNaN(v)) {
@@ -402,11 +369,9 @@ function GridRowInner<T>({
                   }
                 }}
                 onKeyDown={(e) => handleKeyDown(e, col.key as keyof T)}
-                // Prevenir que el scroll del ratón altere valores numéricos
                 onWheel={col.type === 'number' ? (e) => e.currentTarget.blur() : undefined}
-                className={`w-full bg-transparent border-0 text-center font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500 rounded py-1 ${
-                  isSelected ? 'text-cyan-200 font-bold' : 'text-slate-100'
-                }`}
+                className={`w-full bg-transparent border-0 text-center font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500 rounded py-0.5 ${isSelected ? 'text-cyan-200 font-bold' : 'text-slate-100'
+                  }`}
               />
             )}
           </td>
@@ -416,32 +381,22 @@ function GridRowInner<T>({
   );
 }
 
-// ── Función de comparación para React.memo ────────────────────────────────────
-// Devuelve true = no re-renderizar desde el padre (props iguales).
-// La clave: row se compara por REFERENCIA. Mientras el usuario tipea,
-// el estado global no cambia → row es el mismo objeto → todas las demás
-// filas son saltadas por React.memo (solo la fila activa re-renderiza via
-// su propio useState interno, que bypasa memo).
 function areRowPropsEqual<T>(prev: GridRowProps<T>, next: GridRowProps<T>): boolean {
   if (prev.row !== next.row) return false;
   if (prev.isSelected !== next.isSelected) return false;
   if (prev.rowIndex !== next.rowIndex) return false;
   if (prev.totalRows !== next.totalRows) return false;
   if (prev.columns !== next.columns) return false;
-  // Comparar alertas: referencia primero (mayormente estable con debounce),
-  // luego contenido si la referencia cambió (actualización post-tipeo)
   if (prev.rowAlerts === next.rowAlerts) return true;
   if (prev.rowAlerts.length !== next.rowAlerts.length) return false;
   for (let i = 0; i < prev.rowAlerts.length; i++) {
     if (prev.rowAlerts[i].field !== next.rowAlerts[i].field ||
-        prev.rowAlerts[i].type  !== next.rowAlerts[i].type) return false;
+      prev.rowAlerts[i].type !== next.rowAlerts[i].type) return false;
   }
   return true;
 }
 
 const GridRow = memo(GridRowInner, areRowPropsEqual) as typeof GridRowInner;
-
-// ─── Componente Principal ─────────────────────────────────────────────────────
 
 export default function BaseEditableGrid<T>({
   data,
@@ -458,9 +413,34 @@ export default function BaseEditableGrid<T>({
   getAlertRowIndex
 }: BaseEditableGridProps<T>) {
 
-  // Pre-computar mapa de alertas por fila (O(alertas) una vez).
-  // Cada fila recibe solo sus propias alertas → getCellTdStyle busca en
-  // un array de 0-5 items en lugar del array global.
+  // --- MOTOR DE RENDIMIENTO: RENDERIZADO PROGRESIVO EN LOTES ---
+  const [renderLimit, setRenderLimit] = useState(() => {
+    // Si hay una fila seleccionada mayor a 40, inicializamos el límite para que la incluya de golpe
+    const initialLimit = selectedRowIndex !== null ? Math.max(40, selectedRowIndex + 10) : 40;
+    return Math.min(data.length, initialLimit);
+  });
+
+  // Resetear el límite progresivo al cargar un taladro o array de datos diferente
+  useEffect(() => {
+    const initialLimit = selectedRowIndex !== null ? Math.max(40, selectedRowIndex + 10) : 40;
+    setRenderLimit(Math.min(data.length, initialLimit));
+  }, [data]);
+
+  // Incrementar progresivamente el límite de renderizado cediendo el control al navegador
+  useEffect(() => {
+    if (renderLimit < data.length) {
+      const timer = setTimeout(() => {
+        setRenderLimit(prev => Math.min(data.length, prev + 40));
+      }, 20); // Ventana de 20ms que permite al navegador pintar y responder a clics
+      return () => clearTimeout(timer);
+    }
+  }, [renderLimit, data.length]);
+
+  // Array rebanado según el límite de carga progresivo actual
+  const visibleData = useMemo(() => {
+    return data.slice(0, renderLimit);
+  }, [data, renderLimit]);
+
   const alertsByRow = useMemo(() => {
     const map = new Map<number, ValidationAlert[]>();
     for (const alert of alerts) {
@@ -474,7 +454,6 @@ export default function BaseEditableGrid<T>({
     return map;
   }, [alerts]);
 
-  // Estilos de cabecera memoizados
   const headerStyles = useMemo(
     () => columns.map(col => getHeaderStyle(col)),
     [columns]
@@ -497,7 +476,7 @@ export default function BaseEditableGrid<T>({
           </tr>
         </thead>
         <tbody>
-          {data.map((row, rowIndex) => {
+          {visibleData.map((row, rowIndex) => {
             const alertRowIndex = getAlertRowIndex ? getAlertRowIndex(row, rowIndex) : rowIndex;
             const isSelected = selectedRowIndex === rowIndex;
             const rowAlerts = alertsByRow.get(alertRowIndex) ?? EMPTY_ALERTS;

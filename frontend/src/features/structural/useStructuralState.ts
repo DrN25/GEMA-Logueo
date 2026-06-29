@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import type { Discontinuidad, Corrida } from './structuralColumns';
 
 interface UseStructuralStateProps {
@@ -46,12 +46,29 @@ export function useStructuralState({
     });
   }, []);
 
-  // --- Mapeo y Filtrado de Discontinuidades con Índices Originales ---
+  // --- MAPEO Y ESTABILIZACIÓN EN MEMORIA DE DISCONTINUIDADES ---
+  const prevMappedRef = useRef<{ disc: Discontinuidad; originalIndex: number }[]>([]);
+
   const mappedDiscontinuidades = useMemo(() => {
-    return discontinuidades.map((disc, originalIndex) => ({
-      disc,
-      originalIndex
-    }));
+    const prevMapped = prevMappedRef.current;
+
+    const mapped = discontinuidades.map((disc, originalIndex) => {
+      const prev = prevMapped[originalIndex];
+
+      // Verificación de consistencia referencial para conservar referencias estables de React.memo
+      const isSameDisc = prev &&
+        prev.originalIndex === originalIndex &&
+        Object.keys(disc).every(key => disc[key as keyof Discontinuidad] === prev.disc[key as keyof Discontinuidad]);
+
+      if (isSameDisc) {
+        return prev; // Mantiene la misma referencia exacta
+      }
+
+      return { disc, originalIndex };
+    });
+
+    prevMappedRef.current = mapped;
+    return mapped;
   }, [discontinuidades]);
 
   const filteredDiscontinuidades = useMemo(() => {
@@ -111,7 +128,6 @@ export function useStructuralState({
     } else {
       let validatedValue = value;
 
-      // 1. Campos específicos con límites definidos
       if (field === 'alfa') {
         const parsed = parseFloat(value);
         if (!isNaN(parsed)) {
@@ -166,7 +182,6 @@ export function useStructuralState({
           validatedValue = -1;
         }
       }
-      // 2. Validación genérica de mínimos para los demás campos numéricos
       else {
         const camposNumericos: (keyof Discontinuidad)[] = ['abertura', 'espesor', 'forma'];
         if (camposNumericos.includes(field)) {
@@ -230,7 +245,7 @@ export function useStructuralState({
     onDiscontinuidadesChange([...discontinuidades, newRow]);
   }, [discontinuidades, corridas, geologo, onDiscontinuidadesChange]);
 
-  // --- Insertar Fila Debajo de Fila Seleccionada (Clonación y Reindexación) ---
+  // --- Insertar Fila (Clonación y Reindexación) ---
   const insertDiscontinuidadRow = useCallback((index: number) => {
     const prevRow = discontinuidades[index];
     if (!prevRow) return;

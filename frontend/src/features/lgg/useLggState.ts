@@ -94,42 +94,56 @@ export function useLggState({
     });
   }, []);
 
-  // Cache de resultados RMR por fila: evita recalcular filas que no cambiaron.
-  // Funciona como un mapa de hash rápido: si la llave de una fila no cambió,
-  // devolvemos el resultado anterior sin llamar a calculateRowRmr().
+  // Cache persistente de resultados RMR por clave de cálculo
   const rmrCache = useRef<Map<string, CorridaEnriquecida>>(new Map());
+  // Conservador de referencias estables para evitar re-renders innecesarios en React.memo
+  const prevEnrichedRef = useRef<CorridaEnriquecida[]>([]);
 
   // 2. Lógica Reactiva de Cálculos Geomecánicos y RMR Enriquecido
   const corridasEnriquecidas = useMemo<CorridaEnriquecida[]>(() => {
-    // Limpiar entradas de cache que ya no existen (filas eliminadas)
+    // Limpiar caché si crece desproporcionadamente
     if (rmrCache.current.size > corridas.length * 2) {
       rmrCache.current.clear();
     }
 
-    return corridas.map((row, idx) => {
-      // Construir clave de cache con solo los campos que afectan el cálculo RMR.
-      // Es un string corto y su construcción es ~10x más rápida que JSON.stringify(row).
+    const prevEnriched = prevEnrichedRef.current;
+
+    const enriched = corridas.map((row, idx) => {
+      const prev = prevEnriched[idx];
+
+      // Verificación de igualdad superficial dinámica para conservar la misma referencia física
+      // de la corrida si sus propiedades base no han mutado. Así React.memo saltará la fila.
+      const isSameRow = prev &&
+        prev.originalIndex === idx &&
+        Object.keys(row).every(key => row[key as keyof Corrida] === prev[key as keyof Corrida]);
+
+      if (isSameRow) {
+        return prev; // Reutilización de referencia estricta en memoria
+      }
+
+      // Clave rápida de cálculo geomecánico
       const cacheKey = `${row.de}|${row.a}|${row.rec_m}|${row.rqd_m}|${row.lrf_m}|${row.small_frag_m}|${row.mec_frac}|${row.frac_nat}|${row.resistencia}|${row.abertura}|${row.rugosidad}|${row.intemperismo}|${row.relleno1}|${row.espesor}|${row.agua_obs}|${waterTableM}`;
 
       const cached = rmrCache.current.get(cacheKey);
       if (cached) {
-        // Fila no cambió: devolver resultado anterior sin recalcular
-        return { ...cached, originalIndex: idx };
+        if (cached.originalIndex === idx) {
+          return cached; // Reutilización de caché con índice idéntico
+        }
+        return { ...cached, originalIndex: idx }; // Copia ligera si cambió el índice
       }
 
       const rmrRes = calculateRowRmr(row, waterTableM);
       const isErr = !!rmrRes.error;
 
-      // Determinar clase verbal RMR89
       let rmrClass89 = 'Muy Mala';
       if (!isErr && rmrRes.rmr_89 !== undefined) {
         rmrClass89 = rmrRes.rmr_89 >= 81 ? 'Muy Buena' :
-                     rmrRes.rmr_89 >= 61 ? 'Buena' :
-                     rmrRes.rmr_89 >= 41 ? 'Regular' :
-                     rmrRes.rmr_89 >= 21 ? 'Mala' : 'Muy Mala';
+          rmrRes.rmr_89 >= 61 ? 'Buena' :
+            rmrRes.rmr_89 >= 41 ? 'Regular' :
+              rmrRes.rmr_89 >= 21 ? 'Mala' : 'Muy Mala';
       }
 
-      const enriched: CorridaEnriquecida = {
+      const enrichedRow: CorridaEnriquecida = {
         ...row,
         rmr76Score: isErr || rmrRes.rmr_76 === undefined ? 'ERR' : rmrRes.rmr_76,
         rmr89Score: isErr || rmrRes.rmr_89 === undefined ? 'ERR' : rmrRes.rmr_89,
@@ -141,29 +155,28 @@ export function useLggState({
         originalIndex: idx
       };
 
-      rmrCache.current.set(cacheKey, enriched);
-      return enriched;
+      rmrCache.current.set(cacheKey, enrichedRow);
+      return enrichedRow;
     });
+
+    prevEnrichedRef.current = enriched;
+    return enriched;
   }, [corridas, waterTableM]);
 
-  // 3. Filtrar las corridas enriquecidas para mostrar en la grilla
+  // 3. Filtrar las corridas enriquecidas para mostrar en la grilla (preserva referencias estables)
   const filteredCorridas = useMemo(() => {
     return corridasEnriquecidas.filter((row) => {
-      // Litología
       if (appliedFilters.lito) {
         const query = appliedFilters.lito.toUpperCase();
         const match = [row.lito1, row.lito2, row.lito3].some(l => l && l.toUpperCase().includes(query));
         if (!match) return false;
       }
-      // Resistencia
       if (appliedFilters.resistencia) {
         if (row.resistencia !== appliedFilters.resistencia) return false;
       }
-      // Calidad de Roca RMR89
       if (appliedFilters.rmrClass) {
         if (row.rmr89Class !== appliedFilters.rmrClass) return false;
       }
-      // Geotécnico / Comentarios
       if (appliedFilters.geotecnico) {
         const query = appliedFilters.geotecnico.toLowerCase();
         const match = [row.comentarios].some(c => c && c.toLowerCase().includes(query));
@@ -180,7 +193,6 @@ export function useLggState({
     const firstDeKpi = corridas.length > 0 ? Math.min(...corridas.map(r => r.de)) : 0;
     const lastAKpi = corridas.length > 0 ? Math.max(...corridas.map(r => r.a)) : 0;
 
-    // Promedios
     let totalRec = 0;
     let totalRqd = 0;
     let validCount = 0;
@@ -256,7 +268,7 @@ export function useLggState({
     onCorridasChange(updated);
   }, [corridas, onCorridasChange]);
 
-  // 6.5. Inserción/Clonación de Fila
+  // 7. Inserción/Clonación de Fila
   const insertCorridaRow = useCallback((index: number) => {
     const original = corridas[index];
     if (!original) return;
@@ -279,12 +291,11 @@ export function useLggState({
     onCorridasChange(reindexed);
   }, [corridas, onCorridasChange]);
 
-  // 7. Modificación de Celda con Validaciones de Negocio e Integridad Geomecánica
+  // 8. Modificación de Celda con Validaciones Geomecánicas Síncronas
   const handleCellChange = useCallback((index: number, field: keyof Corrida, value: any) => {
     const updated = [...corridas];
     let row = { ...updated[index] };
 
-    // Validaciones específicas
     if (field === 'lito1' || field === 'lito2' || field === 'lito3') {
       const resCascade = resolveLithologyCascade(
         field === 'lito1' ? value : (row.lito1 || 'LMT'),
@@ -366,12 +377,9 @@ export function useLggState({
   }, [corridas, onCorridasChange]);
 
   return {
-    // Listas filtradas y enriquecidas
     corridasEnriquecidas,
     filteredCorridas,
     kpiSummary,
-
-    // Métodos de filtros
     filterLito,
     setFilterLito,
     filterResistencia,
@@ -383,8 +391,6 @@ export function useLggState({
     appliedFilters,
     handleApplyFilters,
     handleClearFilters,
-
-    // Métodos de grilla
     addCorridaRow,
     deleteCorridaRow,
     insertCorridaRow,

@@ -186,6 +186,8 @@ export default function App() {
   const [syncStatus, setSyncStatus] = useState<'synced' | 'unsaved' | 'saving' | 'offline'>('synced');
   const [syncMessage, setSyncMessage] = useState<string>('Conectado al servidor de base de datos.');
 
+  const [isLoadingTaladro, setIsLoadingTaladro] = useState<boolean>(false);
+
   // Initialize Dark Mode Class
   useEffect(() => {
     const root = window.document.documentElement;
@@ -250,6 +252,7 @@ export default function App() {
   };
 
   const handleSelectTaladro = async (name: string, shouldSwitchView: boolean = true) => {
+    setIsLoadingTaladro(true); // 1. Activar Modal de Carga
     setSyncStatus('saving');
     try {
       const res = await fetch(`${API_BASE}/api/taladros/${name}`);
@@ -260,7 +263,7 @@ export default function App() {
         setOriginalName(data.name);
         setSyncStatus('synced');
         if (shouldSwitchView) {
-          setCurrentView('lgg');
+          setCurrentView('collar'); // 2. Redireccionar a Collar y Survey en lugar de LGG
         }
         setSelectedRowIndex(0);
       } else {
@@ -276,7 +279,7 @@ export default function App() {
         setOriginalName(parsed.name);
         setSyncStatus('offline');
       } else {
-        // Initialize offline fallback structure
+        // Inicializar fallback estructural offline
         const defaultTal: Taladro = {
           name,
           proyecto: "Proyecto A",
@@ -317,9 +320,11 @@ export default function App() {
         setSyncStatus('unsaved');
       }
       if (shouldSwitchView) {
-        setCurrentView('lgg');
+        setCurrentView('collar'); // 2. Redireccionar a Collar y Survey en caso offline también
       }
       setSelectedRowIndex(0);
+    } finally {
+      setIsLoadingTaladro(false); // 3. Desactivar Modal de Carga
     }
   };
 
@@ -978,6 +983,8 @@ export default function App() {
             waterTableM={97.0}
             darkMode={darkMode}
             activeTaladroName={activeTaladro.name}
+            activeTaladroGeologo={activeTaladro.geologo}
+            activeTaladroFecha={activeTaladro.fecha_registro}
             sidebarCollapsed={sidebarCollapsed}
             onFocusField={handleFocusField}
             onCreateTaladro={(newTal) => handleCreateTaladro(newTal, 'lgg')}
@@ -1154,12 +1161,197 @@ export default function App() {
           onOpenCatalogs={() => setShowCatalogsModal(true)}
         />
 
-        {/* Screen Content Wrapper */}
-        <div className={`flex-1 p-6 relative flex flex-col ${currentView === 'lgg' || currentView === 'lgest'
-          ? 'overflow-hidden'
-          : 'overflow-y-auto'
-          }`}>
-          {renderActiveView()}
+        {/* Screen Content Wrapper - Cambiado a overflow-hidden porque los scrolls se manejan internamente */}
+        <div className="flex-1 p-6 relative flex flex-col overflow-hidden">
+
+          {/* 1. Dashboard Principal (Solo se desmonta si no hay taladro activo) */}
+          {(!activeTaladro || currentView === 'dashboard' || currentView === 'list') && (
+            <div className="flex-1 flex flex-col min-h-0">
+              <MainDashboard
+                taladros={taladros}
+                onSelectTaladro={handleSelectTaladro}
+                onCreateTaladro={handleCreateTaladro}
+                onDeleteTaladro={handleDeleteTaladro}
+              />
+            </div>
+          )}
+
+          {/* 2. VISTAS CORE EN MODO KEEP-ALIVE (Toggles CSS instantáneos sin desmontar DOM) */}
+          {activeTaladro && (
+            <>
+              {/* Vista Collar y Survey */}
+              <div className={currentView === 'collar' ? "flex-1 flex flex-col min-h-0 overflow-y-auto" : "hidden"}>
+                <CollarView
+                  collar={activeTaladro}
+                  surveys={activeTaladro.surveys}
+                  alerts={activeAlerts}
+                  onCollarChange={handleCollarChange}
+                  onSurveysChange={handleSurveysChange}
+                />
+              </div>
+
+              {/* Vista Logueo Geotécnico General (LGG) */}
+              <div className={currentView === 'lgg' ? "flex-1 flex flex-col min-h-0" : "hidden"}>
+                <LggView
+                  corridas={activeTaladro.corridas}
+                  alerts={activeAlerts}
+                  onCorridasChange={handleCorridasChange}
+                  selectedRowIndex={selectedRowIndex}
+                  onSelectRow={setSelectedRowIndex}
+                  waterTableM={97.0}
+                  darkMode={darkMode}
+                  activeTaladroName={activeTaladro.name}
+                  activeTaladroGeologo={activeTaladro.geologo}
+                  activeTaladroFecha={activeTaladro.fecha_registro}
+                  sidebarCollapsed={sidebarCollapsed}
+                  onFocusField={handleFocusField}
+                  onCreateTaladro={(newTal) => handleCreateTaladro(newTal, 'lgg')}
+                  onRenameTaladro={handleRenameTaladro}
+                  syncStatus={syncStatus}
+                  defaultTurno={activeTaladro.turno}
+                />
+              </div>
+
+              {/* Vista Logueo Estructural */}
+              <div className={currentView === 'lgest' ? "flex-1 flex flex-col min-h-0" : "hidden"}>
+                <StructuralView
+                  discontinuidades={activeTaladro.discontinuidades}
+                  corridas={activeTaladro.corridas}
+                  onDiscontinuidadesChange={handleDiscontinuidadesChange}
+                  geologo={activeTaladro.geologo}
+                  activeTaladroName={activeTaladro.name}
+                  alerts={activeAlerts}
+                  onImportExcel={handleImportStructExcelData}
+                  darkMode={darkMode}
+                  sidebarCollapsed={sidebarCollapsed}
+                  onFocusField={handleFocusField}
+                />
+              </div>
+
+              {/* Vista Ensayos PLT */}
+              <div className={currentView === 'reports_plt' ? "flex-1 flex flex-col min-h-0" : "hidden"}>
+                <PltView
+                  ensayos_plt={activeTaladro.ensayos_plt || []}
+                  onEnsayosPltChange={handleEnsayosPltChange}
+                  corridas={activeTaladro.corridas}
+                  collar={activeTaladro}
+                  alerts={activeAlerts}
+                  onImportExcel={handleImportPltExcelData}
+                />
+              </div>
+            </>
+          )}
+
+          {/* 3. VISTAS LIGERAS CONDICIONALES (Se montan bajo demanda) */}
+          {activeTaladro && currentView === 'rmr' && (
+            <div className="flex-1 overflow-y-auto">
+              <RmrAnalysis
+                corridas={activeTaladro.corridas}
+                waterTableM={97.0}
+                activeTaladroName={activeTaladro.name}
+                geologo={activeTaladro.geologo}
+                fecha={activeTaladro.fecha_registro}
+              />
+            </div>
+          )}
+
+          {activeTaladro && currentView === 'dashboard_rqd' && (
+            <div className="flex-1 overflow-y-auto">
+              <RqdDashboard
+                activeTaladro={activeTaladro}
+                taladros={taladros}
+                onSelectTaladro={(name) => handleSelectTaladro(name, false)}
+              />
+            </div>
+          )}
+
+          {activeTaladro && currentView === 'reports_pdf' && (
+            <div className="flex-1 overflow-y-auto">
+              <ReportsPdf
+                activeTaladro={activeTaladro}
+                taladros={taladros}
+                onSelectTaladro={(name) => handleSelectTaladro(name, false)}
+              />
+            </div>
+          )}
+
+          {activeTaladro && currentView === 'config' && (
+            <div className="flex-1 overflow-y-auto">
+              <div className="glass-panel p-6 rounded-xl border border-navy-800 space-y-4 max-w-xl mx-auto text-slate-300">
+                <h2 className="text-lg font-bold text-slate-100 uppercase tracking-wide border-b border-navy-800 pb-2">
+                  Configuración de Parámetros
+                </h2>
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between items-center py-2 border-b border-navy-900/60">
+                    <span>Campaña</span>
+                    <input
+                      type="text"
+                      value={activeTaladro.campana}
+                      onChange={(e) => handleCollarChange({ ...activeTaladro, campana: e.target.value })}
+                      className="bg-navy-900 border border-navy-700 rounded px-2.5 py-1 text-center w-32 text-slate-100 focus:outline-none"
+                    />
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-navy-900/60">
+                    <span>Turno Predeterminado</span>
+                    <select
+                      value={activeTaladro.turno}
+                      onChange={(e) => handleCollarChange({ ...activeTaladro, turno: e.target.value })}
+                      className="bg-navy-900 border border-navy-700 rounded px-2 py-1 text-slate-200 focus:outline-none"
+                    >
+                      <option value="D">Día</option>
+                      <option value="N">Noche</option>
+                    </select>
+                  </div>
+                  <div className="flex justify-between items-center py-2">
+                    <span>Diámetro Predeterminado</span>
+                    <select
+                      value={activeTaladro.diametro}
+                      onChange={(e) => handleCollarChange({ ...activeTaladro, diametro: e.target.value })}
+                      className="bg-navy-900 border border-navy-700 rounded px-2 py-1 text-slate-200 focus:outline-none"
+                    >
+                      <option value="HQ3">HQ3</option>
+                      <option value="NQ3">NQ3</option>
+                      <option value="PQ3">PQ3</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {currentView === 'auditoria' && (
+            <div className="flex-1 overflow-y-auto">
+              <BulkAuditor apiBase={API_BASE} />
+            </div>
+          )}
+
+          {activeTaladro && currentView === 'import' && (
+            <div className="flex-1 overflow-y-auto">
+              <div className="glass-panel p-8 rounded-xl border border-navy-800 space-y-6 max-w-2xl mx-auto text-center text-slate-300 shadow-2xl relative overflow-hidden backdrop-blur-md">
+                <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-500 via-cyan-400 to-emerald-500" />
+                <div className="w-16 h-16 rounded-full bg-blue-500/10 text-blue-500 dark:text-cyan-400 flex items-center justify-center mx-auto ring-4 ring-blue-500/5 animate-pulse">
+                  <Database size={32} />
+                </div>
+                <div className="space-y-2">
+                  <h2 className="text-xl font-bold text-slate-100 uppercase tracking-wider">
+                    Importación y Exportación de Datos
+                  </h2>
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-500 dark:text-cyan-400 text-xs font-bold uppercase tracking-wider">
+                    <Construction size={12} className="animate-spin" />
+                    Módulo En Progreso / In Progress
+                  </div>
+                </div>
+                <p className="text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
+                  Este módulo facilitará la importación directa de datos históricos en formato BCP y la exportación unificada de registros a plantillas estructuradas de geotecnia minera para software especializado como <span className="text-slate-200 font-semibold">Leapfrog</span>, <span className="text-slate-200 font-semibold">gINT</span> y <span className="text-slate-200 font-semibold">Vulcan</span>.
+                </p>
+                <div className="pt-4 border-t border-navy-800/60 max-w-md mx-auto">
+                  <p className="text-xs text-slate-500">
+                    La conexión duplicada con SQL Server local se encuentra activa. Las rutinas de persistencia normalizadas ya están preparadas en el backend API.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Floating validation bottom-right QA/QC panel — hidden on Carga para Revisión */}
@@ -1185,6 +1377,23 @@ export default function App() {
         isOpen={showFormulasModal}
         onClose={() => setShowFormulasModal(false)}
       />
+
+      {/* Modal de Carga a pantalla completa durante la sincronización */}
+      {isLoadingTaladro && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-navy-950/80 backdrop-blur-md animate-fade-in">
+          <div className="glass-panel p-8 rounded-2xl border border-navy-800 flex flex-col items-center gap-4 bg-[#090f1d]/95 text-center shadow-2xl">
+            <div className="relative w-16 h-16">
+              {/* Dos spinners concéntricos en dirección opuesta */}
+              <div className="absolute inset-0 rounded-full border-4 border-cyan-500/10 border-t-cyan-500 animate-spin" />
+              <div className="absolute inset-2 rounded-full border-4 border-blue-500/10 border-b-blue-500 animate-spin [animation-duration:1.2s] [animation-direction:reverse]" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-sm font-black text-slate-100 uppercase tracking-wider">Cargando Taladro</h3>
+              <p className="text-[11px] text-slate-400 font-semibold">Sincronizando con base de datos SQL Server local...</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -186,7 +186,7 @@ export default function ExcelImportModal({
         const defaultSheet = workbook.SheetNames.find(name => {
           const upper = name.toUpperCase();
           if (currentImportType === 'STRUCT') {
-            return upper.includes('STRUCT') || upper.includes('ESTRUCT') || upper.includes('DISC') || upper.includes('JUNTA');
+            return upper.includes('STRUCT') || upper.includes('ESTRUCT') || upper.includes('EST');
           }
           if (currentImportType === 'PLT') {
             return upper.includes('PLT') || upper.includes('ENSAYO');
