@@ -106,16 +106,33 @@ export function getRockClass(rmrScore: number): string {
 
 export function calculateRowRmr(row: any, waterTableM: number = 97.0) {
   try {
-    const de = parseFloat(row.de) || 0;
-    const a = parseFloat(row.a) || 0;
+    // --- DETECCIÓN DE DATOS INCOMPLETOS O VACÍOS ---
+    const numericFields = ['de', 'a', 'rec_m', 'rqd_m', 'lrf_m', 'small_frag_m', 'frac_nat', 'abertura', 'rugosidad', 'jrc10', 'espesor'];
+    for (const key of numericFields) {
+      const val = parseFloat(row[key]);
+      if (val === undefined || val === null || isNaN(val) || val === -1) {
+        return { error: "Datos incompletos" }; // Retorno controlado sin lanzar excepciones
+      }
+    }
+
+    const stringFields = ['lito1', 'resistencia', 'tipo_est1', 'intemperismo', 'relleno1', 'agua_obs'];
+    for (const key of stringFields) {
+      const val = row[key];
+      if (val === undefined || val === null || val === "" || val === "-1") {
+        return { error: "Datos incompletos" };
+      }
+    }
+
+    const de = parseFloat(row.de);
+    const a = parseFloat(row.a);
     const perf = parseFloat((a - de).toFixed(2));
 
     if (perf <= 0 || perf > 1.6) {
       return { error: "Corrida inválida" };
     }
 
-    const rec_m = parseFloat(row.rec_m) || 0;
-    const rqd_m = parseFloat(row.rqd_m) || 0;
+    const rec_m = parseFloat(row.rec_m);
+    const rqd_m = parseFloat(row.rqd_m);
 
     if (rec_m > perf || rqd_m > rec_m) {
       return { error: "Inconsistencia física" };
@@ -124,18 +141,18 @@ export function calculateRowRmr(row: any, waterTableM: number = 97.0) {
     const rec_pct = Math.round(Number(((rec_m / perf) * 100).toFixed(6)));
     const rqd_pct = Math.round(Number(((rqd_m / perf) * 100).toFixed(6)));
 
-    const lrf_m = parseFloat(row.lrf_m) || 0;
+    const lrf_m = parseFloat(row.lrf_m);
     const frf = lrf_m > 0 ? Math.floor(Math.round(lrf_m * 100) / 5) + 1 : 0;
-    const frac_nat = parseInt(row.frac_nat) || 0;
+    const frac_nat = parseInt(row.frac_nat);
     const total_frac = frac_nat + frf;
     const spacing_mm = Math.round(total_frac > 0 ? (perf / total_frac) * 1000 : perf * 1000);
 
-    const strength = row.resistencia || 'R4';
-    const aperture = parseFloat(row.abertura) || 0;
-    const roughness = parseInt(row.rugosidad) || 1;
-    const filling = row.relleno1 || 'cwf';
-    const thickness = parseFloat(row.espesor) || 0;
-    const weathering = row.intemperismo || 'UWF';
+    const strength = row.resistencia;
+    const aperture = parseFloat(row.abertura);
+    const roughness = parseInt(row.rugosidad);
+    const filling = row.relleno1;
+    const thickness = parseFloat(row.espesor);
+    const weathering = row.intemperismo;
 
     const s_score = STRENGTH_RATINGS[strength] || 0;
     const rqd_score = calculateRqdRating(rqd_pct);

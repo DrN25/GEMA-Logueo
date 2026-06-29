@@ -221,23 +221,23 @@ export function useStructuralState({
       de: matchingCorrida ? matchingCorrida.de : 0.0,
       a: matchingCorrida ? matchingCorrida.a : 0.0,
       profundidad: initialDepth,
-      litologia: matchingCorrida ? matchingCorrida.lito1 : '',
-      lito1: matchingCorrida ? matchingCorrida.lito1 : '',
-      lito2: matchingCorrida ? (matchingCorrida.lito2 || '-1') : '-1',
-      lito3: matchingCorrida ? (matchingCorrida.lito3 || '-1') : '-1',
-      tipo_estructura: "JN",
-      alfa: 45.0,
-      beta: -1,
-      forma: 4,
-      rugosidad: 2,
-      jrc10: 10,
-      abertura: 0.1,
-      weathering: "UWF",
-      espesor: 0.0,
-      relleno1: "cwf",
+      litologia: '-1',      // <-- Vacío
+      lito1: '-1',          // <-- Vacío
+      lito2: '-1',
+      lito3: '-1',
+      tipo_estructura: "-1",// <-- Vacío
+      alfa: -1,             // <-- Vacío
+      beta: -1,             // <-- Vacío
+      forma: -1,            // <-- Vacío
+      rugosidad: -1,        // <-- Vacío
+      jrc10: -1,            // <-- Vacío
+      abertura: -1,         // <-- Vacío
+      weathering: "-1",     // <-- Vacío
+      espesor: -1,          // <-- Vacío
+      relleno1: "-1",       // <-- Vacío
       relleno2: "-1",
-      dureza_pared: matchingCorrida ? matchingCorrida.resistencia : "R4",
-      agua: "CDC",
+      dureza_pared: "-1",   // <-- Vacío
+      agua: "-1",           // <-- Vacío
       geotecnico: geologo || "",
       comentario: "",
       corrida: matchingCorrida ? matchingCorrida.corrida : 0,

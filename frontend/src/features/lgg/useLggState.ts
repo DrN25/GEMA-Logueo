@@ -228,31 +228,31 @@ export function useLggState({
       corrida: corridas.length + 1,
       de: newDe,
       a: newA,
-      rec_m: parseFloat((newA - newDe).toFixed(2)),
-      rqd_m: parseFloat((newA - newDe).toFixed(2)),
-      lrf_m: 0.0,
-      small_frag_m: 0.0,
-      mec_frac: 0,
-      lito1: lastRow ? lastRow.lito1 : 'LMT',
+      rec_m: -1,         // <-- Vacío
+      rqd_m: -1,         // <-- Vacío
+      lrf_m: -1,         // <-- Vacío
+      small_frag_m: -1,  // <-- Vacío
+      mec_frac: -1,      // <-- Vacío
+      lito1: '-1',       // <-- Vacío (Sin litología inicial)
       lito2: '-1',
       lito3: '-1',
-      resistencia: lastRow ? lastRow.resistencia : 'R4',
+      resistencia: '-1', // <-- Vacío
       orientacion: 'X',
-      offset: 0.0,
-      tipo_est1: 'JN',
+      offset: -1,        // <-- Vacío
+      tipo_est1: '-1',   // <-- Vacío
       tipo_est2: '-1',
-      frac_nat: 0,
-      frac_buz30: 0,
-      frac_buz60: 0,
-      frac_buz90: 0,
-      abertura: 0.1,
-      rugosidad: 2,
-      jrc10: 17,
-      intemperismo: 'UWF',
-      relleno1: 'cwf',
+      frac_nat: -1,      // <-- Vacío
+      frac_buz30: -1,    // <-- Vacío
+      frac_buz60: -1,    // <-- Vacío
+      frac_buz90: -1,    // <-- Vacío
+      abertura: -1,      // <-- Vacío
+      rugosidad: -1,     // <-- Vacío
+      jrc10: -1,         // <-- Vacío
+      intemperismo: '-1',// <-- Vacío
+      relleno1: '-1',    // <-- Vacío
       relleno2: '-1',
-      espesor: 0.0,
-      agua_obs: 'CDC',
+      espesor: -1,       // <-- Vacío
+      agua_obs: '-1',    // <-- Vacío
       turno: defaultTurno,
       comentarios: ''
     };

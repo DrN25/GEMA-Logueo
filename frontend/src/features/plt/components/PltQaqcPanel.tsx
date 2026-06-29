@@ -183,7 +183,7 @@ export default function PltQaqcPanel({
                         </div>
                     </div>
 
-                    {/* Auditoría QA/QC PLT */}
+                    {/* Auditoría QA/QC PLT Card */}
                     <div className="glass-panel p-4 rounded-xl border border-navy-800/40 bg-navy-900/10 flex flex-col justify-between shadow-md">
                         <div className="flex items-center justify-between">
                             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">QA/QC PLT</span>
@@ -198,11 +198,12 @@ export default function PltQaqcPanel({
                                 <span className={`text-2xl font-black ${criticalCount > 0 ? 'text-red-400' : warningCount > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
                                     {pltAlerts.length}
                                 </span>
-                                <span className="text-xs text-slate-400">alertas</span>
+                                <span className="text-xs text-slate-400 font-semibold">alertas</span>
                             </div>
-                            <div className="text-[10px] text-slate-500 flex gap-2 mt-1.5">
+                            <div className="text-[10px] text-slate-500 flex gap-1.5 mt-1.5 flex-wrap">
                                 <span className="bg-red-500/10 text-red-400 px-1.5 py-0.5 rounded border border-red-500/20">{criticalCount} Err</span>
                                 <span className="bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded border border-amber-500/20">{warningCount} Adv</span>
+                                <span className="bg-slate-500/10 text-slate-400 px-1.5 py-0.5 rounded border border-slate-500/20">{vacioCount} Vac</span>
                             </div>
                         </div>
                     </div>
@@ -347,8 +348,8 @@ export default function PltQaqcPanel({
                                             key={idx}
                                             onClick={() => handleAlertFix(alert.field)}
                                             className={`p-3.5 rounded-lg border text-left cursor-pointer transition-all hover:translate-x-1 active:scale-[0.99] flex justify-between items-center ${isCritical
-                                                    ? 'bg-red-500/5 dark:bg-red-950/20 border-red-500/20 text-red-200 hover:bg-red-500/10 hover:border-red-500/35'
-                                                    : 'bg-amber-500/5 dark:bg-amber-950/15 border-amber-500/25 text-amber-200 hover:bg-amber-500/10 hover:border-amber-500/35'
+                                                ? 'bg-red-500/5 dark:bg-red-950/20 border-red-500/20 text-red-200 hover:bg-red-500/10 hover:border-red-500/35'
+                                                : 'bg-amber-500/5 dark:bg-amber-950/15 border-amber-500/25 text-amber-200 hover:bg-amber-500/10 hover:border-amber-500/35'
                                                 }`}
                                         >
                                             <div className="flex gap-3 items-start pr-4">
@@ -360,8 +361,8 @@ export default function PltQaqcPanel({
                                                 <div className="space-y-2 flex-1 min-w-0">
                                                     <div className="flex flex-wrap gap-1.5 items-center">
                                                         <span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-full border ${isCritical
-                                                                ? 'bg-red-500/20 border-red-500/40 text-red-300'
-                                                                : 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                                                            ? 'bg-red-500/20 border-red-500/40 text-red-300'
+                                                            : 'bg-amber-500/20 border-amber-500/40 text-amber-300'
                                                             }`}>
                                                             {isCritical ? 'Error crítico' : 'Aviso'}
                                                         </span>

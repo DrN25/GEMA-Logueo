@@ -178,10 +178,10 @@ export default function LggQaqcPanel({
 
     return (
       <div className="space-y-6 pb-12 animate-fade-in text-slate-200">
-        
+
         {/* Overview stats layout */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          
+
           {/* Total Tramos Card */}
           <div className="glass-panel p-4 rounded-xl border border-navy-800/40 bg-navy-900/10 flex flex-col justify-between shadow-md">
             <div className="flex items-center justify-between">
@@ -238,10 +238,10 @@ export default function LggQaqcPanel({
             </div>
           </div>
 
-          {/* Total Auditor Alerts Card */}
+          {/* Auditoría QA/QC Card */}
           <div className="glass-panel p-4 rounded-xl border border-navy-800/40 bg-navy-900/10 flex flex-col justify-between shadow-md">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Auditoría QA/QC</span>
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">QA/QC en LGG</span>
               {criticalCount > 0 ? (
                 <ShieldAlert size={16} className="text-red-400 animate-pulse" />
               ) : (
@@ -249,15 +249,19 @@ export default function LggQaqcPanel({
               )}
             </div>
             <div className="mt-4">
-              <div className="flex items-baseline gap-2">
-                <span className={`text-2xl font-black ${criticalCount > 0 ? 'text-red-400' : warningCount > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                  {safeAlerts.length}
-                </span>
-                <span className="text-xs text-slate-400">alertas</span>
-              </div>
-              <div className="text-[10px] text-slate-500 flex gap-2 mt-1.5">
-                <span className="bg-red-500/10 text-red-400 px-1.5 py-0.5 rounded border border-red-500/20">{criticalCount} Err</span>
-                <span className="bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded border border-amber-500/20">{warningCount} Adv</span>
+              <div className="flex gap-2.5">
+                <div>
+                  <span className={`text-lg font-black ${criticalCount > 0 ? 'text-red-400' : 'text-slate-500'}`}>{criticalCount}</span>
+                  <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wide">Críticos</span>
+                </div>
+                <div>
+                  <span className={`text-lg font-black ${warningCount > 0 ? 'text-amber-400' : 'text-slate-500'}`}>{warningCount}</span>
+                  <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wide">Avisos</span>
+                </div>
+                <div>
+                  <span className={`text-lg font-black ${vacioCount > 0 ? 'text-slate-400' : 'text-slate-500'}`}>{vacioCount}</span>
+                  <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wide">Vacíos</span>
+                </div>
               </div>
             </div>
           </div>
@@ -266,7 +270,7 @@ export default function LggQaqcPanel({
 
         {/* Main dashboard breakdown grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
+
           {/* Core Physical Balance Visualizer */}
           <div className="glass-panel p-5 rounded-xl border border-navy-800/40 bg-navy-900/10 lg:col-span-2 space-y-4 shadow-xl">
             <div>
@@ -390,7 +394,7 @@ export default function LggQaqcPanel({
 
           {/* Quality Bins Breakdown (RQD and RMR) */}
           <div className="glass-panel p-5 rounded-xl border border-navy-800/40 bg-navy-900/10 space-y-6 shadow-xl">
-            
+
             {/* RQD Classes */}
             <div className="space-y-3">
               <div>
@@ -490,61 +494,59 @@ export default function LggQaqcPanel({
               [...safeAlerts]
                 .sort((a, b) => (a?.type === 'CRITICAL' ? -1 : 1) - (b?.type === 'CRITICAL' ? -1 : 1))
                 .map((alert, idx) => {
-                if (!alert) return null;
-                const isCritical = alert.type === 'CRITICAL';
-                const context = getAlertContext(alert.field);
-                return (
-                  <div
-                    key={idx}
-                    onClick={() => handleAlertFix(alert.field)}
-                    className={`p-3.5 rounded-lg border text-left cursor-pointer transition-all hover:translate-x-1 active:scale-[0.99] flex justify-between items-center ${
-                      isCritical
+                  if (!alert) return null;
+                  const isCritical = alert.type === 'CRITICAL';
+                  const context = getAlertContext(alert.field);
+                  return (
+                    <div
+                      key={idx}
+                      onClick={() => handleAlertFix(alert.field)}
+                      className={`p-3.5 rounded-lg border text-left cursor-pointer transition-all hover:translate-x-1 active:scale-[0.99] flex justify-between items-center ${isCritical
                         ? 'bg-red-500/5 dark:bg-red-950/20 border-red-500/20 text-red-200 hover:bg-red-500/10 hover:border-red-500/35'
                         : 'bg-amber-500/5 dark:bg-amber-950/15 border-amber-500/25 text-amber-200 hover:bg-amber-500/10 hover:border-amber-500/35'
-                    }`}
-                  >
-                    <div className="flex gap-3 items-start pr-4">
-                      {isCritical ? (
-                        <AlertOctagon size={18} className="text-red-400 shrink-0 mt-0.5" />
-                      ) : (
-                        <AlertTriangle size={18} className="text-amber-400 shrink-0 mt-0.5" />
-                      )}
-                      <div className="space-y-2 flex-1 min-w-0">
-                        {/* Badge row */}
-                        <div className="flex flex-wrap gap-1.5 items-center">
-                          {/* Severity badge */}
-                          <span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-full border ${
-                            isCritical
+                        }`}
+                    >
+                      <div className="flex gap-3 items-start pr-4">
+                        {isCritical ? (
+                          <AlertOctagon size={18} className="text-red-400 shrink-0 mt-0.5" />
+                        ) : (
+                          <AlertTriangle size={18} className="text-amber-400 shrink-0 mt-0.5" />
+                        )}
+                        <div className="space-y-2 flex-1 min-w-0">
+                          {/* Badge row */}
+                          <div className="flex flex-wrap gap-1.5 items-center">
+                            {/* Severity badge */}
+                            <span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-full border ${isCritical
                               ? 'bg-red-500/20 border-red-500/40 text-red-300'
                               : 'bg-amber-500/20 border-amber-500/40 text-amber-300'
-                          }`}>
-                            {isCritical ? 'Error crítico' : 'Aviso'}
-                          </span>
-                          {/* Tab badge */}
-                          <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-800/70 border border-slate-700/60 text-slate-300">
-                            <MapPin size={11} className="text-cyan-400 shrink-0" />
-                            {context.tab}
-                          </span>
-                          {/* Column badge */}
-                          <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300">
-                            <Tag size={11} className="shrink-0" />
-                            {context.column}
-                          </span>
+                              }`}>
+                              {isCritical ? 'Error crítico' : 'Aviso'}
+                            </span>
+                            {/* Tab badge */}
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-800/70 border border-slate-700/60 text-slate-300">
+                              <MapPin size={11} className="text-cyan-400 shrink-0" />
+                              {context.tab}
+                            </span>
+                            {/* Column badge */}
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300">
+                              <Tag size={11} className="shrink-0" />
+                              {context.column}
+                            </span>
+                          </div>
+                          {/* Message */}
+                          <p className="text-sm leading-snug text-slate-200 font-medium">{alert.message}</p>
                         </div>
-                        {/* Message */}
-                        <p className="text-sm leading-snug text-slate-200 font-medium">{alert.message}</p>
                       </div>
+                      <button
+                        type="button"
+                        className="flex items-center gap-1 bg-navy-950 hover:bg-navy-900 border border-navy-850 hover:border-navy-750 text-slate-400 hover:text-slate-200 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 active:scale-95 shadow-sm"
+                      >
+                        <span>Corregir</span>
+                        <ArrowRight size={13} />
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      className="flex items-center gap-1 bg-navy-950 hover:bg-navy-900 border border-navy-850 hover:border-navy-750 text-slate-400 hover:text-slate-200 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 active:scale-95 shadow-sm"
-                    >
-                      <span>Corregir</span>
-                      <ArrowRight size={13} />
-                    </button>
-                  </div>
-                );
-              })
+                  );
+                })
             )}
           </div>
         </div>

@@ -1,9 +1,9 @@
 export interface ValidationAlert {
-  type: 'CRITICAL' | 'WARNING';
+  type: 'CRITICAL' | 'WARNING' | 'VACIO'; // <--- TRES NIVELES DE GRAVEDAD
   field: string;
   message: string;
-  corridaIndex?: number; // si aplica a una fila de LGG
-  surveyIndex?: number;  // si aplica a una fila de Survey
+  corridaIndex?: number;
+  surveyIndex?: number;
 }
 
 const WEATHERING_COMPATIBILITY: Record<string, string[]> = {
@@ -16,13 +16,8 @@ const WEATHERING_COMPATIBILITY: Record<string, string[]> = {
   'R6': ['UWF']
 };
 
-/**
- * Valida todos los datos generales de collar y lecturas de survey del taladro.
- */
 export function validateCollarAndSurvey(_collar: any, surveys: any[]): ValidationAlert[] {
   const alerts: ValidationAlert[] = [];
-  
-  // 1. Validar que la profundidad de lectura no exceda el EOH oficial
   const eoh = parseFloat(_collar?.prof_final_eoh);
   if (eoh !== undefined && eoh !== null && eoh !== -1 && !isNaN(eoh)) {
     for (let i = 0; i < surveys.length; i++) {
@@ -38,7 +33,6 @@ export function validateCollarAndSurvey(_collar: any, surveys: any[]): Validatio
     }
   }
 
-  // 2. Validar cambios bruscos de Dip (> 2 grados entre lecturas consecutivas)
   for (let i = 1; i < surveys.length; i++) {
     const prevDip = parseFloat(surveys[i - 1].dip) || 0;
     const currDip = parseFloat(surveys[i].dip) || 0;
@@ -58,9 +52,6 @@ export function validateCollarAndSurvey(_collar: any, surveys: any[]): Validatio
   return alerts;
 }
 
-/**
- * Ejecuta validaciones reactivas por fila de LGG.
- */
 export function validateRowQAQC(row: any, index: number, corridas?: any[]): ValidationAlert[] {
   const alerts: ValidationAlert[] = [];
 
@@ -99,7 +90,42 @@ export function validateRowQAQC(row: any, index: number, corridas?: any[]): Vali
     const aperture = parseFloat(row.abertura) || 0.0;
     const thickness = parseFloat(row.espesor) || 0.0;
 
-    // Regla: Continuidad Espacial de Corridas
+    // --- DETECCIÓN DE CAMPOS VACÍOS (Reglas_Tablas.md) ---
+    const mandatoryLggFields = [
+      { key: 'de', label: 'de: (m)' },
+      { key: 'a', label: 'a: (m)' },
+      { key: 'rec_m', label: 'Rec. (m)' },
+      { key: 'rqd_m', label: 'RQD (m)' },
+      { key: 'lrf_m', label: 'LRF (m)' },
+      { key: 'small_frag_m', label: 'Frag <10cm' },
+      { key: 'frac_nat', label: 'Frac Nat' },
+      { key: 'lito1', label: 'Lito 1' },
+      { key: 'resistencia', label: 'Resist ISRM' },
+      { key: 'tipo_est1', label: 'Tipo Est 1' },
+      { key: 'frac_buz30', label: 'Buz <30°' },
+      { key: 'frac_buz60', label: '30°-60°' },
+      { key: 'frac_buz90', label: 'Buz >60°' },
+      { key: 'abertura', label: 'Abertura' },
+      { key: 'rugosidad', label: 'Rugosidad' },
+      { key: 'jrc10', label: 'Jrc10' },
+      { key: 'intemperismo', label: 'Intemp' },
+      { key: 'relleno1', label: 'Relleno 1' },
+      { key: 'espesor', label: 'Espesor' },
+      { key: 'agua_obs', label: 'Agua' }
+    ];
+
+    mandatoryLggFields.forEach(f => {
+      const val = row[f.key];
+      if (val === undefined || val === null || String(val).trim() === "" || String(val) === "-1" || val === -1) {
+        alerts.push({
+          type: 'VACIO', // <-- Categorizado como VACIO (Discreto en UI)
+          field: `${f.key}-${index}`,
+          message: `Fila ${row.corrida}: El campo obligatorio '${f.label}' se encuentra vacío o es -1 (Sin Dato).`,
+          corridaIndex: index
+        });
+      }
+    });
+
     if (corridas && index > 0) {
       const prevA = parseFloat(corridas[index - 1].a) || 0.0;
       if (Math.abs(de - prevA) > 0.001) {
@@ -112,7 +138,6 @@ export function validateRowQAQC(row: any, index: number, corridas?: any[]): Vali
       }
     }
 
-    // 1. Longitud de Corrida
     if (perf <= 0) {
       alerts.push({
         type: 'CRITICAL',
@@ -129,7 +154,6 @@ export function validateRowQAQC(row: any, index: number, corridas?: any[]): Vali
       });
     }
 
-    // 2. Recuperación vs Avance
     if (rec_m > perf) {
       alerts.push({
         type: 'CRITICAL',
@@ -139,7 +163,6 @@ export function validateRowQAQC(row: any, index: number, corridas?: any[]): Vali
       });
     }
 
-    // 3. RQD vs Recuperación
     if (rqd_m > rec_m) {
       alerts.push({
         type: 'CRITICAL',
@@ -149,7 +172,6 @@ export function validateRowQAQC(row: any, index: number, corridas?: any[]): Vali
       });
     }
 
-    // 3b. LRF vs Recuperación (Reglas_Tablas.md)
     if (lrf_m > rec_m) {
       alerts.push({
         type: 'CRITICAL',
@@ -159,7 +181,6 @@ export function validateRowQAQC(row: any, index: number, corridas?: any[]): Vali
       });
     }
 
-    // 4. Balance Físico del Testigo
     const rqd_val = rqd_m < 0 ? 0.0 : rqd_m;
     const lrf_val = lrf_m < 0 ? 0.0 : lrf_m;
     const small_val = small_frag_m < 0 ? 0.0 : small_frag_m;
@@ -173,7 +194,6 @@ export function validateRowQAQC(row: any, index: number, corridas?: any[]): Vali
       });
     }
 
-    // 5. Conteo de Fracturas por Buzamiento
     const b30_val = buz30 < 0 ? 0 : buz30;
     const b60_val = buz60 < 0 ? 0 : buz60;
     const b90_val = buz90 < 0 ? 0 : buz90;
@@ -188,7 +208,6 @@ export function validateRowQAQC(row: any, index: number, corridas?: any[]): Vali
       });
     }
 
-    // 6. Relleno vs Abertura (Reglas_Tablas.md espesor <= abertura exceptions)
     const exceptions = ["F", "RF", "VN", "SZ", "F+10", "BED"];
     const tipo_est1 = row.tipo_est1 || "";
     const tipo_est2 = row.tipo_est2 || "";
@@ -217,7 +236,6 @@ export function validateRowQAQC(row: any, index: number, corridas?: any[]): Vali
       });
     }
 
-    // 7. Compatibilidad Resistencia vs Intemperismo
     const validWeatherings = WEATHERING_COMPATIBILITY[resistencia];
     if (validWeatherings && !validWeatherings.includes(weathering)) {
       alerts.push({
@@ -239,9 +257,6 @@ export function validateRowQAQC(row: any, index: number, corridas?: any[]): Vali
   return alerts;
 }
 
-/**
- * Ejecuta validaciones reactivas por fila de Logueo Estructural (LG EST).
- */
 export function validateStructuralQAQC(discontinuidades: any[], corridas: any[]): ValidationAlert[] {
   const alerts: ValidationAlert[] = [];
 
@@ -250,7 +265,36 @@ export function validateStructuralQAQC(discontinuidades: any[], corridas: any[])
       const depth = parseFloat(d.profundidad);
       const idStr = d.id || (idx + 1);
 
-      // 1. Validación de Profundidad Huérfana
+      // --- DETECCIÓN DE CAMPOS VACÍOS (Reglas_Tablas.md) ---
+      const mandatoryStructFields = [
+        { key: 'profundidad', label: 'Profundidad' },
+        { key: 'tipo_estructura', label: 'Tipo Estructura' },
+        { key: 'alfa', label: 'Alfa' },
+        { key: 'beta', label: 'Beta' },
+        { key: 'forma', label: 'Forma' },
+        { key: 'rugosidad', label: 'Rugosidad' },
+        { key: 'jrc10', label: 'JRC10' },
+        { key: 'abertura', label: 'Abertura' },
+        { key: 'weathering', label: 'Grado Intemp.' },
+        { key: 'espesor', label: 'Espesor' },
+        { key: 'relleno1', label: 'Relleno 1' },
+        { key: 'dureza_pared', label: 'Dureza pared' },
+        { key: 'agua', label: 'Presen. Agua' },
+        { key: 'geotecnico', label: 'Geotécnico' },
+        { key: 'tipo', label: 'Tipo' }
+      ];
+
+      mandatoryStructFields.forEach(f => {
+        const val = d[f.key];
+        if (val === undefined || val === null || String(val).trim() === "" || String(val) === "-1" || val === -1) {
+          alerts.push({
+            type: 'VACIO', // <-- Categorizado como VACIO
+            field: `struct-${f.key}-${idx}`,
+            message: `Fila ${idStr}: El campo obligatorio '${f.label}' se encuentra vacío o es -1 (Sin Dato).`
+          });
+        }
+      });
+
       if (isNaN(depth)) {
         alerts.push({
           type: 'CRITICAL',
@@ -269,7 +313,6 @@ export function validateStructuralQAQC(discontinuidades: any[], corridas: any[])
         });
       }
 
-      // 1b. Validación de Corrida Exacta (de/a)
       const estDe = parseFloat(d.de);
       const estA = parseFloat(d.a);
       if (!isNaN(estDe) && !isNaN(estA)) {
@@ -290,14 +333,13 @@ export function validateStructuralQAQC(discontinuidades: any[], corridas: any[])
         }
       }
 
-      // 2. Límites de Ángulo Alfa y Beta
       const alfa = parseFloat(d.alfa);
       if (!isNaN(alfa)) {
         if (alfa !== -1 && (alfa < 0 || alfa > 90)) {
           alerts.push({
             type: 'CRITICAL',
             field: `struct-alfa-${idx}`,
-            message: `Fila ${idStr}: El ángulo Alfa (${alfa}°) es inválido. Debe estar entre 0° y 90°, o ser -1 (No Existe).`
+            message: `Fila ${idStr}: El ángulo Alfa (${alfa}°) es inválido. Debe estar entre 0° y 90°, o ser -1.`
           });
         }
       }
@@ -308,34 +350,11 @@ export function validateStructuralQAQC(discontinuidades: any[], corridas: any[])
           alerts.push({
             type: 'CRITICAL',
             field: `struct-beta-${idx}`,
-            message: `Fila ${idStr}: El ángulo Beta (${beta}°) es inválido. Debe estar entre 0° y 360°, o ser -1 (No Existe).`
+            message: `Fila ${idStr}: El ángulo Beta (${beta}°) es inválido. Debe estar entre 0° y 360°, o ser -1.`
           });
         }
       }
 
-      const dip = parseFloat(d.dip);
-      if (!isNaN(dip)) {
-        if (dip < 0 || dip > 90) {
-          alerts.push({
-            type: 'CRITICAL',
-            field: `struct-dip-${idx}`,
-            message: `Fila ${idStr}: El ángulo Dip (${dip}°) es inválido. Debe estar entre 0° y 90°.`
-          });
-        }
-      }
-
-      const azimuth = parseFloat(d.azimuth);
-      if (!isNaN(azimuth)) {
-        if (azimuth < 0 || azimuth > 360) {
-          alerts.push({
-            type: 'CRITICAL',
-            field: `struct-azimuth-${idx}`,
-            message: `Fila ${idStr}: El ángulo Azimut (${azimuth}°) es inválido. Debe estar entre 0° y 360°.`
-          });
-        }
-      }
-
-      // 3. Límites de JRC10
       const jrc10 = parseInt(d.jrc10);
       if (!isNaN(jrc10)) {
         if (jrc10 > 20) {
@@ -353,7 +372,6 @@ export function validateStructuralQAQC(discontinuidades: any[], corridas: any[])
         }
       }
 
-      // 4. Espesor Relleno vs Abertura Junta (Reglas_Tablas.md)
       const abertura = parseFloat(d.abertura) || 0.0;
       const espesor = parseFloat(d.espesor) || 0.0;
       const relleno1 = d.relleno1 || 'cwf';
@@ -364,11 +382,10 @@ export function validateStructuralQAQC(discontinuidades: any[], corridas: any[])
         alerts.push({
           type: 'CRITICAL',
           field: `struct-espesor-${idx}`,
-          message: `Fila ${idStr}: El espesor de relleno (${espesor}mm) no puede ser mayor que la abertura de junta (${abertura}mm), excepto para estructuras F, RF, VN, SZ, F+10, BED.`
+          message: `Fila ${idStr}: El espesor de relleno (${espesor}mm) no puede ser mayor que la abertura de junta (${abertura}mm), excepto en estructuras F, RF, VN, SZ, F+10, BED.`
         });
       }
 
-      // 5. Consistencia de Relleno y Abertura
       if (espesor > 0 && (relleno1 === 'cwf' || relleno1 === '-1')) {
         alerts.push({
           type: 'WARNING',
@@ -392,7 +409,6 @@ export function validateStructuralQAQC(discontinuidades: any[], corridas: any[])
         }
       }
 
-      // 6. Consistencia entre Forma y JRC10 (Lookup DATOS LG R4:T13)
       const forma = parseInt(d.forma);
       let validJrcValues: number[] = [];
 
@@ -429,9 +445,6 @@ export function validateStructuralQAQC(discontinuidades: any[], corridas: any[])
   return alerts;
 }
 
-/**
- * Valida los ensayos de carga puntual (PLT) de un taladro con auditoría cruzada de consistencia física con LGG.
- */
 export function validatePltQAQC(plts: any[], corridas: any[], collar: any): ValidationAlert[] {
   const alerts: ValidationAlert[] = [];
   const collarEste = parseFloat(collar.collar_este) || 0;
@@ -451,6 +464,39 @@ export function validatePltQAQC(plts: any[], corridas: any[], collar: any): Vali
       const ucs = parseFloat(plt.ucs) || 0.0;
       const tipo_rotura = String(plt.tipo_rotura_code || '').trim().toUpperCase();
 
+      // --- DETECCIÓN DE CAMPOS VACÍOS (Reglas_Tablas.md) ---
+      const mandatoryPltFields = [
+        { key: 'fecha', label: 'Fecha' },
+        { key: 'nro_muestra', label: 'Nro Muestra' },
+        { key: 'nro_caja', label: 'Nro Caja' },
+        { key: 'corrida_desde', label: 'Corrida Desde' },
+        { key: 'corrida_hasta', label: 'Corrida Hasta' },
+        { key: 'from_m', label: 'From' },
+        { key: 'to_m', label: 'To' },
+        { key: 'este_m', label: 'Este' },
+        { key: 'norte_m', label: 'Norte' },
+        { key: 'elevacion_msnm', label: 'Elevación' },
+        { key: 'tipo_de_ensayo', label: 'Tipo de Ensayo' },
+        { key: 'diametro_taladro_nominacion', label: 'Diám. Taladro' },
+        { key: 'litologia_1', label: 'Litología 1' },
+        { key: 'd_mm', label: 'D (mm)' },
+        { key: 'p_instr_kn', label: 'P instr (kN)' },
+        { key: 'tipo_rotura_code', label: 'Tipo de Rotura' },
+        { key: 'direccion_rotura_code', label: 'Dirección Rotura' },
+        { key: 'ejecutadoPor', label: 'Ejecutado por' }
+      ];
+
+      mandatoryPltFields.forEach(f => {
+        const val = plt[f.key];
+        if (val === undefined || val === null || String(val).trim() === "" || String(val) === "-1" || val === -1) {
+          alerts.push({
+            type: 'VACIO', // <-- Categorizado como VACIO
+            field: `plt-${f.key}-${idx}`,
+            message: `PLT ${idStr}: El campo obligatorio '${f.label}' se encuentra vacío o es -1 (Sin Dato).`
+          });
+        }
+      });
+
       if (from > to) {
         alerts.push({
           type: 'CRITICAL',
@@ -459,7 +505,6 @@ export function validatePltQAQC(plts: any[], corridas: any[], collar: any): Vali
         });
       }
 
-      // 1. Is(50) anómalo (> 25 MPa)
       if (is_50_mpa > 25) {
         alerts.push({
           type: 'WARNING',
@@ -468,7 +513,6 @@ export function validatePltQAQC(plts: any[], corridas: any[], collar: any): Vali
         });
       }
 
-      // 2. UCS fuera de rango físico (< 0 o > 500 MPa)
       if (ucs < 0 || ucs > 500) {
         alerts.push({
           type: 'CRITICAL',
@@ -477,7 +521,6 @@ export function validatePltQAQC(plts: any[], corridas: any[], collar: any): Vali
         });
       }
 
-      // 3. Tipo de rotura no reconocido
       const validRoturas = ['M', 'E', 'C'];
       if (tipo_rotura && !validRoturas.includes(tipo_rotura)) {
         alerts.push({
@@ -487,10 +530,7 @@ export function validatePltQAQC(plts: any[], corridas: any[], collar: any): Vali
         });
       }
 
-      // --- RESOLUCIÓN DINÁMICA DE LA CORRIDA DE LGG ---
       const matchingCorrida = corridas.find(c => c.de <= from && to <= c.a);
-
-      // Si existe una corrida en LGG, usamos sus límites reales. De lo contrario, usamos lo guardado o 0.
       const de_limite = matchingCorrida ? matchingCorrida.de : (parseFloat(plt.corrida_desde) || 0.0);
       const a_limite = matchingCorrida ? matchingCorrida.a : (parseFloat(plt.corrida_hasta) || 0.0);
 
@@ -507,9 +547,6 @@ export function validatePltQAQC(plts: any[], corridas: any[], collar: any): Vali
           message: `PLT ${idStr}: El intervalo [${from}m - ${to}m] se encuentra fuera de los límites de la corrida [${de_limite}m - ${a_limite}m].`,
         });
       } else {
-        // --- AUDITORÍA DE CONSISTENCIA CRUZADA (LGG VS PLT) ---
-
-        // A. Alerta por discrepancia de Litología 1 (Solo si el PLT ya tiene una lito asignada que no coincide)
         const pltLito1 = String(plt.litologia_1 || '').trim().toUpperCase();
         const lggLito1 = String(matchingCorrida.lito1 || '').trim().toUpperCase();
         if (pltLito1 && pltLito1 !== '-' && lggLito1 && lggLito1 !== '-' && pltLito1 !== lggLito1) {
@@ -520,7 +557,6 @@ export function validatePltQAQC(plts: any[], corridas: any[], collar: any): Vali
           });
         }
 
-        // B. Alerta por inconsistencia de Resistencia (UCS Real vs Estimada)
         const pltRes = plt.isrm_indice_r;
         const lggRes = matchingCorrida.resistencia;
 
@@ -538,7 +574,6 @@ export function validatePltQAQC(plts: any[], corridas: any[], collar: any): Vali
         }
       }
 
-      // 4. Advertencias Físicas e Instrumentales (L < D)
       if (long_muestra < d) {
         alerts.push({
           type: 'CRITICAL',
@@ -555,7 +590,6 @@ export function validatePltQAQC(plts: any[], corridas: any[], collar: any): Vali
         });
       }
 
-      // Coordenadas imposibles o fuera de rango
       const este = parseFloat(plt.este_m) || 0.0;
       const norte = parseFloat(plt.norte_m) || 0.0;
       const elev = parseFloat(plt.elevacion_msnm) || 0.0;

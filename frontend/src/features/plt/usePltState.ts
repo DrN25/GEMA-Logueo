@@ -187,27 +187,27 @@ export function usePltState({
       norte_m: collar.collar_norte || 0.0,
       elevacion_msnm: collar.collar_cota || 0.0,
       long_de_muestra_mm: 150.0,
-      tipo_de_ensayo: 'D',
-      diametro_taladro_nominacion: lastRow ? lastRow.diametro_taladro_nominacion : 'HQ',
-      d_mm: lastRow ? lastRow.d_mm : 61.1,
+      tipo_de_ensayo: '-1',              // <-- Vacío
+      diametro_taladro_nominacion: '-1',  // <-- Vacío
+      d_mm: -1,                          // <-- Vacío
       verif_de_longitud: 'OK',
-      p_instr_kn: 0.0,
-      tipo_rotura_code: 'M',
-      direccion_rotura_code: 'NA',
+      p_instr_kn: -1,                    // <-- Vacío
+      tipo_rotura_code: '-1',             // <-- Vacío
+      direccion_rotura_code: '-1',        // <-- Vacío
       ejecutadoPor: lastRow ? lastRow.ejecutadoPor : 'CBA',
       is_mpa: 0.0,
       fact_corr: 1.094,
       is_50_mpa: 0.0,
       factor_k: 8.29,
       ucs: 0.0,
-      isrm_indice_r: 'R0',
+      isrm_indice_r: '-1',               // <-- Vacío
       observaciones: '',
       corrida_desde: lastRow ? lastRow.corrida_desde : 0.0,
       corrida_hasta: lastRow ? lastRow.corrida_hasta : 1.5,
-      litologia_1: 'MZB',
-      litologia_2: 'MZB',
-      litologia_3: 'MZB_EQ',
-      tipo_litologico: 'Intrusivas'
+      litologia_1: '-1',                 // <-- Vacío
+      litologia_2: '-1',
+      litologia_3: '-1',
+      tipo_litologico: ''
     };
 
     const newRows = [...ensayos_plt, newRow];

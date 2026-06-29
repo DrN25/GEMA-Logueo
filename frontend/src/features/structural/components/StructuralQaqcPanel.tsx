@@ -193,10 +193,10 @@ export default function StructuralQaqcPanel({
             </div>
           </div>
 
-          {/* Auditor Alerts Counter */}
+          {/* Auditor Alerts Card */}
           <div className="glass-panel p-4 rounded-xl border border-navy-800/40 bg-navy-900/10 flex flex-col justify-between shadow-md">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Filtro de Calidad</span>
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Calidad Estructural</span>
               {criticalCount > 0 ? (
                 <ShieldAlert size={16} className="text-red-400 animate-pulse" />
               ) : (
@@ -212,6 +212,10 @@ export default function StructuralQaqcPanel({
                 <div>
                   <span className={`text-lg font-black ${warningCount > 0 ? 'text-amber-400' : 'text-slate-500'}`}>{warningCount}</span>
                   <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wide">Avisos</span>
+                </div>
+                <div>
+                  <span className={`text-lg font-black ${vacioCount > 0 ? 'text-slate-400' : 'text-slate-500'}`}>{vacioCount}</span>
+                  <span className="text-[9px] text-slate-500 font-bold block uppercase tracking-wide">Vacíos</span>
                 </div>
               </div>
             </div>
@@ -244,7 +248,7 @@ export default function StructuralQaqcPanel({
                 {structuralAlerts.map((alert, index) => {
                   const isCritical = alert.type === 'CRITICAL';
                   const context = getAlertContext(alert.field);
-                  
+
                   // Extract row number (1-based for the user)
                   const match = alert.field.match(/\d+/);
                   const rowNumber = match ? parseInt(match[0], 10) + 1 : 'N/A';
@@ -253,11 +257,10 @@ export default function StructuralQaqcPanel({
                     <div
                       key={index}
                       onClick={() => handleAlertFix(alert.field)}
-                      className={`group p-3 rounded-xl border transition-all duration-200 cursor-pointer flex items-center justify-between ${
-                        isCritical
-                          ? 'bg-red-500/5 hover:bg-red-500/10 border-red-500/25 hover:border-red-500/40'
-                          : 'bg-amber-500/5 hover:bg-amber-500/10 border-amber-500/25 hover:border-amber-500/40'
-                      }`}
+                      className={`group p-3 rounded-xl border transition-all duration-200 cursor-pointer flex items-center justify-between ${isCritical
+                        ? 'bg-red-500/5 hover:bg-red-500/10 border-red-500/25 hover:border-red-500/40'
+                        : 'bg-amber-500/5 hover:bg-amber-500/10 border-amber-500/25 hover:border-amber-500/40'
+                        }`}
                     >
                       <div className="flex items-center gap-3">
                         <div className={`p-2 rounded-lg ${isCritical ? 'bg-red-500/10 text-red-400' : 'bg-amber-500/10 text-amber-400'}`}>

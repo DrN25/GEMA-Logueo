@@ -103,10 +103,27 @@ function getCellTdStyle(
 
   if (alert) {
     const isCritical = alert.type === 'CRITICAL';
-    const alertColor = isCritical ? 'rgba(239, 68, 68, 0.85)' : 'rgba(245, 158, 11, 0.75)';
-    const alertBg = isCritical ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.12)';
+    const isWarning = alert.type === 'WARNING';
+    const isVacio = alert.type === 'VACIO';
 
-    style.outline = `2px solid ${alertColor}`;
+    let alertColor = '';
+    let alertBg = '';
+    let outlineStyle = 'solid';
+
+    if (isCritical) {
+      alertColor = 'rgba(239, 68, 68, 0.85)'; // Rojo sutil
+      alertBg = 'rgba(239, 68, 68, 0.15)';
+    } else if (isWarning) {
+      alertColor = 'rgba(245, 158, 11, 0.75)'; // Naranja/Amarillo
+      alertBg = 'rgba(245, 158, 11, 0.12)';
+    } else if (isVacio) {
+      // VACÍO: Contorno punteado (dashed) color Slate apagado de baja prioridad visual
+      alertColor = 'rgba(148, 163, 184, 0.35)'; // Gris Slate
+      alertBg = 'rgba(148, 163, 184, 0.04)'; // Fondo imperceptible
+      outlineStyle = 'dashed';
+    }
+
+    style.outline = `2px ${outlineStyle} ${alertColor}`;
     style.outlineOffset = '-2px';
     background = baseBg ? `linear-gradient(${alertBg}, ${alertBg}), ${baseBg}` : alertBg;
   } else if (baseBg) {

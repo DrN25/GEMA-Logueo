@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AlertOctagon, AlertTriangle, CheckCircle, Minimize2, MapPin, Tag, ArrowLeftRight } from 'lucide-react';
+import { AlertOctagon, AlertTriangle, CheckCircle, Minimize2, MapPin, Tag, ArrowLeftRight, HelpCircle } from 'lucide-react';
 import type { ValidationAlert } from '../../utils/qaqcValidator';
 
 interface ValidationPanelProps {
@@ -10,7 +10,6 @@ interface ValidationPanelProps {
 export default function ValidationPanel({ alerts, onFocusField }: ValidationPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
 
-  // PERSISTENCIA: El sistema recuerda la ubicación preferida del usuario
   const [position, setPosition] = useState<'left' | 'right'>(() => {
     return (localStorage.getItem('geotech_qaqc_panel_pos') as 'left' | 'right') || 'right';
   });
@@ -107,18 +106,14 @@ export default function ValidationPanel({ alerts, onFocusField }: ValidationPane
 
   const criticalCount = alerts.filter(a => a.type === 'CRITICAL').length;
   const warningCount = alerts.filter(a => a.type === 'WARNING').length;
+  const vacioCount = alerts.filter(a => a.type === 'VACIO').length;
 
   if (!isOpen) {
     return (
       <div className={`fixed bottom-6 ${position === 'right' ? 'right-6' : 'left-6'} z-40 flex items-center gap-1.5 group transition-all duration-300`}>
 
-        {/* Botón flotante de cambio de lado - Más prioritario, compacto y de color celeste/cyan */}
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            togglePosition();
-          }}
+          onClick={(e) => { e.stopPropagation(); e.preventDefault(); togglePosition(); }}
           className={`w-6 h-6 rounded-full bg-cyan-950/90 border border-cyan-500/30 hover:border-cyan-400 text-cyan-400 hover:text-cyan-300 flex items-center justify-center shadow-md transition-all duration-300 opacity-50 group-hover:opacity-100 active:scale-90 z-50 ${position === 'right' ? 'order-first' : 'order-last'
             }`}
           title="Mover panel al lado opuesto"
@@ -129,16 +124,17 @@ export default function ValidationPanel({ alerts, onFocusField }: ValidationPane
         <button
           onClick={() => setIsOpen(true)}
           className={`relative w-14 h-14 rounded-full flex items-center justify-center border shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95 backdrop-blur-md opacity-75 hover:opacity-100 ${criticalCount > 0
-            ? 'bg-red-50 dark:bg-red-950/85 border-red-200 dark:border-red-500/50 text-red-600 dark:text-red-400 shadow-[0_0_20px_rgba(239,68,68,0.15)] dark:shadow-[0_0_20px_rgba(239,68,68,0.3)] hover:shadow-[0_0_25px_rgba(239,68,68,0.55)]'
-            : warningCount > 0
-              ? 'bg-amber-50 dark:bg-amber-950/85 border-amber-200 dark:border-amber-500/50 text-amber-600 dark:text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.15)] dark:shadow-[0_0_20px_rgba(245,158,11,0.25)] hover:shadow-[0_0_25px_rgba(245,158,11,0.45)]'
-              : 'bg-emerald-50 dark:bg-emerald-950/85 border-emerald-200 dark:border-emerald-500/50 text-emerald-600 dark:text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.15)] dark:shadow-[0_0_20px_rgba(16,185,129,0.2)] hover:shadow-[0_0_25px_rgba(16,185,129,0.35)]'
+              ? 'bg-red-50 dark:bg-red-950/85 border-red-200 dark:border-red-500/50 text-red-600 dark:text-red-400 shadow-[0_0_20px_rgba(239,68,68,0.15)] dark:shadow-[0_0_20px_rgba(239,68,68,0.3)] hover:shadow-[0_0_25px_rgba(239,68,68,0.55)]'
+              : warningCount > 0
+                ? 'bg-amber-50 dark:bg-amber-950/85 border-amber-200 dark:border-amber-500/50 text-amber-600 dark:text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.15)] dark:shadow-[0_0_20px_rgba(245,158,11,0.25)] hover:shadow-[0_0_25px_rgba(245,158,11,0.45)]'
+                : vacioCount > 0
+                  ? 'bg-slate-50 dark:bg-slate-900/85 border-slate-200 dark:border-slate-800/80 text-slate-500 dark:text-slate-400 shadow-sm' // Gris Slate Neutro
+                  : 'bg-emerald-50 dark:bg-emerald-950/85 border-emerald-200 dark:border-emerald-500/50 text-emerald-600 dark:text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.15)] dark:shadow-[0_0_20px_rgba(16,185,129,0.2)] hover:shadow-[0_0_25px_rgba(16,185,129,0.35)]'
             }`}
           title={`${alerts.length} validaciones pendientes. Haz clic para expandir.`}
         >
-          {/* Anillo pulsante en caso de errores */}
           {alerts.length > 0 && (
-            <span className={`absolute inset-0 rounded-full animate-ping opacity-25 ${criticalCount > 0 ? 'bg-red-500' : 'bg-amber-500'
+            <span className={`absolute inset-0 rounded-full animate-ping opacity-25 ${criticalCount > 0 ? 'bg-red-500' : warningCount > 0 ? 'bg-amber-500' : 'bg-slate-500'
               }`} />
           )}
 
@@ -146,14 +142,18 @@ export default function ValidationPanel({ alerts, onFocusField }: ValidationPane
             <AlertOctagon size={24} className="animate-pulse" />
           ) : warningCount > 0 ? (
             <AlertTriangle size={24} />
+          ) : vacioCount > 0 ? (
+            <HelpCircle size={24} className="text-slate-500 dark:text-slate-400" /> // Icono de ayuda neutro
           ) : (
             <CheckCircle size={24} />
           )}
 
           {alerts.length > 0 && (
             <span className={`absolute -top-1.5 -right-1.5 min-w-6 h-6 px-1.5 rounded-full text-xs font-black flex items-center justify-center border shadow-md ${criticalCount > 0
-              ? 'bg-red-500 border-red-400 text-white'
-              : 'bg-amber-500 border-amber-400 text-black'
+                ? 'bg-red-500 border-red-400 text-white'
+                : warningCount > 0
+                  ? 'bg-amber-500 border-amber-400 text-black'
+                  : 'bg-slate-500 border-slate-400 text-white'
               }`}>
               {alerts.length}
             </span>
@@ -171,7 +171,7 @@ export default function ValidationPanel({ alerts, onFocusField }: ValidationPane
           <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Validaciones</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="flex gap-1.5 mr-1">
+          <div className="flex gap-1.5 mr-1 flex-wrap justify-end">
             {criticalCount > 0 && (
               <span className="bg-red-500/20 border border-red-500/40 text-red-400 text-xxs font-extrabold px-1.5 py-0.5 rounded-md animate-pulse">
                 {criticalCount} CRÍT.
@@ -182,9 +182,13 @@ export default function ValidationPanel({ alerts, onFocusField }: ValidationPane
                 {warningCount} AVISO
               </span>
             )}
+            {vacioCount > 0 && (
+              <span className="bg-slate-500/10 border border-slate-500/30 text-slate-450 text-xxs font-extrabold px-1.5 py-0.5 rounded-md">
+                {vacioCount} VACÍOS
+              </span>
+            )}
           </div>
 
-          {/* Botón para cambiar de lado en la cabecera */}
           <button
             onClick={togglePosition}
             className="p-1 rounded-md text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10 transition-colors"
@@ -195,7 +199,7 @@ export default function ValidationPanel({ alerts, onFocusField }: ValidationPane
 
           <button
             onClick={() => setIsOpen(false)}
-            className="p-1 rounded-md text-slate-500 hover:text-slate-355 hover:bg-navy-800/80 transition-colors"
+            className="p-1 rounded-md text-slate-500 hover:text-slate-350 hover:bg-navy-800/80 transition-colors"
             title="Minimizar panel"
           >
             <Minimize2 size={14} />
@@ -213,9 +217,14 @@ export default function ValidationPanel({ alerts, onFocusField }: ValidationPane
           </div>
         ) : (
           [...alerts]
-            .sort((a, b) => (a.type === 'CRITICAL' ? -1 : 1) - (b.type === 'CRITICAL' ? -1 : 1))
+            .sort((a, b) => {
+              const weight = { 'CRITICAL': 0, 'WARNING': 1, 'VACIO': 2 };
+              return weight[a.type] - weight[b.type];
+            })
             .map((alert, idx) => {
               const isCritical = alert.type === 'CRITICAL';
+              const isWarning = alert.type === 'WARNING';
+              const isVacio = alert.type === 'VACIO';
               const context = getAlertContext(alert.field);
 
               return (
@@ -223,38 +232,39 @@ export default function ValidationPanel({ alerts, onFocusField }: ValidationPane
                   key={idx}
                   onClick={() => onFocusField(alert.field)}
                   className={`p-3 rounded-lg border text-left cursor-pointer transition-all hover:scale-[1.01] active:scale-[0.99] ${isCritical
-                    ? 'bg-red-50 dark:bg-red-950/45 border-red-200 dark:border-red-800/40 text-red-800 dark:text-slate-200 hover:bg-red-100 dark:hover:bg-red-950/60'
-                    : 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/30 text-amber-800 dark:text-slate-200 hover:bg-amber-100 dark:hover:bg-amber-950/50'
+                      ? 'bg-red-50 dark:bg-red-950/45 border-red-200 dark:border-red-800/40 text-red-800 dark:text-slate-200 hover:bg-red-100 dark:hover:bg-red-950/60'
+                      : isWarning
+                        ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/30 text-amber-800 dark:text-slate-200 hover:bg-amber-100 dark:hover:bg-amber-950/50'
+                        : 'bg-slate-50/50 dark:bg-slate-900/30 border-slate-200/50 dark:border-slate-800/30 text-slate-600 dark:text-slate-400 hover:bg-slate-100/50 dark:hover:bg-slate-900/50'
                     }`}
                 >
                   <div className="flex gap-2.5 items-start">
                     {isCritical ? (
                       <AlertOctagon size={16} className="text-red-400 shrink-0 mt-0.5" />
-                    ) : (
+                    ) : isWarning ? (
                       <AlertTriangle size={16} className="text-amber-400 shrink-0 mt-0.5" />
+                    ) : (
+                      <HelpCircle size={16} className="text-slate-500 shrink-0 mt-0.5" />
                     )}
                     <div className="space-y-2 flex-1 min-w-0">
-                      {/* Badges row */}
                       <div className="flex flex-wrap gap-1.5 items-center">
-                        {/* Severity badge */}
                         <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${isCritical
-                          ? 'bg-red-500/20 border-red-500/40 text-red-300'
-                          : 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                            ? 'bg-red-500/20 border-red-500/40 text-red-300'
+                            : isWarning
+                              ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                              : 'bg-slate-500/20 border-slate-500/30 text-slate-400'
                           }`}>
-                          {isCritical ? 'Error' : 'Aviso'}
+                          {isCritical ? 'Error' : isWarning ? 'Aviso' : 'Vacío'}
                         </span>
-                        {/* Tab badge */}
                         <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-800/70 border border-slate-700/60 text-slate-300">
                           <MapPin size={10} className="text-cyan-400 shrink-0" />
                           {context.tab}
                         </span>
-                        {/* Column badge */}
                         <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300">
                           <Tag size={10} className="shrink-0" />
                           {context.column}
                         </span>
                       </div>
-                      {/* Message */}
                       <p className="text-xs leading-snug text-slate-200 font-medium">{alert.message}</p>
                     </div>
                   </div>
