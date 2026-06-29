@@ -182,7 +182,7 @@ export function getStructuralColumns({
         return (
           <div className="flex items-center gap-1.5 w-full h-full px-1">
             <input
-              id={`struct-cell-${row.originalIndex}-0`}
+              id={`struct-cell-${row.originalIndex}-profundidad`}
               type="number"
               step="0.01"
               value={row.disc.profundidad}
@@ -263,7 +263,7 @@ export function getStructuralColumns({
         }
         return (
           <select
-            id={`struct-cell-${row.originalIndex}-1`}
+            id={`struct-cell-${row.originalIndex}-tipo_estructura`}
             value={row.disc.tipo_estructura}
             onChange={(e) => handleCellChange(row.originalIndex, 'tipo_estructura', e.target.value)}
             onKeyDown={(e) => handleKeyDown(e, row.originalIndex, 'tipo_estructura')}
@@ -294,7 +294,7 @@ export function getStructuralColumns({
         }
         return (
           <input
-            id={`struct-cell-${row.originalIndex}-2`}
+            id={`struct-cell-${row.originalIndex}-alfa`}
             type="number"
             min="-1"
             max="90"
@@ -323,7 +323,7 @@ export function getStructuralColumns({
         }
         return (
           <input
-            id={`struct-cell-${row.originalIndex}-3`}
+            id={`struct-cell-${row.originalIndex}-beta`}
             type="number"
             min="-1"
             max="360"
@@ -352,7 +352,7 @@ export function getStructuralColumns({
         }
         return (
           <select
-            id={`struct-cell-${row.originalIndex}-4`}
+            id={`struct-cell-${row.originalIndex}-forma`}
             value={row.disc.forma}
             onChange={(e) => handleCellChange(row.originalIndex, 'forma', parseInt(e.target.value) || 1)}
             onKeyDown={(e) => handleKeyDown(e, row.originalIndex, 'forma')}
@@ -383,7 +383,7 @@ export function getStructuralColumns({
         }
         return (
           <input
-            id={`struct-cell-${row.originalIndex}-5`}
+            id={`struct-cell-${row.originalIndex}-rugosidad`}
             type="number"
             min="-1"
             max="9"
@@ -411,7 +411,7 @@ export function getStructuralColumns({
         }
         return (
           <input
-            id={`struct-cell-${row.originalIndex}-6`}
+            id={`struct-cell-${row.originalIndex}-jrc10`}
             type="number"
             min="-1"
             max="20"
@@ -439,7 +439,7 @@ export function getStructuralColumns({
         }
         return (
           <input
-            id={`struct-cell-${row.originalIndex}-7`}
+            id={`struct-cell-${row.originalIndex}-abertura`}
             type="number"
             min="-1"
             step="0.01"
@@ -467,7 +467,7 @@ export function getStructuralColumns({
         }
         return (
           <select
-            id={`struct-cell-${row.originalIndex}-8`}
+            id={`struct-cell-${row.originalIndex}-weathering`}
             value={row.disc.weathering}
             onChange={(e) => handleCellChange(row.originalIndex, 'weathering', e.target.value)}
             onKeyDown={(e) => handleKeyDown(e, row.originalIndex, 'weathering')}
@@ -498,7 +498,7 @@ export function getStructuralColumns({
         }
         return (
           <input
-            id={`struct-cell-${row.originalIndex}-9`}
+            id={`struct-cell-${row.originalIndex}-espesor`}
             type="number"
             min="-1"
             step="0.01"
@@ -526,7 +526,7 @@ export function getStructuralColumns({
         }
         return (
           <select
-            id={`struct-cell-${row.originalIndex}-10`}
+            id={`struct-cell-${row.originalIndex}-relleno1`}
             value={row.disc.relleno1}
             onChange={(e) => handleCellChange(row.originalIndex, 'relleno1', e.target.value)}
             onKeyDown={(e) => handleKeyDown(e, row.originalIndex, 'relleno1')}
@@ -550,14 +550,14 @@ export function getStructuralColumns({
       renderCell: (row, _idx, isSelected) => {
         if (!isSelected) {
           return (
-            <span className="text-slate-350 block text-center truncate py-1.5 font-semibold">
+            <span className="text-slate-355 block text-center truncate py-1.5 font-semibold">
               {(!row.disc.relleno2 || row.disc.relleno2 === "-1") ? "-" : row.disc.relleno2}
             </span>
           );
         }
         return (
           <select
-            id={`struct-cell-${row.originalIndex}-11`}
+            id={`struct-cell-${row.originalIndex}-relleno2`}
             value={row.disc.relleno2 || '-1'}
             onChange={(e) => handleCellChange(row.originalIndex, 'relleno2', e.target.value)}
             onKeyDown={(e) => handleKeyDown(e, row.originalIndex, 'relleno2')}
@@ -588,7 +588,7 @@ export function getStructuralColumns({
         }
         return (
           <select
-            id={`struct-cell-${row.originalIndex}-12`}
+            id={`struct-cell-${row.originalIndex}-dureza_pared`}
             value={row.disc.dureza_pared}
             onChange={(e) => handleCellChange(row.originalIndex, 'dureza_pared', e.target.value)}
             onKeyDown={(e) => handleKeyDown(e, row.originalIndex, 'dureza_pared')}
@@ -619,7 +619,7 @@ export function getStructuralColumns({
         }
         return (
           <select
-            id={`struct-cell-${row.originalIndex}-13`}
+            id={`struct-cell-${row.originalIndex}-agua`}
             value={row.disc.agua}
             onChange={(e) => handleCellChange(row.originalIndex, 'agua', e.target.value)}
             onKeyDown={(e) => handleKeyDown(e, row.originalIndex, 'agua')}
@@ -650,7 +650,7 @@ export function getStructuralColumns({
         }
         return (
           <input
-            id={`struct-cell-${row.originalIndex}-14`}
+            id={`struct-cell-${row.originalIndex}-geotecnico`}
             type="text"
             value={row.disc.geotecnico}
             onChange={(e) => handleCellChange(row.originalIndex, 'geotecnico', e.target.value)}
@@ -676,7 +676,7 @@ export function getStructuralColumns({
         }
         return (
           <input
-            id={`struct-cell-${row.originalIndex}-15`}
+            id={`struct-cell-${row.originalIndex}-comentario`}
             type="text"
             value={row.disc.comentario || ''}
             onChange={(e) => handleCellChange(row.originalIndex, 'comentario', e.target.value)}
@@ -714,7 +714,7 @@ export function getStructuralColumns({
         }
         return (
           <select
-            id={`struct-cell-${row.originalIndex}-16`}
+            id={`struct-cell-${row.originalIndex}-tipo`}
             value={row.disc.tipo}
             onChange={(e) => handleCellChange(row.originalIndex, 'tipo', e.target.value)}
             onKeyDown={(e) => handleKeyDown(e, row.originalIndex, 'tipo')}

@@ -38,22 +38,19 @@ interface BaseEditableGridProps<T> {
 
 const EMPTY_ALERTS: ValidationAlert[] = [];
 
-// Ayudante estable para enfocar y colocar el cursor al final de la celda
 const focusAndCursorAtEnd = (el: HTMLInputElement | HTMLSelectElement) => {
-  el.focus();
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+
+  el.focus({ preventScroll: true });
   if (el.tagName === 'INPUT') {
     const input = el as HTMLInputElement;
     const len = input.value?.length || 0;
     try {
-      // setSelectionRange solo se soporta en ciertos tipos de input. Lo envolvemos en un catch para inputs numéricos
       input.setSelectionRange(len, len);
-    } catch (e) {
-      // Fallback seguro de enfoque si el navegador no permite mover la selección en tipos numéricos
-    }
+    } catch (e) { }
   }
 };
 
-// Generador de estilos de celdas con bordes sutiles y soporte sticky
 function getCellTdStyle(
   colKey: string,
   isSticky: boolean,
@@ -66,12 +63,12 @@ function getCellTdStyle(
   idPrefix: string
 ): React.CSSProperties {
   let alert: ValidationAlert | undefined;
+
   if (idPrefix === 'lgg-cell') {
     alert = rowAlerts.find(a => a.field === `${colKey}-${alertRowIndex}`);
   } else if (idPrefix === 'struct-cell') {
     alert = rowAlerts.find(a => a.field === `struct-${colKey}-${alertRowIndex}`);
   } else if (idPrefix === 'plt-cell') {
-    // RESOLUCIÓN EXPLICITA: Asocia el prefijo "plt-" con el nombre de campo y el índice de fila de PLT
     alert = rowAlerts.find(a => a.field === `plt-${colKey}-${alertRowIndex}`);
   } else {
     alert = rowAlerts.find(a =>
@@ -82,8 +79,6 @@ function getCellTdStyle(
 
   const actualStickyRight = isStickyRight || colKey === 'accion';
   const isStickyAny = isSticky || actualStickyRight;
-
-  // DISEÑO: Bordes interiores sutiles para evitar sensación de celdas combinadas
   let borderShadow = 'inset -1px 0 0 0 rgba(255, 255, 255, 0.04), inset 0 -1px 0 0 rgba(255, 255, 255, 0.04)';
 
   const stickyStyle: React.CSSProperties = {};
@@ -250,14 +245,16 @@ function GridRowInner<T>({
         if (onAddRow) {
           onAddRow();
           setTimeout(() => {
-            const nextEl = document.getElementById(`${idPrefix}-${totalRows}-0`);
+            const firstFieldName = editableFields[0];
+            const nextEl = document.getElementById(`${idPrefix}-${totalRows}-${String(firstFieldName)}`);
             if (nextEl) focusAndCursorAtEnd(nextEl as HTMLInputElement);
           }, 100);
         }
         return;
       }
       targetColIndex = colIndex + 1;
-      const nextId = `${idPrefix}-${targetRow}-${targetColIndex}`;
+      const targetFieldKey = editableFields[targetColIndex];
+      const nextId = `${idPrefix}-${targetRow}-${String(targetFieldKey)}`;
       setTimeout(() => {
         const el = document.getElementById(nextId) as HTMLInputElement | null;
         if (el) focusAndCursorAtEnd(el);
@@ -270,7 +267,8 @@ function GridRowInner<T>({
       : undefined;
     commitField(field, currentDomVal);
 
-    const nextId = `${idPrefix}-${targetRow}-${targetColIndex}`;
+    const targetFieldKey = editableFields[targetColIndex];
+    const nextId = `${idPrefix}-${targetRow}-${String(targetFieldKey)}`;
     setTimeout(() => {
       const el = document.getElementById(nextId) as HTMLInputElement | null;
       if (el) focusAndCursorAtEnd(el);
@@ -307,16 +305,16 @@ function GridRowInner<T>({
         return (
           <td
             key={colKeyStr}
-            // MEJORA: El ID de la celda ahora se asocia al índice estable original (alertRowIndex)
-            id={`${idPrefix}-td-${alertRowIndex}-${colIdx}`}
+            id={`${idPrefix}-td-${alertRowIndex}-${colKeyStr}`} // <-- ID TD Semántico basado en BD
             className={`${isStickyAny ? 'bg-navy-950 text-center' : 'px-1'} ${col.cellClassName || ''}`}
             style={cellStyle}
             onClick={() => {
-              if (!isSelected && colIdx !== -1) {
-                onSelect(rowIndex);
+              if (colIdx !== -1) {
+                if (!isSelected) {
+                  onSelect(rowIndex);
+                }
                 setTimeout(() => {
-                  // Usamos alertRowIndex para enfocar el selector correspondiente
-                  const inputId = `${idPrefix}-${alertRowIndex}-${colIdx}`;
+                  const inputId = `${idPrefix}-${alertRowIndex}-${colKeyStr}`;
                   const inputEl = document.getElementById(inputId);
                   if (inputEl) focusAndCursorAtEnd(inputEl as HTMLInputElement);
                 }, 40);
@@ -333,8 +331,7 @@ function GridRowInner<T>({
               </span>
             ) : col.type === 'select' ? (
               <select
-                id={`${idPrefix}-${alertRowIndex}-${colIdx}`}
-
+                id={`${idPrefix}-${alertRowIndex}-${colKeyStr}`} // <-- ID SELECT Semántico basado en BD
                 value={String(row[col.key as keyof T] ?? '-1')}
                 onChange={(e) => onCellChange(rowIndex, col.key as keyof T, e.target.value)}
                 onKeyDown={(e) => handleKeyDown(e, col.key as keyof T)}
@@ -347,7 +344,7 @@ function GridRowInner<T>({
               </select>
             ) : (
               <input
-                id={`${idPrefix}-${alertRowIndex}-${colIdx}`}
+                id={`${idPrefix}-${alertRowIndex}-${colKeyStr}`} // <-- ID INPUT Semántico basado en BD
                 type={col.type}
                 step={col.step}
                 min={col.min}
@@ -419,7 +416,6 @@ export default function BaseEditableGrid<T>({
   getAlertRowIndex
 }: BaseEditableGridProps<T>) {
 
-  // --- MOTOR DE RENDIMIENTO: RENDERIZADO PROGRESIVO EN LOTES ---
   const [renderLimit, setRenderLimit] = useState(() => {
     const initialLimit = selectedRowIndex !== null ? Math.max(40, selectedRowIndex + 10) : 40;
     return Math.min(data.length, initialLimit);
@@ -443,7 +439,6 @@ export default function BaseEditableGrid<T>({
     return data.slice(0, renderLimit);
   }, [data, renderLimit]);
 
-  // --- MEJORA: MOTOR DE REDIMENSIONAMIENTO DE COLUMNAS ARRISTRABLES (COL-RESIZE) ---
   const [colWidths, setColWidths] = useState<Record<string, number>>({});
   const activeColRef = useRef<{ key: string; startX: number; startWidth: number } | null>(null);
 
@@ -495,8 +490,6 @@ export default function BaseEditableGrid<T>({
   return (
     <div className="flex-1 overflow-auto border border-navy-800/80 rounded-xl bg-navy-950/65 shadow-2xl relative min-h-[350px]">
       <table className="w-full border-separate text-xs text-left table-fixed" style={{ borderSpacing: 0, minWidth }}>
-
-        {/* Colgroup para inyectar los anchos adaptable de manera unificada */}
         <colgroup>
           {columns.map((col) => {
             const customWidth = colWidths[String(col.key)];
@@ -519,8 +512,6 @@ export default function BaseEditableGrid<T>({
                 style={headerStyles[colIdx]}
               >
                 <div className="px-2 truncate">{col.label}</div>
-
-                {/* Divisor interactivo sutil para arrastrar columnas (Resizer) */}
                 {col.key !== 'accion' && (
                   <div
                     onMouseDown={(e) => handleResizeStart(e, String(col.key))}

@@ -1,6 +1,5 @@
 import { Trash2, Check, X, Copy } from 'lucide-react';
 import type { GridColumn } from '../../components/common/BaseEditableGrid';
-import type { Corrida } from './useLggState';
 import type { CorridaEnriquecida } from './useLggState';
 import {
   LITHOLOGY_CATALOG,
@@ -11,8 +10,6 @@ import {
   RELLENO_OPTIONS,
   INTEMPERISMO_OPTIONS,
   AGUA_OPTIONS,
-  ORIENTACION_OPTIONS,
-  ESTRUCTURA_OPTIONS,
   STRENGTH_CATALOG,
   GROUNDWATER_CATALOG
 } from '../../utils/catalogData';
@@ -119,7 +116,7 @@ interface LggColumnBuilderProps {
   lastRowGeologo: (idx: number) => string;
   lastRowFecha: (idx: number) => string;
   lastRowTaladroName: (idx: number) => string;
-  handleCellChange: (idx: number, field: keyof Corrida, val: any) => void;
+  handleCellChange: (idx: number, field: any, val: any) => void;
   deleteCorridaRow: (idx: number) => void;
   insertCorridaRow: (idx: number) => void;
 }
@@ -275,10 +272,8 @@ export function getLggColumns({
       label: 'Lito 1',
       width: 'w-28',
       type: 'select',
-      options: LITO1_OPTIONS,
       renderCell: (row, _idx, isSelected) => {
         const style = getLithologyStyleNullable(row.lito1, isDark);
-        // PERFORMANCE: Si la fila no está activa, renderizar un elemento de texto plano ultra liviano
         if (!isSelected) {
           return (
             <div className="w-full h-full flex items-center justify-center px-1" style={style}>
@@ -289,7 +284,7 @@ export function getLggColumns({
         return (
           <div className="w-full h-full flex items-center justify-center px-1" style={style}>
             <select
-              id={`lgg-cell-${row.originalIndex}-8`}
+              id={`lgg-cell-${row.originalIndex}-lito1`} // <-- ID Semántico
               value={row.lito1}
               onChange={(e) => handleCellChange(row.originalIndex, 'lito1', e.target.value)}
               className="w-full bg-transparent border-0 py-1 text-center font-bold focus:outline-none cursor-pointer text-xs"
@@ -310,7 +305,6 @@ export function getLggColumns({
       label: 'Lito 2',
       width: 'w-28',
       type: 'select',
-      options: LITO2_OPTIONS,
       renderCell: (row, _idx, isSelected) => {
         const style = getLithologyStyleNullable(row.lito2, isDark);
         if (!isSelected) {
@@ -325,7 +319,7 @@ export function getLggColumns({
         return (
           <div className="w-full h-full flex items-center justify-center px-1" style={style}>
             <select
-              id={`lgg-cell-${row.originalIndex}-9`}
+              id={`lgg-cell-${row.originalIndex}-lito2`} // <-- ID Semántico
               value={row.lito2 || '-1'}
               onChange={(e) => handleCellChange(row.originalIndex, 'lito2', e.target.value)}
               className="w-full bg-transparent border-0 py-1 text-center font-bold focus:outline-none cursor-pointer text-xs"
@@ -347,7 +341,6 @@ export function getLggColumns({
       label: 'Lito 3',
       width: 'w-28',
       type: 'select',
-      options: LITO3_OPTIONS,
       renderCell: (row, _idx, isSelected) => {
         const style = getLithologyStyleNullable(row.lito3, isDark);
         if (!isSelected) {
@@ -362,7 +355,7 @@ export function getLggColumns({
         return (
           <div className="w-full h-full flex items-center justify-center px-1" style={style}>
             <select
-              id={`lgg-cell-${row.originalIndex}-10`}
+              id={`lgg-cell-${row.originalIndex}-lito3`} // <-- ID Semántico
               value={row.lito3 || '-1'}
               onChange={(e) => handleCellChange(row.originalIndex, 'lito3', e.target.value)}
               className="w-full bg-transparent border-0 py-1 text-center font-bold focus:outline-none cursor-pointer text-xs"
@@ -384,7 +377,6 @@ export function getLggColumns({
       label: 'Resist ISRM',
       width: 'w-28',
       type: 'select',
-      options: RESISTENCIA_OPTIONS,
       renderCell: (row, _idx, isSelected) => {
         const style = getResistenciaStyle(row.resistencia, isDark);
         if (!isSelected) {
@@ -399,7 +391,7 @@ export function getLggColumns({
         return (
           <div className="w-full h-full flex items-center justify-center px-1" style={style}>
             <select
-              id={`lgg-cell-${row.originalIndex}-11`}
+              id={`lgg-cell-${row.originalIndex}-resistencia`} // <-- ID Semántico
               value={row.resistencia}
               onChange={(e) => handleCellChange(row.originalIndex, 'resistencia', e.target.value)}
               className="w-full bg-transparent border-0 py-1 text-center font-bold focus:outline-none cursor-pointer text-xs"
@@ -420,7 +412,7 @@ export function getLggColumns({
       label: 'Ori',
       width: 'w-24',
       type: 'select',
-      options: ORIENTACION_OPTIONS
+      options: ['N', 'S', 'X']
     },
     {
       key: 'offset',
@@ -434,14 +426,14 @@ export function getLggColumns({
       label: 'Tipo Est 1',
       width: 'w-28',
       type: 'select',
-      options: ESTRUCTURA_OPTIONS
+      options: ['JN', 'F-10', 'SZ', 'BED', 'VN', 'CON', 'SE', 'F+10', '-1']
     },
     {
       key: 'tipo_est2',
       label: 'Tipo Est 2',
       width: 'w-28',
       type: 'select',
-      options: ESTRUCTURA_OPTIONS
+      options: ['JN', 'F-10', 'SZ', 'BED', 'VN', 'CON', 'SE', 'F+10', '-1']
     },
     {
       key: 'frac_nat',
@@ -524,7 +516,6 @@ export function getLggColumns({
       label: 'Intemp',
       width: 'w-28',
       type: 'select',
-      options: INTEMPERISMO_OPTIONS,
       renderCell: (row, _idx, isSelected) => {
         const style = getIntemperismoStyle(row.intemperismo, isDark);
         if (!isSelected) {
@@ -539,7 +530,7 @@ export function getLggColumns({
         return (
           <div className="w-full h-full flex items-center justify-center px-1" style={style}>
             <select
-              id={`lgg-cell-${row.originalIndex}-22`}
+              id={`lgg-cell-${row.originalIndex}-intemperismo`} // <-- ID Semántico
               value={row.intemperismo}
               onChange={(e) => handleCellChange(row.originalIndex, 'intemperismo', e.target.value)}
               className="w-full bg-transparent border-0 py-1 text-center font-bold focus:outline-none cursor-pointer text-xs"
@@ -567,7 +558,6 @@ export function getLggColumns({
       label: 'Relleno 2',
       width: 'w-28',
       type: 'select',
-      options: RELLENO_OPTIONS,
       renderCell: (row, _idx, isSelected) => {
         if (!isSelected) {
           return (
@@ -578,7 +568,7 @@ export function getLggColumns({
         }
         return (
           <select
-            id={`lgg-cell-${row.originalIndex}-24`}
+            id={`lgg-cell-${row.originalIndex}-relleno2`} // <-- ID Semántico
             value={row.relleno2 || '-1'}
             onChange={(e) => handleCellChange(row.originalIndex, 'relleno2', e.target.value)}
             className="w-full bg-transparent border-0 px-1 py-1 text-center text-slate-300 focus:outline-none cursor-pointer focus:ring-1 focus:ring-blue-500 rounded text-xs"
@@ -625,7 +615,6 @@ export function getLggColumns({
       label: 'Agua',
       width: 'w-28',
       type: 'select',
-      options: AGUA_OPTIONS,
       renderCell: (row, _idx, isSelected) => {
         const style = getAguaStyle(row.agua_obs, isDark);
         if (!isSelected) {
@@ -640,7 +629,7 @@ export function getLggColumns({
         return (
           <div className="w-full h-full flex items-center justify-center px-1" style={style}>
             <select
-              id={`lgg-cell-${row.originalIndex}-26`}
+              id={`lgg-cell-${row.originalIndex}-agua_obs`} // <-- ID Semántico
               value={row.agua_obs}
               onChange={(e) => handleCellChange(row.originalIndex, 'agua_obs', e.target.value)}
               className="w-full bg-transparent border-0 py-1 text-center font-bold focus:outline-none cursor-pointer text-xs"
@@ -675,7 +664,6 @@ export function getLggColumns({
       label: 'Turno',
       width: 'w-24',
       type: 'select',
-      options: ['D', 'N'],
       renderCell: (row, _idx, isSelected) => {
         if (!isSelected) {
           return (
@@ -686,7 +674,7 @@ export function getLggColumns({
         }
         return (
           <select
-            id={`lgg-cell-${row.originalIndex}-27`}
+            id={`lgg-cell-${row.originalIndex}-turno`} // <-- ID Semántico
             value={row.turno || 'D'}
             onChange={(e) => handleCellChange(row.originalIndex, 'turno', e.target.value)}
             className="w-full bg-transparent border-0 py-1 text-center text-slate-300 focus:outline-none cursor-pointer focus:ring-1 focus:ring-blue-500 rounded text-xs"
@@ -755,8 +743,6 @@ export function getLggColumns({
       isStickyRight: true,
       stickyRight: 0,
       renderCell: (row, _idx, isSelected) => {
-        // PERFORMANCE: Solo mostramos botones de acción en la fila actualmente seleccionada
-        // Esto limpia visualmente la tabla de ruidos y acelera el renderizado del scroll.
         if (!isSelected) {
           return null;
         }
