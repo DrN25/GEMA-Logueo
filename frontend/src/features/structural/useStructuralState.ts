@@ -6,6 +6,8 @@ interface UseStructuralStateProps {
   corridas: Corrida[];
   onDiscontinuidadesChange: (discontinuidades: Discontinuidad[]) => void;
   geologo: string;
+  selectedRowIndex: number | null;
+  onSelectRow: (index: number | null) => void;
 }
 
 const EDITABLE_COLS: (keyof Discontinuidad)[] = [
@@ -18,10 +20,10 @@ export function useStructuralState({
   discontinuidades,
   corridas,
   onDiscontinuidadesChange,
-  geologo
+  geologo,
+  selectedRowIndex,
+  onSelectRow
 }: UseStructuralStateProps) {
-  const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null);
-
   // --- Filtros ---
   const [filterTipoEst, setFilterTipoEst] = useState<string>('');
   const [filterWeathering, setFilterWeathering] = useState<string>('');
@@ -243,7 +245,8 @@ export function useStructuralState({
     };
 
     onDiscontinuidadesChange([...discontinuidades, newRow]);
-  }, [discontinuidades, corridas, geologo, onDiscontinuidadesChange]);
+    onSelectRow(discontinuidades.length);
+  }, [discontinuidades, corridas, geologo, onDiscontinuidadesChange, onSelectRow]);
 
   // --- Insertar Fila (Clonación y Reindexación) ---
   const insertDiscontinuidadRow = useCallback((index: number) => {
@@ -292,7 +295,8 @@ export function useStructuralState({
       .filter((_, i) => i !== index)
       .map((row, i) => ({ ...row, id: i + 1 }));
     onDiscontinuidadesChange(updated);
-  }, [discontinuidades, onDiscontinuidadesChange]);
+    onSelectRow(updated.length > 0 ? 0 : null);
+  }, [discontinuidades, onDiscontinuidadesChange, onSelectRow]);
 
   // --- Teclado / Navegación ---
   const handleKeyDown = useCallback((
@@ -347,6 +351,7 @@ export function useStructuralState({
     }
 
     const nextElementId = `struct-cell-${targetRow}-${targetColIndex}`;
+    onSelectRow(targetRow);
 
     setTimeout(() => {
       const element = document.getElementById(nextElementId) as HTMLInputElement | HTMLSelectElement;
@@ -357,7 +362,7 @@ export function useStructuralState({
         }
       }
     }, 10);
-  }, [discontinuidades.length, addDiscontinuidadRow]);
+  }, [discontinuidades.length, addDiscontinuidadRow, onSelectRow]);
 
   return {
     filteredDiscontinuidades,
@@ -371,8 +376,6 @@ export function useStructuralState({
     addDiscontinuidadRow,
     insertDiscontinuidadRow,
     deleteRow,
-    handleKeyDown,
-    selectedRowIndex,
-    setSelectedRowIndex
+    handleKeyDown
   };
 }

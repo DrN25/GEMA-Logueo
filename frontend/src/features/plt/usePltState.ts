@@ -11,17 +11,20 @@ interface UsePltStateProps {
   onEnsayosPltChange: (plts: EnsayoPlt[]) => void;
   corridas: any[];
   collar: any;
+  selectedRowIndex: number | null;
+  onSelectRow: (index: number | null) => void;
 }
 
 export function usePltState({
   ensayos_plt,
   onEnsayosPltChange,
   corridas,
-  collar
+  collar,
+  selectedRowIndex,
+  onSelectRow
 }: UsePltStateProps) {
   const [activeSubTab, setActiveSubTab] = useState<'plt' | 'dashboard' | 'qaqc'>('plt');
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null);
 
   const cleanNum = (val: any): number => {
     const num = parseFloat(val);
@@ -209,24 +212,24 @@ export function usePltState({
 
     const newRows = [...ensayos_plt, newRow];
     onEnsayosPltChange(newRows);
-    setSelectedRowIndex(newRows.length - 1);
+    onSelectRow(newRows.length - 1);
 
     setTimeout(() => {
       const nextId = `plt-cell-${ensayos_plt.length}-nro_muestra`;
       const el = document.getElementById(nextId) as HTMLInputElement;
       if (el) { el.focus(); el.select(); }
     }, 100);
-  }, [ensayos_plt, onEnsayosPltChange, collar]);
+  }, [ensayos_plt, onEnsayosPltChange, collar, onSelectRow]);
 
   const deleteRow = useCallback((rowIdx: number) => {
     const updated = ensayos_plt.filter((_, idx) => idx !== rowIdx);
     onEnsayosPltChange(updated);
     if (selectedRowIndex === rowIdx) {
-      setSelectedRowIndex(updated.length > 0 ? 0 : null);
+      onSelectRow(updated.length > 0 ? 0 : null);
     } else if (selectedRowIndex !== null && selectedRowIndex > rowIdx) {
-      setSelectedRowIndex(selectedRowIndex - 1);
+      onSelectRow(selectedRowIndex - 1);
     }
-  }, [ensayos_plt, onEnsayosPltChange, selectedRowIndex]);
+  }, [ensayos_plt, onEnsayosPltChange, selectedRowIndex, onSelectRow]);
 
   const handleExportExcel = useCallback(() => {
     try {
@@ -286,7 +289,7 @@ export function usePltState({
     isImportModalOpen,
     setIsImportModalOpen,
     selectedRowIndex,
-    setSelectedRowIndex,
+    setSelectedRowIndex: onSelectRow,
     handleCellChange,
     addRow,
     deleteRow,

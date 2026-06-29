@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Body, Depends
 from sqlalchemy.orm import Session
 from typing import Dict, Any
+from sqlalchemy import text 
 import math
 
 from app.database import get_db
@@ -34,13 +35,8 @@ def validate_row(corrida: Dict[str, Any] = Body(...)):
 
 @router.get("/dashboard/rqd-summary")
 def get_dashboard_rqd_summary(db: Session = Depends(get_db)):
-    """
-    Endpoint eficiente para el Dashboard RQD & Espaciamiento.
-    Realiza un JOIN profundo en una sola query SQL para agregar todos los datos
-    necesarios de TODOS los taladros activos.
-    """
     try:
-        rows = db.execute(models.text("""
+        rows = db.execute(text("""
             SELECT
                 t.numero            AS numero,
                 a.anio              AS anio,
@@ -60,6 +56,7 @@ def get_dashboard_rqd_summary(db: Session = Depends(get_db)):
             ORDER BY a.anio, t.numero, r.de
         """)).fetchall()
     except Exception as e:
+        print("Error en SQL Server RQD query:", e)
         return {"points_rqd_esp": [], "points_ff_rqd": [], "taladros": []}
 
     points_rqd_esp = []

@@ -17,6 +17,8 @@ interface PltViewProps {
   alerts: ValidationAlert[];
   darkMode?: boolean;
   onImportExcel?: (importedRows: any[]) => void;
+  selectedRowIndex: number | null;
+  onSelectRow: (index: number | null) => void;
 }
 
 const EDITABLE_FIELDS: (keyof EnsayoPlt)[] = [
@@ -50,7 +52,10 @@ export default function PltView({
   collar,
   alerts,
   darkMode = true,
-  onImportExcel
+  onImportExcel,
+  selectedRowIndex,
+  onSelectRow
+
 }: PltViewProps) {
   const [showKpis, setShowKpis] = useState(true);
 
@@ -59,13 +64,11 @@ export default function PltView({
     setActiveSubTab,
     isImportModalOpen,
     setIsImportModalOpen,
-    selectedRowIndex,
-    setSelectedRowIndex,
     handleCellChange,
     addRow,
     deleteRow,
     handleExportExcel
-  } = usePltState({ ensayos_plt, onEnsayosPltChange, corridas, collar });
+  } = usePltState({ ensayos_plt, onEnsayosPltChange, corridas, collar, selectedRowIndex, onSelectRow });
 
   // --- PATRÓN DE CALLBACKS ESTABLES CON REF ---
   const cellChangeRef = useRef(handleCellChange);
@@ -96,7 +99,8 @@ export default function PltView({
     setTimeout(() => {
       const el = document.getElementById(fieldId);
       if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // MEJORA: inline: 'center' centra horizontalmente también la celda de PLT
+        el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
         el.focus();
         if (el.tagName === 'INPUT') {
           (el as HTMLInputElement).select();
@@ -144,8 +148,8 @@ export default function PltView({
           <button
             onClick={() => setShowKpis(!showKpis)}
             className={`mr-4 flex items-center gap-1.5 px-3 py-1 rounded-lg border text-xxs font-black uppercase tracking-wider transition-all active:scale-95 ${showKpis
-                ? 'bg-navy-900 border-navy-800 text-slate-400 hover:text-slate-200 hover:bg-navy-850'
-                : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20'
+              ? 'bg-navy-900 border-navy-800 text-slate-400 hover:text-slate-200 hover:bg-navy-850'
+              : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20'
               }`}
           >
             {showKpis ? <EyeOff size={12} /> : <Eye size={12} />}
@@ -263,7 +267,7 @@ export default function PltView({
               data={ensayos_plt}
               columns={columns}
               selectedRowIndex={selectedRowIndex}
-              onSelectRow={setSelectedRowIndex}
+              onSelectRow={onSelectRow}
               onCellChange={stableHandleCellChange}
               alerts={alerts}
               idPrefix="plt-cell"

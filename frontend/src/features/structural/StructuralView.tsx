@@ -35,6 +35,8 @@ interface StructuralViewProps {
   darkMode?: boolean;
   sidebarCollapsed?: boolean;
   onFocusField?: (fieldId: string) => void;
+  selectedRowIndex: number | null;
+  onSelectRow: (index: number | null) => void;
 }
 
 const EDITABLE_COLS: (keyof Discontinuidad)[] = [
@@ -53,7 +55,9 @@ export default function StructuralView({
   onImportExcel,
   darkMode = true,
   sidebarCollapsed = false,
-  onFocusField
+  onFocusField,
+  selectedRowIndex,
+  onSelectRow
 }: StructuralViewProps) {
   const [activeSubTab, setActiveSubTab] = useState<'lgest' | 'qaqc'>('lgest');
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -80,13 +84,14 @@ export default function StructuralView({
     insertDiscontinuidadRow,
     deleteRow,
     handleKeyDown,
-    selectedRowIndex,
-    setSelectedRowIndex
   } = useStructuralState({
     discontinuidades,
     corridas,
     onDiscontinuidadesChange,
-    geologo
+    geologo,
+    selectedRowIndex,
+    onSelectRow
+
   });
 
   // --- PATRÓN DE CALLBACKS ESTABLES CON REF ---
@@ -207,8 +212,8 @@ export default function StructuralView({
           <button
             onClick={() => setShowKpis(!showKpis)}
             className={`mr-4 flex items-center gap-1.5 px-3 py-1 rounded-lg border text-xxs font-black uppercase tracking-wider transition-all active:scale-95 ${showKpis
-                ? 'bg-navy-900 border-navy-800 text-slate-400 hover:text-slate-200 hover:bg-navy-850'
-                : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20'
+              ? 'bg-navy-900 border-navy-800 text-slate-400 hover:text-slate-200 hover:bg-navy-850'
+              : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20'
               }`}
           >
             {showKpis ? <EyeOff size={12} /> : <Eye size={12} />}
@@ -246,8 +251,8 @@ export default function StructuralView({
                     type="button"
                     onClick={() => setShowFilters(!showFilters)}
                     className={`flex items-center gap-1.5 border active:scale-95 px-3 py-1.5 rounded-lg text-xxs font-black uppercase tracking-wider transition-all shadow-sm ${showFilters
-                        ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20'
-                        : 'bg-navy-900 border-navy-800 text-slate-400 hover:bg-navy-850'
+                      ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20'
+                      : 'bg-navy-900 border-navy-800 text-slate-400 hover:bg-navy-850'
                       }`}
                   >
                     <Filter size={12} />

@@ -757,89 +757,109 @@ export default function App() {
 
   // Mapped field focusing logic from ValidationPanel
   const handleFocusField = (fieldId: string) => {
-    // 1. Determine correct view tab based on field prefix
+    // 1. Redireccionar a la pestaña correspondiente
+    let targetView = 'lgg';
+    let idPrefix = 'lgg-cell';
+    const isStruct = fieldId.startsWith('struct-');
+    const isPlt = fieldId.startsWith('plt-');
+
     if (fieldId.startsWith('survey-') || fieldId.startsWith('collar-')) {
-      setCurrentView('collar');
+      targetView = 'collar';
     } else if (fieldId.endsWith('-input') || fieldId === 'input-sondaje-name') {
-      setCurrentView('collar');
-    } else if (fieldId.startsWith('struct-')) {
-      setCurrentView('lgest');
-    } else if (fieldId.startsWith('plt-')) {
-      setCurrentView('reports_plt');
-    } else {
-      setCurrentView('lgg');
+      targetView = 'collar';
+    } else if (isStruct) {
+      targetView = 'lgest';
+      idPrefix = 'struct-cell';
+    } else if (isPlt) {
+      targetView = 'reports_plt';
+      idPrefix = 'plt-cell';
     }
 
-    // 2. Wait for rendering, scroll and focus element
+    setCurrentView(targetView);
+
+    // 2. EXTRACCIÓN DE ÍNDICE ROBUSTA MULTI-GUION (split('-'))
+    const parts = fieldId.split('-');
+    let index: number | null = null;
+    let field = '';
+
+    if (parts.length >= 2) {
+      // El último segmento siempre será el índice numérico de la fila
+      const lastPart = parts[parts.length - 1];
+      const parsedIndex = parseInt(lastPart, 10);
+
+      if (!isNaN(parsedIndex)) {
+        index = parsedIndex;
+        if (isStruct || isPlt || fieldId.startsWith('survey-')) {
+          field = parts[1]; // Para "struct-jrc10-1463", extrae "jrc10"
+        } else {
+          field = parts[0]; // Para "de-5", extrae "de" (LGG)
+        }
+      }
+    }
+
+    // Si es LGG, podemos disparar la selección global de inmediato
+    if (index !== null && !isStruct && !isPlt) {
+      setSelectedRowIndex(index);
+    }
+
+    // 3. Esperar al renderizado y enfocar mediante clic programático
     setTimeout(() => {
       let element = document.getElementById(fieldId);
 
-      if (!element) {
-        if (fieldId.startsWith('struct-')) {
-          const match = fieldId.match(/^struct-([a-z0-9_]+)-(\d+)$/);
-          if (match) {
-            const [, field, indexStr] = match;
-            const index = parseInt(indexStr);
-            const structColMap: Record<string, number> = {
-              'profundidad': 0, 'tipo_estructura': 1, 'alfa': 2, 'beta': 3,
-              'forma': 4, 'rugosidad': 5, 'jrc10': 6, 'abertura': 7,
-              'weathering': 8, 'espesor': 9, 'relleno1': 10, 'relleno2': 11,
-              'dureza_pared': 12, 'agua': 13, 'geotecnico': 14, 'comentario': 15,
-              'tipo': 16
-            };
-            const colIdx = structColMap[field];
-            if (colIdx !== undefined) {
-              element = document.getElementById(`struct-cell-${index}-${colIdx}`);
-            }
-          }
-        } else if (fieldId.startsWith('plt-')) {
-          const match = fieldId.match(/^plt-([a-z0-9_]+)-(\d+)$/);
-          if (match) {
-            const [, field, indexStr] = match;
-            const index = parseInt(indexStr);
-            const pltColMap: Record<string, number> = {
-              'fecha': 0, 'nro_muestra': 1, 'nro_caja': 2, 'from_m': 5, 'to_m': 6,
-              'este_m': 7, 'norte_m': 8, 'elevacion_msnm': 9,
-              'tipo_de_ensayo': 10, 'diametro_taladro_nominacion': 11, 'd_mm': 15,
-              'p_instr_kn': 16, 'tipo_rotura_code': 17, 'direccion_rotura_code': 18,
-              'ejecutadoPor': 19, 'observaciones': 20
-            };
-            const colIdx = pltColMap[field];
-            if (colIdx !== undefined) {
-              element = document.getElementById(`plt-cell-${index}-${colIdx}`);
-            }
-          }
+      // Si el elemento interactivo directo no existe en el DOM, resolvemos y pulsamos su celda TD
+      if (!element && index !== null) {
+        let colIdx: number | undefined;
+
+        if (isStruct) {
+          const structColMap: Record<string, number> = {
+            'profundidad': 0, 'tipo_estructura': 1, 'alfa': 2, 'beta': 3,
+            'forma': 4, 'rugosidad': 5, 'jrc10': 6, 'abertura': 7,
+            'weathering': 8, 'espesor': 9, 'relleno1': 10, 'relleno2': 11,
+            'dureza_pared': 12, 'agua': 13, 'geotecnico': 14, 'comentario': 15,
+            'tipo': 16
+          };
+          colIdx = structColMap[field];
+        } else if (isPlt) {
+          const pltColMap: Record<string, number> = {
+            'fecha': 0, 'nro_muestra': 1, 'nro_caja': 2, 'from_m': 5, 'to_m': 6,
+            'este_m': 7, 'norte_m': 8, 'elevacion_msnm': 9,
+            'tipo_de_ensayo': 10, 'diametro_taladro_nominacion': 11, 'd_mm': 15,
+            'p_instr_kn': 16, 'tipo_rotura_code': 17, 'direccion_rotura_code': 18,
+            'ejecutadoPor': 19, 'observaciones': 20
+          };
+          colIdx = pltColMap[field];
         } else {
-          const match = fieldId.match(/^([a-z0-9_]+)-(\d+)$/);
-          if (match) {
-            const [, field, indexStr] = match;
-            const index = parseInt(indexStr);
-            const colMap: Record<string, number> = {
-              'de': 0, 'a': 1, 'rec_m': 2, 'rqd_m': 3, 'lrf_m': 4, 'small_frag_m': 5,
-              'mec_frac': 6, 'frac_nat': 7, 'lito1': 8, 'lito2': 9, 'lito3': 10,
-              'resistencia': 11, 'orientacion': 12, 'offset': 13, 'tipo_est1': 14,
-              'tipo_est2': 15, 'frac_buz30': 16, 'frac_buz60': 17, 'frac_buz90': 18,
-              'abertura': 19, 'rugosidad': 20, 'jrc10': 21, 'intemperismo': 22,
-              'relleno1': 23, 'relleno2': 24, 'espesor': 25, 'agua_obs': 26,
-              'turno': 27, 'comentarios': 28
-            };
-            const colIdx = colMap[field];
-            if (colIdx !== undefined) {
-              element = document.getElementById(`lgg-cell-${index}-${colIdx}`);
-              setSelectedRowIndex(index);
-            }
+          const colMap: Record<string, number> = {
+            'de': 0, 'a': 1, 'rec_m': 2, 'rqd_m': 3, 'lrf_m': 4, 'small_frag_m': 5,
+            'mec_frac': 6, 'frac_nat': 7, 'lito1': 8, 'lito2': 9, 'lito3': 10,
+            'resistencia': 11, 'orientacion': 12, 'offset': 13, 'tipo_est1': 14,
+            'tipo_est2': 15, 'frac_buz30': 16, 'frac_buz60': 17, 'frac_buz90': 18,
+            'abertura': 19, 'rugosidad': 20, 'jrc10': 21, 'intemperismo': 22,
+            'relleno1': 23, 'relleno2': 24, 'espesor': 25, 'agua_obs': 26,
+            'turno': 27, 'comentarios': 28
+          };
+          colIdx = colMap[field];
+        }
+
+        if (colIdx !== undefined) {
+          // Buscamos la celda física TD que SIEMPRE existe con el ID de la advertencia estable (index)
+          const tdElement = document.getElementById(`${idPrefix}-td-${index}-${colIdx}`);
+          if (tdElement) {
+            tdElement.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+            tdElement.click(); // Activa la fila y enfoca automáticamente
+            return;
           }
         }
       }
 
       if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
         element.focus();
         if (element.tagName === 'INPUT') {
           (element as HTMLInputElement).select();
         }
       }
-    }, 120);
+    }, 150);
   };
 
   const handleCollarChange = (updatedCollar: Collar) => {
@@ -1017,6 +1037,7 @@ export default function App() {
             activeTaladroName={activeTaladro.name}
             geologo={activeTaladro.geologo}
             fecha={activeTaladro.fecha_registro}
+            taladros={taladros}
           />
         );
       case 'import':
@@ -1225,6 +1246,9 @@ export default function App() {
                   darkMode={darkMode}
                   sidebarCollapsed={sidebarCollapsed}
                   onFocusField={handleFocusField}
+                  // --- MEJORA: Sincronizar selección de fila con App.tsx ---
+                  selectedRowIndex={selectedRowIndex}
+                  onSelectRow={setSelectedRowIndex}
                 />
               </div>
 
@@ -1237,6 +1261,10 @@ export default function App() {
                   collar={activeTaladro}
                   alerts={activeAlerts}
                   onImportExcel={handleImportPltExcelData}
+                  darkMode={darkMode}
+                  // --- MEJORA: Sincronizar selección de fila con App.tsx ---
+                  selectedRowIndex={selectedRowIndex}
+                  onSelectRow={setSelectedRowIndex}
                 />
               </div>
             </>
@@ -1251,6 +1279,7 @@ export default function App() {
                 activeTaladroName={activeTaladro.name}
                 geologo={activeTaladro.geologo}
                 fecha={activeTaladro.fecha_registro}
+                taladros={taladros}
               />
             </div>
           )}

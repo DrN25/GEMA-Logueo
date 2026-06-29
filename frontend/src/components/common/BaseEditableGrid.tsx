@@ -101,20 +101,22 @@ function getCellTdStyle(
       : 'rgba(6, 182, 212, 0.08)';
   }
 
+  const style: React.CSSProperties = { ...stickyStyle };
+
   if (alert) {
     const isCritical = alert.type === 'CRITICAL';
-    const alertBg = isCritical ? 'rgba(239, 68, 68, 0.12)' : 'rgba(245, 158, 11, 0.12)';
-    const alertBorder = isCritical
-      ? 'inset 0 0 0 2px rgba(239, 68, 68, 0.6)'
-      : 'inset 0 0 0 2px rgba(245, 158, 11, 0.5)';
+    const alertColor = isCritical ? 'rgba(239, 68, 68, 0.85)' : 'rgba(245, 158, 11, 0.75)';
+    const alertBg = isCritical ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.12)';
 
-    borderShadow = `${alertBorder}, ${borderShadow}`;
+    // MEJORA CSS: outline con offset negativo para forzar a que el contorno
+    // se pinte POR ENCIMA de los divs de colores de litologías o intemperismo
+    style.outline = `2px solid ${alertColor}`;
+    style.outlineOffset = '-2px';
     background = baseBg ? `linear-gradient(${alertBg}, ${alertBg}), ${baseBg}` : alertBg;
   } else if (baseBg) {
     background = baseBg;
   }
 
-  const style: React.CSSProperties = { ...stickyStyle };
   if (borderShadow) style.boxShadow = borderShadow;
   if (background) style.background = background;
   return style;
@@ -304,15 +306,17 @@ function GridRowInner<T>({
         return (
           <td
             key={colKeyStr}
+            // MEJORA: El ID de la celda ahora se asocia al índice estable original (alertRowIndex)
+            id={`${idPrefix}-td-${alertRowIndex}-${colIdx}`}
             className={`${isStickyAny ? 'bg-navy-950 text-center' : 'px-1'} ${col.cellClassName || ''}`}
             style={cellStyle}
             onClick={() => {
               if (!isSelected && colIdx !== -1) {
                 onSelect(rowIndex);
                 setTimeout(() => {
-                  const inputId = `${idPrefix}-${rowIndex}-${colIdx}`;
+                  // Usamos alertRowIndex para enfocar el selector correspondiente
+                  const inputId = `${idPrefix}-${alertRowIndex}-${colIdx}`;
                   const inputEl = document.getElementById(inputId);
-                  // MEJORA: Enfoca la celda colocando el cursor al final de forma sutil
                   if (inputEl) focusAndCursorAtEnd(inputEl as HTMLInputElement);
                 }, 40);
               }
@@ -328,7 +332,8 @@ function GridRowInner<T>({
               </span>
             ) : col.type === 'select' ? (
               <select
-                id={`${idPrefix}-${rowIndex}-${colIdx}`}
+                id={`${idPrefix}-${alertRowIndex}-${colIdx}`}
+
                 value={String(row[col.key as keyof T] ?? '-1')}
                 onChange={(e) => onCellChange(rowIndex, col.key as keyof T, e.target.value)}
                 onKeyDown={(e) => handleKeyDown(e, col.key as keyof T)}
@@ -341,7 +346,7 @@ function GridRowInner<T>({
               </select>
             ) : (
               <input
-                id={`${idPrefix}-${rowIndex}-${colIdx}`}
+                id={`${idPrefix}-${alertRowIndex}-${colIdx}`}
                 type={col.type}
                 step={col.step}
                 min={col.min}
