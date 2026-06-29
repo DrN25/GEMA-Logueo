@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import { calculateRowRmr } from '../../utils/formulaEngine';
 import { resolveLithologyCascade } from '../../utils/catalogData';
 
@@ -94,9 +94,29 @@ export function useLggState({
     });
   }, []);
 
+  // Cache de resultados RMR por fila: evita recalcular filas que no cambiaron.
+  // Funciona como un mapa de hash rápido: si la llave de una fila no cambió,
+  // devolvemos el resultado anterior sin llamar a calculateRowRmr().
+  const rmrCache = useRef<Map<string, CorridaEnriquecida>>(new Map());
+
   // 2. Lógica Reactiva de Cálculos Geomecánicos y RMR Enriquecido
   const corridasEnriquecidas = useMemo<CorridaEnriquecida[]>(() => {
+    // Limpiar entradas de cache que ya no existen (filas eliminadas)
+    if (rmrCache.current.size > corridas.length * 2) {
+      rmrCache.current.clear();
+    }
+
     return corridas.map((row, idx) => {
+      // Construir clave de cache con solo los campos que afectan el cálculo RMR.
+      // Es un string corto y su construcción es ~10x más rápida que JSON.stringify(row).
+      const cacheKey = `${row.de}|${row.a}|${row.rec_m}|${row.rqd_m}|${row.lrf_m}|${row.small_frag_m}|${row.mec_frac}|${row.frac_nat}|${row.resistencia}|${row.abertura}|${row.rugosidad}|${row.intemperismo}|${row.relleno1}|${row.espesor}|${row.agua_obs}|${waterTableM}`;
+
+      const cached = rmrCache.current.get(cacheKey);
+      if (cached) {
+        // Fila no cambió: devolver resultado anterior sin recalcular
+        return { ...cached, originalIndex: idx };
+      }
+
       const rmrRes = calculateRowRmr(row, waterTableM);
       const isErr = !!rmrRes.error;
 
@@ -109,7 +129,7 @@ export function useLggState({
                      rmrRes.rmr_89 >= 21 ? 'Mala' : 'Muy Mala';
       }
 
-      return {
+      const enriched: CorridaEnriquecida = {
         ...row,
         rmr76Score: isErr || rmrRes.rmr_76 === undefined ? 'ERR' : rmrRes.rmr_76,
         rmr89Score: isErr || rmrRes.rmr_89 === undefined ? 'ERR' : rmrRes.rmr_89,
@@ -120,6 +140,9 @@ export function useLggState({
         isErr,
         originalIndex: idx
       };
+
+      rmrCache.current.set(cacheKey, enriched);
+      return enriched;
     });
   }, [corridas, waterTableM]);
 

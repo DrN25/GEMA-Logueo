@@ -12,8 +12,8 @@ import {
     Scale,
     TrendingUp
 } from 'lucide-react';
-import type { EnsayoPlt } from '../../App';
-import type { ValidationAlert } from '../../utils/qaqcValidator';
+import type { EnsayoPlt } from '../../../App';
+import type { ValidationAlert } from '../../../utils/qaqcValidator';
 
 interface PltQaqcPanelProps {
     ensayos_plt: EnsayoPlt[];

@@ -2,8 +2,8 @@ import {
     ChevronUp,
     ChevronDown
 } from 'lucide-react';
-import type { EnsayoPlt } from '../../App';
-import type { ValidationAlert } from '../../utils/qaqcValidator';
+import type { EnsayoPlt } from '../../../App';
+import type { ValidationAlert } from '../../../utils/qaqcValidator';
 
 interface QaqcPltDashboardPanelProps {
     ensayos_plt: EnsayoPlt[];

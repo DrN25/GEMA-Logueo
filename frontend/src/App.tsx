@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Construction,
   Database
@@ -696,24 +696,59 @@ export default function App() {
     }
   };
 
-  // Compile active alerts Reactively
-  const compileAlerts = (): ValidationAlert[] => {
-    if (!activeTaladro) return [];
+  // ─── VALIDACIÓN QA/QC CON DEBOUNCE (750ms) ───────────────────────────────
+  //
+  // Estrategia: las validaciones NO corren mientras el usuario está escribiendo.
+  // Solo se ejecutan 750ms después del último cambio en el estado.
+  //
+  // ¿Cómo funciona?
+  //   - Cada vez que activeTaladro cambia (cada keystroke), el timer anterior
+  //     se cancela y se inicia uno nuevo de 750ms.
+  //   - Solo si el usuario no toca nada en 750ms, el snapshot se actualiza
+  //     y las validaciones corren.
+  //   - Durante la escritura activa: validationSnapshot se congela en su
+  //     valor anterior → activeAlerts no cambia → ninguna fila se invalida.
+  //
+  // Los límites numéricos (jrc10: 0-20, rugosidad: 0-9, etc.) NO son parte
+  // de este sistema — se aplican en handleCellChange de forma sincrónica,
+  // antes de actualizar el estado, por lo que siguen funcionando al instante.
 
-    const surveyAlerts = validateCollarAndSurvey(activeTaladro, activeTaladro.surveys);
+  const [validationSnapshot, setValidationSnapshot] = useState<typeof activeTaladro>(null);
 
-    const lggAlerts = activeTaladro.corridas.flatMap((row, idx) =>
-      validateRowQAQC(row, idx, activeTaladro.corridas)
+  useEffect(() => {
+    if (!activeTaladro) {
+      setValidationSnapshot(null);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setValidationSnapshot(activeTaladro);
+    }, 750);
+    // El cleanup cancela el timer si activeTaladro cambia antes de que expire
+    return () => clearTimeout(timer);
+  }, [activeTaladro]);
+
+  const activeAlerts = useMemo((): ValidationAlert[] => {
+    if (!validationSnapshot) return [];
+
+    const surveyAlerts = validateCollarAndSurvey(validationSnapshot, validationSnapshot.surveys);
+
+    const lggAlerts = validationSnapshot.corridas.flatMap((row, idx) =>
+      validateRowQAQC(row, idx, validationSnapshot.corridas)
     );
 
-    const structuralAlerts = validateStructuralQAQC(activeTaladro.discontinuidades, activeTaladro.corridas);
+    const structuralAlerts = validateStructuralQAQC(
+      validationSnapshot.discontinuidades,
+      validationSnapshot.corridas
+    );
 
-    const pltAlerts = validatePltQAQC(activeTaladro.ensayos_plt || [], activeTaladro.corridas, activeTaladro);
+    const pltAlerts = validatePltQAQC(
+      validationSnapshot.ensayos_plt || [],
+      validationSnapshot.corridas,
+      validationSnapshot
+    );
 
     return [...surveyAlerts, ...lggAlerts, ...structuralAlerts, ...pltAlerts];
-  };
-
-  const activeAlerts = compileAlerts();
+  }, [validationSnapshot]);
 
   // Mapped field focusing logic from ValidationPanel
   const handleFocusField = (fieldId: string) => {
@@ -758,11 +793,11 @@ export default function App() {
             const [, field, indexStr] = match;
             const index = parseInt(indexStr);
             const pltColMap: Record<string, number> = {
-              'fecha': 1, 'nro_muestra': 3, 'nro_caja': 4, 'from_m': 7, 'to_m': 8,
-              'este_m': 11, 'norte_m': 12, 'elevacion_msnm': 13, 'long_de_muestra_mm': 14,
-              'tipo_de_ensayo': 15, 'diametro_taladro_nominacion': 16, 'd_mm': 21,
-              'p_instr_kn': 23, 'tipo_rotura_code': 24, 'direccion_rotura_code': 25,
-              'ejecutadoPor': 26, 'observaciones': 33
+              'fecha': 0, 'nro_muestra': 1, 'nro_caja': 2, 'from_m': 5, 'to_m': 6,
+              'este_m': 7, 'norte_m': 8, 'elevacion_msnm': 9,
+              'tipo_de_ensayo': 10, 'diametro_taladro_nominacion': 11, 'd_mm': 15,
+              'p_instr_kn': 16, 'tipo_rotura_code': 17, 'direccion_rotura_code': 18,
+              'ejecutadoPor': 19, 'observaciones': 20
             };
             const colIdx = pltColMap[field];
             if (colIdx !== undefined) {

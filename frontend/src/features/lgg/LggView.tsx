@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import {
   Plus,
   Search,
@@ -125,18 +125,47 @@ export default function LggView({
     return parentEl?.textContent || new Date().toISOString().split('T')[0];
   };
 
+  // --- PATRÓN DE CALLBACKS ESTABLES CON REF ---
+  // Problema: handleCellChange/deleteCorridaRow/insertCorridaRow se recrean en cada
+  // cambio de estado (porque dependen de `corridas`). Si los pasamos directo a
+  // getLggColumns(), lggColumns se recalcula en cada keystroke, invalidando React.memo.
+  //
+  // Solución: guardar la versión actual en un ref y exponer funciones ESTABLES
+  // que siempre llaman a la versión más reciente del ref. Así lggColumns
+  // nunca cambia de referencia, y las filas memoizadas permanecen válidas.
+  const cellChangeRef = useRef(handleCellChange);
+  const deleteRowRef = useRef(deleteCorridaRow);
+  const insertRowRef = useRef(insertCorridaRow);
+  cellChangeRef.current = handleCellChange;
+  deleteRowRef.current = deleteCorridaRow;
+  insertRowRef.current = insertCorridaRow;
+
+  const stableHandleCellChange = useCallback(
+    (index: number, field: keyof Corrida, value: any) => cellChangeRef.current(index, field, value),
+    [] // sin dependencias: siempre llama al ref actual
+  );
+  const stableDeleteRow = useCallback(
+    (index: number) => deleteRowRef.current(index),
+    []
+  );
+  const stableInsertRow = useCallback(
+    (index: number) => insertRowRef.current(index),
+    []
+  );
+
   // --- CONFIGURACIÓN DE COLUMNAS PARA EL GRID BASE ---
+  // Solo se recalcula si darkMode o activeTaladroName cambian— NO en cada keystroke.
   const lggColumns = useMemo<GridColumn<CorridaEnriquecida>[]>(() => {
     return getLggColumns({
       darkMode,
       lastRowGeologo,
       lastRowFecha,
       lastRowTaladroName,
-      handleCellChange,
-      deleteCorridaRow,
-      insertCorridaRow
+      handleCellChange: stableHandleCellChange,
+      deleteCorridaRow: stableDeleteRow,
+      insertCorridaRow: stableInsertRow
     });
-  }, [darkMode, handleCellChange, deleteCorridaRow, insertCorridaRow, activeTaladroName]);
+  }, [darkMode, activeTaladroName, stableHandleCellChange, stableDeleteRow, stableInsertRow]);
 
   // --- NAVEGACIÓN INTERNA: click en alerta → foco en celda del grid (filter-aware) ---
   const handleInternalFocus = useCallback((fieldId: string) => {
