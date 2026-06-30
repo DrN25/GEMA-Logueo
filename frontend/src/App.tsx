@@ -941,7 +941,7 @@ export default function App() {
 
   // Render proper sub-views
   const renderActiveView = () => {
-    if (currentView === 'auditoria') {
+    if (currentView === 'revision') {
       return <BulkAuditor apiBase={API_BASE} />;
     }
 
@@ -1323,7 +1323,7 @@ export default function App() {
             </div>
           )}
 
-          {currentView === 'auditoria' && (
+          {currentView === 'revision' && (
             <div className="flex-1 overflow-y-auto">
               <BulkAuditor apiBase={API_BASE} />
             </div>
@@ -1359,7 +1359,7 @@ export default function App() {
         </div>
 
         {/* Floating validation QA/QC panel (handles its own positioning left/right) — hidden on Carga para Revisión */}
-        {activeTaladro && currentView !== 'auditoria' && (
+        {activeTaladro && currentView !== 'revision' && (
           <ValidationPanel
             alerts={activeAlerts}
             onFocusField={handleFocusField}

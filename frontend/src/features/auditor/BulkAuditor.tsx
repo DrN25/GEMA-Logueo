@@ -553,7 +553,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
             <p className="text-xs text-slate-350 leading-relaxed font-semibold">
               {status === 'uploading'
                 ? 'Estamos subiendo y pre-analizando el archivo Excel en el servidor...'
-                : 'Analizando las reglas de consistencia física y cruzada entre LGG y Estructural. Esto puede tomar hasta 5 minutos para planillas muy grandes.'
+                : 'Analizando las reglas de consistencia física y cruzada entre LGG y Estructural. Esto puede tomar de 5 a 15 minutos para planillas muy grandes.'
               }
             </p>
           </div>

@@ -13,7 +13,9 @@ def normalize_text(text: str) -> str:
         return ""
     # Reemplazar símbolos de comparación por palabras descriptivas antes de limpiar
     s = str(text).lower()
+    s = s.replace("≥", "mayorigual").replace("≤", "menorigual")
     s = s.replace(">=", "mayorigual").replace("<=", "menorigual").replace(">", "mayor").replace("<", "menor")
+    s = s.replace("∑", "sum").replace("σ", "sum").replace("ς", "sum").replace("Σ", "sum")
     normalized = unicodedata.normalize('NFKD', s).encode('ASCII', 'ignore').decode('utf-8')
     return re.sub(r'[^a-z0-9]', '', normalized).strip()
 
@@ -33,18 +35,18 @@ LGG_PATTERNS = {
     "de": ["de", "desde", "dem", "desdem", "from", "depthfrom"],
     "a": ["a", "hasta", "am", "hastam", "to", "depthto"],
     "rec_m": ["longitudrecuperadam", "recuperacionm", "recm", "recupm", "recuperacion", "recuperada", "longitudrecuperada", "longitudrecuperdadam", "longitudrecuperdada"],
-    "rqd_m": ["rqdm", "rqd", "rqdmfragmentos10cm", "frag10cmm", "sumfrags10cm", "rqdsumfrags10cmm", "fragmentos10cmm", "frags10cmm", "fragmayorigual10cmm", "sumfrag10cm", "fragsmayor10cmm", "fragmayor10cmm"],
+    "rqd_m": ["rqdm", "rqd", "rqdmfragmentos10cm", "frag10cmm", "sumfrags10cm", "rqdsumfrags10cmm", "fragmentos10cmm", "frags10cmm", "fragmayorigual10cmm", "sumfrag10cm", "fragsmayor10cmm", "fragmayor10cmm", "rqdsumfragsmayorigual10cmm", "sumfragsmayorigual10cmm"],
     "lrf_m": ["longitudrocafracturadam", "lrfm", "lrf", "longitudrocafracturada", "rocafracturadam", "rocafracturada"],
-    "small_frag_m": ["sumfrags10cmquenoentranalrqd", "smallfragm", "smallfrag", "sumfrags10cmquenoentranalrqdm", "frags10cmquenoentranalrqdm", "fragmenor10cmm", "fragmentosmenores10cm", "fragmenores10cm"],
+    "small_frag_m": ["sumfrags10cmquenoentranalrqd", "smallfragm", "smallfrag", "sumfrags10cmquenoentranalrqdm", "frags10cmquenoentranalrqdm", "fragmenor10cmm", "fragmentosmenores10cm", "fragmenores10cm", "sumfragsmenor10cmquenoentranalrqdm"],
     "frac_nat": ["ndefracnaturales", "nfracnatur", "nfracnaturales", "fracnat", "fracturasnaturales", "naturales"],
     "lito1": ["lito1", "lito12023", "litologia1", "litologia12023", "litologia"],
     "lito2": ["lito2", "lito22023", "litologia2", "litologia22023"],
     "lito3": ["lito3", "lito32023", "litologia3", "litologia32023"],
-    "resistencia": ["resistencia", "resistestimadaisrm", "resistmaxestimadaisrm", "resistestimada", "resistmax", "resist", "dureza", "isrm", "durezamaterial"],
-    "tipo_est1": ["tipodeestruct", "tipoestructura1", "tipoest1", "estructura1"],
+    "resistencia": ["resistencia", "resistestimadaisrm", "resistmaxestimadaisrm", "resistestimada", "resistmax", "resist", "dureza", "isrm", "durezamaterial", "resistmaxestimada"],
+    "tipo_est1": ["tipodeestruct", "tipoestructura1", "tipoest1", "estructura1", "tipodeestruct1"],
     "tipo_est2": ["tipodeestruct2", "tipoestructura2", "tipoest2", "estructura2"],
     "frac_buz30": ["nfracnatbuz30", "nfracnaturalbuz30", "buz30", "naturalesbuz30", "nfracnatbuzmenor30", "nfracnaturalbuzmenor30", "buzmenor30"],
-    "frac_buz60": ["nfracn30buz60", "nfracnatural30buz60", "buz3060", "buz30a60", "nfracn30menorigualbuzmenor60", "nfracn30menorigualbuz60", "nfracnatural30menorigualbuzmenor60", "nfracn30menorbuzmenor60"],
+    "frac_buz60": ["nfracn30buz60", "nfracnatural30buz60", "buz3060", "buz30a60", "nfracn30menorigualbuzmenor60", "nfracn30menorigualbuz60", "nfracnatural30menorigualbuzmenor60", "nfracn30menorbuzmenor60", "nfracn30menorbuz60"],
     "frac_buz90": ["nfracnatbuz60", "nfracnaturalbuz60", "buz60", "nfracnatbuz90", "nfracnaturalbuz90", "buz90", "nfracnatbuzmayor60", "nfracnaturalbuzmayor60", "buzmayor60"],
     "abertura": ["aberturamm", "abertura", "abert"],
     "rugosidad": ["rugosidadisrm", "rugosidad", "rugos"],
@@ -68,7 +70,7 @@ EST_PATTERNS = {
     "lito1": ["lito1", "lito12023", "litologia1", "litologia12023", "litologia"],
     "lito2": ["lito2", "lito22023", "litologia2", "litologia22023"],
     "lito3": ["lito3", "lito32023", "litologia3", "litologia32023"],
-    "tipo_estructura": ["tipodeestructura", "estructura", "tipoest"],
+    "tipo_estructura": ["tipodeestructura", "estructura", "tipoest", "tipodeestructu"],
     "alfa": ["alpha", "alfa"],
     "beta": ["beta"],
     "dip": ["dip"],
@@ -81,7 +83,7 @@ EST_PATTERNS = {
     "espesor": ["espesorrellenomm", "espesorrelleno", "espesor", "espesormm"],
     "relleno1": ["tipoderelleno1", "relleno1", "tiporelleno1"],
     "relleno2": ["tipoderelleno2", "relleno2", "tiporelleno2"],
-    "dureza_pared": ["durezadepared", "dureza", "durezapared", "durezaestructural", "durezadelapareddeestructura"],
+    "dureza_pared": ["durezadepared", "dureza", "durezapared", "durezaestructural", "durezadelapareddeestructura", "durezadelapareddeestructu"],
     "agua": ["presenciadeaguaisrm", "presenaguaisrm", "presenciaagua", "aguaobs", "agua"],
     "geotecnico": ["geotecnico", "geotécnico", "geologo", "geotecnic", "geot"],
     "comentario": ["comentarios", "comentario", "observaciones", "observacion", "comments", "intervalocomentario"],
@@ -288,16 +290,16 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
 
     # Heurística de Cabeceras
     lgg_header, lgg_map = find_header_row_and_mapping(ws_lgg, LGG_PATTERNS)
-    if len(lgg_map) < 5:
-        for k, v in FALLBACK_LGG_MAP.items():
-            if k not in lgg_map:
-                lgg_map[k] = v
+    # FORZAR FALLBACK SI FALTAN COLUMNAS CRÍTICAS
+    for k, v in FALLBACK_LGG_MAP.items():
+        if k not in lgg_map:
+            lgg_map[k] = v
 
     est_header, est_map = find_header_row_and_mapping(ws_est, EST_PATTERNS)
-    if len(est_map) < 5:
-        for k, v in FALLBACK_EST_MAP.items():
-            if k not in est_map:
-                est_map[k] = v
+    # FORZAR FALLBACK SI FALTAN COLUMNAS CRÍTICAS
+    for k, v in FALLBACK_EST_MAP.items():
+        if k not in est_map:
+            est_map[k] = v
 
     incidencias = []
     lgg_runs = []
@@ -318,14 +320,29 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
     last_a_by_taladro = {}
 
     # 1. VALIDAR HOJA LGG
+    print(f"[*] Iniciando escaneo de LGG. Fila inicial: {lgg_header + 1}, Fila máxima detectada: {ws_lgg.max_row}", flush=True)
+    empty_streak_lgg = 0
+    
     for r in range(lgg_header + 1, ws_lgg.max_row + 1):
+        if r % 50 == 0:
+            print(f"  ... [LGG] Procesando fila {r} / {ws_lgg.max_row}", flush=True)
+            
         row_dict, is_empty = get_row_dict(ws_lgg, r, lgg_map)
-        if is_empty or not row_dict.get("taladro"):
+        taladro_val = row_dict.get("taladro")
+        
+        # Freno de emergencia para "filas fantasma"
+        if is_empty or not taladro_val:
+            empty_streak_lgg += 1
+            if empty_streak_lgg >= 20:
+                print(f"[*] [LGG] Se detectaron 20 filas vacías consecutivas. Terminando lectura de LGG en la fila {r}.", flush=True)
+                break
             continue
             
+        empty_streak_lgg = 0
         total_lgg_filas += 1
-        taladro = safe_str(row_dict["taladro"])
-        corrida_num = safe_int(row_dict["corrida"])
+        
+        taladro = safe_str(taladro_val)
+        corrida_num = safe_int(row_dict.get("corrida", 0))
         camp = sanitize_val(row_dict.get("campana"), int)
         geo = sanitize_val(row_dict.get("geologo"), str)
         sector = "N/A"
@@ -495,20 +512,10 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
         if b30 + b60 + b90 != frac_nat:
             registrar_lgg_error("frac_nat", frac_nat, "ADVERTENCIA", f"La sumatoria de fracturas por buzamiento (Buz <30°: {b30} + 30°-60°: {b60} + >60°: {b90}) da {b30+b60+b90}, no coincide con el conteo general ({frac_nat}).")
 
-        # Abertura vs Espesor con excepciones F, RF, VN, SZ, F+10, BED
         tipo_est1 = safe_str(sanitize_val(row_dict.get("tipo_est1"), str))
         tipo_est2 = safe_str(sanitize_val(row_dict.get("tipo_est2"), str))
         
-        exceptions = {"F", "RF", "VN", "SZ", "F+10", "BED"}
-        if espesor > abertura and (tipo_est1 not in exceptions and tipo_est2 not in exceptions):
-            registrar_lgg_error("espesor", espesor, "ALERTA", f"El espesor de relleno ({espesor}mm) y tipo ('{relleno1}') con estructura ('{tipo_est1}' / '{tipo_est2}') supera a la abertura ({abertura}mm) sin pertenecer a estructuras exceptuadas (F, RF, VN, SZ, F+10, BED).")
-
-        if espesor > 0 and abertura <= 0:
-            registrar_lgg_error("abertura", abertura, "ADVERTENCIA", f"Se declaró espesor de relleno de junta ({espesor}mm) y tipo ('{relleno1}') mayor a 0 pero la abertura es {abertura}mm.")
-        elif espesor == 0 and abertura > 0:
-            registrar_lgg_error("espesor", espesor, "ADVERTENCIA", f"La abertura de junta es {abertura}mm (> 0) pero el espesor de relleno es {espesor}mm (tipo de relleno: '{relleno1}').")
-
-        # Validaciones de catálogos permitidos
+        # Validaciones de catálogos permitidos ANTES de utilizarlas en la lógica relacional
         raw_resistencia = row_dict.get("resistencia")
         resistencia_can = get_canonical_value(raw_resistencia, VALID_STRENGTHS)
         if raw_resistencia is not None and not resistencia_can:
@@ -565,6 +572,16 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
         else:
             tipo_est2 = tipo_est2_can or ""
 
+        # Abertura vs Espesor con excepciones F, RF, VN, SZ, F+10, BED
+        exceptions = {"F", "RF", "VN", "SZ", "F+10", "BED"}
+        if espesor > abertura and (tipo_est1 not in exceptions and tipo_est2 not in exceptions):
+            registrar_lgg_error("espesor", espesor, "ALERTA", f"El espesor de relleno ({espesor}mm) y tipo ('{relleno1}') con estructura ('{tipo_est1}' / '{tipo_est2}') supera a la abertura ({abertura}mm) sin pertenecer a estructuras exceptuadas (F, RF, VN, SZ, F+10, BED).")
+
+        if espesor > 0 and abertura <= 0:
+            registrar_lgg_error("abertura", abertura, "ADVERTENCIA", f"Se declaró espesor de relleno de junta ({espesor}mm) y tipo ('{relleno1}') mayor a 0 pero la abertura es {abertura}mm.")
+        elif espesor == 0 and abertura > 0:
+            registrar_lgg_error("espesor", espesor, "ADVERTENCIA", f"La abertura de junta es {abertura}mm (> 0) pero el espesor de relleno es {espesor}mm (tipo de relleno: '{relleno1}').")
+
         # Resistencia vs Intemperismo
         if resistencia in WEATHERING_COMPATIBILITY:
             valid_w = WEATHERING_COMPATIBILITY[resistencia]
@@ -582,13 +599,27 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
             total_ok += 1
 
     # 2. VALIDAR HOJA ESTRUCTURAL
+    print(f"[*] Iniciando escaneo de Estructural. Fila inicial: {est_header + 1}, Fila máxima detectada: {ws_est.max_row}", flush=True)
+    empty_streak_est = 0
+    
     for r in range(est_header + 1, ws_est.max_row + 1):
+        if r % 50 == 0:
+            print(f"  ... [EST] Procesando fila {r} / {ws_est.max_row}", flush=True)
+            
         row_dict, is_empty = get_row_dict(ws_est, r, est_map)
-        if is_empty or not row_dict.get("taladro"):
+        taladro_val = row_dict.get("taladro")
+        
+        if is_empty or not taladro_val:
+            empty_streak_est += 1
+            if empty_streak_est >= 20:
+                print(f"[*] [EST] Se detectaron 20 filas vacías consecutivas. Terminando lectura de Estructural en la fila {r}.", flush=True)
+                break
             continue
 
+        empty_streak_est = 0
         total_est_filas += 1
-        taladro = safe_str(row_dict["taladro"])
+        
+        taladro = safe_str(taladro_val)
         depth = safe_float(sanitize_val(row_dict.get("profundidad"), float))
         camp = sanitize_val(row_dict.get("campana"), int)
         geo = sanitize_val(row_dict.get("geotecnico"), str)
@@ -726,12 +757,7 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
         else:
             forma = forma_can or "Plano"
 
-        # Espesor vs Abertura con excepciones F, RF, VN, SZ, F+10, BED
-        tipo_est = safe_str(sanitize_val(row_dict.get("tipo_estructura"), str))
-        if espesor > abertura and tipo_est not in exceptions:
-            registrar_est_error("espesor", espesor, "ALERTA", f"El espesor de relleno ({espesor}mm) y tipo ('{relleno1}') con estructura ('{tipo_est}') supera a la abertura de junta ({abertura}mm) sin pertenecer a estructuras exceptuadas (F, RF, VN, SZ, F+10, BED).")
-
-        # Consistencia Relleno
+        # Consistencia Relleno ANTES de verificar contra espesor/abertura
         raw_relleno1 = row_dict.get("relleno1")
         relleno1_can = get_canonical_value(raw_relleno1, VALID_RELLENO)
         if raw_relleno1 is not None and not relleno1_can:
@@ -739,6 +765,12 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
             relleno1 = "cwf"
         else:
             relleno1 = relleno1_can or "cwf"
+
+        # Espesor vs Abertura con excepciones F, RF, VN, SZ, F+10, BED
+        tipo_est = safe_str(sanitize_val(row_dict.get("tipo_estructura"), str))
+        exceptions = {"F", "RF", "VN", "SZ", "F+10", "BED"}
+        if espesor > abertura and tipo_est not in exceptions:
+            registrar_est_error("espesor", espesor, "ALERTA", f"El espesor de relleno ({espesor}mm) y tipo ('{relleno1}') con estructura ('{tipo_est}') supera a la abertura de junta ({abertura}mm) sin pertenecer a estructuras exceptuadas (F, RF, VN, SZ, F+10, BED).")
 
         if espesor > 0 and (not relleno1 or relleno1 in ["cwf", "-1"]):
             registrar_est_error("relleno1", relleno1, "ADVERTENCIA", f"Se declaró espesor de relleno ({espesor}mm) pero el tipo de relleno ('{relleno1}') está sin definir / limpio.")

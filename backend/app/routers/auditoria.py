@@ -748,19 +748,20 @@ def run_logueo_audit_pipeline(file_path: str, lgg_sheet: str, est_sheet: str, au
     start_time = time.time()
     t_str = lambda: datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
-    print(f"[*] [{t_str()}] Inicio de validación geotécnica física y cruzada para el reporte {audit_id}")
-    print(f"[*] [{t_str()}] Hojas de trabajo: LGG='{lgg_sheet}', Estructural='{est_sheet}'")
+    print(f"[*] [{t_str()}] Inicio de validación geotécnica física y cruzada para el reporte {audit_id}", flush=True)
+    print(f"[*] [{t_str()}] Hojas de trabajo: LGG='{lgg_sheet}', Estructural='{est_sheet}'", flush=True)
     
     # 1. Ejecutar validación y guardar diagnóstico
+    print(f"[*] [{t_str()}] Leyendo y cruzando datos de Excel...", flush=True)
     validate_logueo_bulk_sheets(file_path, lgg_sheet, est_sheet, raw_json_out)
     
     elapsed_val = round(time.time() - start_time, 2)
-    print(f"[+] [{t_str()}] Finalización de validación y guardado de JSON diagnóstico en ({elapsed_val}s)")
+    print(f"[+] [{t_str()}] Finalización de validación y guardado de JSON diagnóstico en ({elapsed_val}s)", flush=True)
     
     # Copiar diagnóstico público
     shutil.copyfile(raw_json_out, os.path.join(uploads_dir, "diagnostico_geomecanico.json"))
     
-    print(f"[*] [{t_str()}] Inicio de compilación de KPIs y compactado del reporte para {audit_id}")
+    print(f"[*] [{t_str()}] Inicio de compilación de KPIs y compactado del reporte para {audit_id}", flush=True)
     # 2. Generar archivo compacto resumen
     with open(raw_json_out, "r", encoding="utf-8") as f:
         diag = json.load(f)
@@ -916,10 +917,10 @@ def run_logueo_audit_pipeline(file_path: str, lgg_sheet: str, est_sheet: str, au
     shutil.copyfile(compact_json_out, public_compact_tmp)
     safe_replace(public_compact_tmp, public_compact)
 
-    print(f"[+] [{t_str()}] Finalización de compactado y guardado del resumen JSON en {compact_json_out}")
+    print(f"[+] [{t_str()}] Finalización de compactado y guardado del resumen JSON en {compact_json_out}", flush=True)
 
     # 3. Pre-generar Reporte Excel en segundo plano
-    print(f"[*] [{t_str()}] Inicio de pre-generación del libro Excel para {audit_id}")
+    print(f"[*] [{t_str()}] Inicio de pre-generación del libro Excel para {audit_id}", flush=True)
     excel_start = time.time()
     try:
         wb_rep = generar_excel_reporte_core(diag, compact, incidencias)
@@ -933,9 +934,9 @@ def run_logueo_audit_pipeline(file_path: str, lgg_sheet: str, est_sheet: str, au
         shutil.copyfile(excel_pregenerated_out, public_excel_tmp)
         safe_replace(public_excel_tmp, public_excel)
         elapsed_excel = round(time.time() - excel_start, 2)
-        print(f"[+] [{t_str()}] Libro Excel generado y guardado en disco con éxito ({elapsed_excel}s)")
+        print(f"[+] [{t_str()}] Libro Excel generado y guardado en disco con éxito ({elapsed_excel}s)", flush=True)
     except Exception as e:
-        print(f"[-] [{t_str()}] Error al pre-generar Excel de Logueo: {e}")
+        print(f"[-] [{t_str()}] Error al pre-generar Excel de Logueo: {e}", flush=True)
 
 # --- API ENDPOINTS ---
 
@@ -948,15 +949,15 @@ def verificar_estado_reporte(audit_id: str):
 @router.post("/logueo/cancelar-auditoria")
 def cancelar_auditoria(audit_id: str):
     """Cancela la auditoría eliminando archivos del historial."""
-    print(f"[*] [{t_str()}] Petición de cancelación recibida para {audit_id}")
+    print(f"[*] [{t_str()}] Petición de cancelación recibida para {audit_id}", flush=True)
     for ext in [".xlsx", "_diagnostico.json", "_compact.json", "_reporte_completo.xlsx"]:
         path = os.path.join(history_dir, f"{audit_id}{ext}")
         if os.path.exists(path):
             try:
                 os.remove(path)
-                print(f"[+] [{t_str()}] Archivo eliminado: {path}")
+                print(f"[+] [{t_str()}] Archivo eliminado: {path}", flush=True)
             except Exception as e:
-                print(f"[-] [{t_str()}] No se pudo eliminar {path}: {e}")
+                print(f"[-] [{t_str()}] No se pudo eliminar {path}: {e}", flush=True)
     return {"status": "cancelado"}
 
 @router.post("/logueo/sheets")
@@ -1046,7 +1047,7 @@ def obtener_resumen_ligero(audit_id: str = None, years: str = None):
         
         if not os.path.exists(compact_file) or not os.path.exists(raw_file):
             if os.path.exists(excel_file):
-                return JSONResponse(status_code=202, content={"status": "procesando", "message": "Auditoría geotécnica en proceso..."})
+                return JSONResponse(status_code=202, content={"status": "procesando", "message": "Revisión geotécnica en proceso..."})
             raise HTTPException(status_code=404, detail="La auditoría no existe o fue eliminada.")
     else:
         raw_file = os.path.join(uploads_dir, "diagnostico_geomecanico.json")

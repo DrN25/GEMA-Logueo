@@ -36,7 +36,7 @@ def validate_row(corrida: Dict[str, Any] = Body(...)):
 @router.get("/dashboard/rqd-summary")
 def get_dashboard_rqd_summary(db: Session = Depends(get_db)):
     try:
-        # MIGRACIÓN SÍNCRONA: Query adaptada al esquema físico de GEMA con LEFT JOIN
+        # Consulta avanzada con LEFT JOINs para recuperar litologías, RMR89 y elevación collar
         rows = db.execute(text("""
             SELECT
                 s.CodigoSondaje           AS codigo_sondaje,
@@ -48,10 +48,19 @@ def get_dashboard_rqd_summary(db: Session = Depends(get_db)):
                 lgg.LongitudRocaFracturada AS lrf_m,
                 lgg.NumFracturasNaturales AS frac_nat,
                 lgg.FRF                   AS frf,
-                0                         AS mec_frac
+                lit1.CodigoLitologia      AS lito1,
+                lit3.CodigoLitologia      AS lito3,
+                vrmr.RMR89_Total          AS rmr89,
+                col.Elevacion             AS collar_elev,
+                s.InclinacionTaladro      AS inclinacion
             FROM dbo.Sondajes s
             LEFT JOIN dbo.Campañas c                 ON s.CampañaID = c.CampañaID
             JOIN dbo.LogueoGeotecnicoGeneral lgg     ON lgg.SondajeID = s.SondajeID
+            LEFT JOIN dbo.Litologias lit1            ON lgg.Litologia1ID = lit1.LitologiaID
+            LEFT JOIN dbo.Litologias lit3            ON lgg.Litologia3ID = lit3.LitologiaID
+            LEFT JOIN dbo.ValidacionRMR vrmr         ON vrmr.SondajeID = s.SondajeID 
+                                                    AND vrmr.NumeroCorrida = lgg.NumeroRegistro
+            LEFT JOIN dbo.Collar col                 ON s.SondajeID = col.SondajeID
             ORDER BY c.NombreCampaña, s.CodigoSondaje, lgg.IntervaloDe
         """)).fetchall()
     except Exception as e:
@@ -72,11 +81,15 @@ def get_dashboard_rqd_summary(db: Session = Depends(get_db)):
         lrf_m = float(row[6] or 0.0)
         frac_nat = int(row[7] or 0)
         frf_db = row[8]
-        mec_frac = int(row[9] or 0)
+        
+        # Mapeos geológicos adicionales
+        lito1 = row[9].strip() if row[9] else "S/D"
+        lito3 = row[10].strip() if row[10] else "S/D"
+        rmr89 = int(row[11]) if row[11] is not None else None
+        collar_elev = float(row[12]) if row[12] is not None else 4000.0
+        inclinacion = float(row[13]) if row[13] is not None else -90.0
 
         perf = round(a_m - de_m, 4)
-        
-        # MODIFICACIÓN: Cambiamos de 1.6m a 5.0m para evitar descartar taladros con barril de 3.0m diamantino.
         if perf <= 0 or perf > 5.0:
             continue
 
@@ -96,14 +109,23 @@ def get_dashboard_rqd_summary(db: Session = Depends(get_db)):
 
         ph_teorico = round(100 * math.exp(-0.1 * ff_per_m) * (0.1 * ff_per_m + 1), 2)
 
+        # CÁLCULO TRIGONOMÉTRICO DE COTA DEL TESTIGO (Independent spatial projection)
+        prof_media = (de_m + a_m) / 2.0
+        inc_rad = math.radians(abs(inclinacion))
+        elev_run = round(collar_elev - (prof_media * math.sin(inc_rad)), 1)
+
         point_esp = {
             "taladro": name,
             "corrida": f"{de_m:.1f}-{a_m:.1f}",
-            "prof_m": round((de_m + a_m) / 2, 2),
+            "prof_m": round(prof_media, 2),
             "rqd_pct": rqd_pct,
             "spacing_mm": spacing_mm,
             "ff_per_m": ff_per_m,
             "ph_teorico": ph_teorico,
+            "lito1": lito1,
+            "lito3": lito3,
+            "rmr89": rmr89,
+            "elev_m": elev_run
         }
         points_rqd_esp.append(point_esp)
         points_ff_rqd.append(point_esp)
