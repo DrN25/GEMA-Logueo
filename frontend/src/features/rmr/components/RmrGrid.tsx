@@ -1,16 +1,12 @@
 import React, { useMemo } from 'react';
-import { Settings } from 'lucide-react';
 import BaseEditableGrid, { type GridColumn } from '../../../components/common/BaseEditableGrid';
 
 interface RmrGridProps {
-  calculatedRows: any[];
-  filteredCorridas: any[];
+  calculatedRows?: any[];
   activeTaladroName: string;
   geologo: string;
   fecha: string;
-  waterTableM: number;
   showAllColumns: boolean;
-  setShowAllColumns: (val: boolean) => void;
 }
 
 const getQualityColor = (rmr: number) => {
@@ -27,14 +23,11 @@ const getClasificacionRelleno = (relleno: string) => {
 };
 
 export default function RmrGrid({
-  calculatedRows,
-  filteredCorridas,
+  calculatedRows = [],
   activeTaladroName,
   geologo,
   fecha,
-  waterTableM,
-  showAllColumns,
-  setShowAllColumns
+  showAllColumns
 }: RmrGridProps) {
 
   // --- MAPEO DE FILAS A UN ESQUEMA PLANO COMPATIBLE CON BASEEDITABLEGRID ---
@@ -105,7 +98,7 @@ export default function RmrGrid({
     });
   }, [calculatedRows]);
 
-  // --- CONFIGURACIÓN DE COLUMNAS DE ANÁLISIS DE RMR (MÉTODO RE-ESCRITO CON ESTILO DE GRUPO) ---
+  // --- CONFIGURACIÓN DE COLUMNAS DE ANÁLISIS DE RMR ---
   const columns = useMemo<GridColumn<any>[]>(() => {
     const list: GridColumn<any>[] = [
       {
@@ -115,7 +108,7 @@ export default function RmrGrid({
         type: 'readonly',
         isSticky: true,
         stickyLeft: 0,
-        cellClassName: 'text-center font-bold'
+        cellClassName: 'text-center font-bold text-slate-400'
       },
       {
         key: 'taladro',
@@ -206,7 +199,6 @@ export default function RmrGrid({
         width: 'w-20',
         type: 'readonly',
         headerBgClass: 'bg-cyan-950/30 text-cyan-400 font-black',
-        // MEJORA: Centrado perfecto vertical y horizontal de los Badges mediante flexbox
         renderCell: (row) => {
           const score = row.rmr_76;
           if (score === 'ERR') {
@@ -231,7 +223,6 @@ export default function RmrGrid({
         width: 'w-24',
         type: 'readonly',
         headerBgClass: 'bg-cyan-950/30 text-cyan-400 font-bold',
-        // MEJORA: Centrado perfecto vertical y horizontal de las etiquetas mediante flexbox
         renderCell: (row) => (
           <div className="flex justify-center items-center h-full w-full py-0.5">
             <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded text-[10px] font-bold uppercase ${getQualityColor(row.rmr_76 === 'ERR' ? 0 : row.rmr_76)}`}>
@@ -260,7 +251,6 @@ export default function RmrGrid({
         width: 'w-24',
         type: 'readonly',
         headerBgClass: 'bg-emerald-950/30 text-emerald-400 font-black',
-        // MEJORA: Centrado perfecto vertical y horizontal de los Badges mediante flexbox
         renderCell: (row) => {
           const score = row.rmr_89;
           if (score === 'ERR') {
@@ -285,7 +275,6 @@ export default function RmrGrid({
         width: 'w-28',
         type: 'readonly',
         headerBgClass: 'bg-emerald-950/30 text-emerald-400 font-bold',
-        // MEJORA: Centrado perfecto vertical y horizontal de las etiquetas mediante flexbox
         renderCell: (row) => (
           <div className="flex justify-center items-center h-full w-full py-0.5">
             <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded text-[10px] font-bold uppercase ${getQualityColor(row.rmr_89 === 'ERR' ? 0 : row.rmr_89)}`}>
@@ -300,51 +289,18 @@ export default function RmrGrid({
   }, [showAllColumns, activeTaladroName, geologo, fecha]);
 
   return (
-    <div className="glass-panel p-5 rounded-xl border border-navy-800 space-y-4 shadow-2xl relative overflow-hidden animate-fade-in flex flex-col h-[550px] min-h-0">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-navy-800 pb-3 shrink-0">
-        <div>
-          <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider">
-            Rejilla Detallada de Ratings RMR
-          </h3>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Auditoría y puntuación geomecánica por corrida (Nivel Freático configurado: {waterTableM} m)
-          </p>
-        </div>
-
-        {/* Toggler de columnas */}
-        <button
-          onClick={() => setShowAllColumns(!showAllColumns)}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xxs font-black uppercase tracking-wider transition-all border shadow-md active:scale-95 ${!showAllColumns
-            ? 'bg-purple-500/10 border-purple-500/30 text-purple-400 hover:bg-purple-500/20'
-            : 'bg-navy-900/60 border-navy-800 text-slate-400 hover:text-slate-200 hover:border-navy-700'
-            }`}
-        >
-          <Settings size={13} className={!showAllColumns ? 'rotate-90 transition-transform duration-300' : 'transition-transform duration-300'} />
-          <span>{showAllColumns ? 'Solo RMR' : 'Mostrar Todo'}</span>
-        </button>
-      </div>
-
-      {/* SECCIÓN FLEXIBLE CON INDEPENDENT VIEWPORT SCROLL (ESTILO EXCEL) */}
-      <div className="flex-1 min-h-0 flex flex-col">
-        <BaseEditableGrid<any>
-          data={gridData}
-          columns={columns}
-          selectedRowIndex={null}
-          onSelectRow={() => { }}
-          onCellChange={() => { }}
-          alerts={[]}
-          idPrefix="rmr-grid"
-          getRowKey={(row) => row.id}
-          editableFields={[]}
-          darkMode={true}
-          minWidth={showAllColumns ? "4400px" : "2100px"}
-        />
-      </div>
-
-      <div className="flex justify-between items-center text-[10px] text-slate-500 pt-2 border-t border-navy-800/40 shrink-0">
-        <span>* Todos los cálculos siguen los estándares geomecánicos de Bieniawski 1976 y 1989.</span>
-        <span>Mostrando {filteredCorridas.length} de {calculatedRows.length} corridas totales.</span>
-      </div>
-    </div>
+    <BaseEditableGrid<any>
+      data={gridData}
+      columns={columns}
+      selectedRowIndex={null}
+      onSelectRow={() => { }}
+      onCellChange={() => { }}
+      alerts={[]}
+      idPrefix="rmr-grid"
+      getRowKey={(row) => row.id}
+      editableFields={[]}
+      darkMode={true}
+      minWidth={showAllColumns ? "4400px" : "2100px"}
+    />
   );
 }

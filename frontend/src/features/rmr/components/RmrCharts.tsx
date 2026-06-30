@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import {
-  ComposedChart, Scatter, Line, XAxis, YAxis, CartesianGrid,
+  ComposedChart, Scatter, Line, XAxis, YAxis, ZAxis, CartesianGrid,
   ResponsiveContainer, Label, Cell
 } from 'recharts';
 import {
@@ -16,8 +16,8 @@ import {
 
 interface RmrChartsProps {
   activeTaladroName: string;
-  scatterBien: any[];
-  scatterPh: any[];
+  scatterBien?: any[];
+  scatterPh?: any[];
   hoveredPointBien: any;
   setHoveredPointBien: (val: any) => void;
   hoveredPointPh: any;
@@ -85,8 +85,8 @@ const MiniPhTooltip = ({ hoveredPoint }: any) => {
 
 export default function RmrCharts({
   activeTaladroName,
-  scatterBien,
-  scatterPh,
+  scatterBien = [],
+  scatterPh = [],
   hoveredPointBien,
   setHoveredPointBien,
   hoveredPointPh,
@@ -148,11 +148,14 @@ export default function RmrCharts({
                 <Label value="RQD (%)" angle={-90} position="insideLeft" offset={3} fill="#64748b" fontSize={8} />
               </YAxis>
 
+              {/* Control de radio absoluto del Scatter vía ZAxis de Recharts */}
+              <ZAxis type="number" range={[10, 10]} />
+
               <Line data={bienMinLine} dataKey="y" type="monotone" dot={false} stroke="#1f77b4" strokeWidth={1.2} strokeDasharray="5 3" legendType="none" style={{ pointerEvents: 'none' }} />
               <Line data={bienMaxLine} dataKey="y" type="monotone" dot={false} stroke="#ff7f0e" strokeWidth={1.2} strokeDasharray="5 3" legendType="none" style={{ pointerEvents: 'none' }} />
               <Line data={bienMidLine} dataKey="y" type="monotone" dot={false} stroke="#2ca02c" strokeWidth={1.2} strokeDasharray="3 3" style={{ pointerEvents: 'none' }} />
 
-              <Scatter data={scatterBien} r={2.8}>
+              <Scatter data={scatterBien}>
                 {scatterBien.map((entry, index) => (
                   <Cell
                     key={`cell-bien-mini-${index}`}
@@ -215,11 +218,14 @@ export default function RmrCharts({
                 <Label value="RQD (%)" angle={-90} position="insideLeft" offset={3} fill="#64748b" fontSize={8} />
               </YAxis>
 
+              {/* Control de radio absoluto del Scatter vía ZAxis de Recharts */}
+              <ZAxis type="number" range={[10, 10]} />
+
               <Line data={phSuaveLine} dataKey="y" type="monotone" dot={false} stroke="#e2e8f0" strokeWidth={1.2} strokeDasharray="5 3" legendType="none" style={{ pointerEvents: 'none' }} />
               <Line data={lambdaMinLine} dataKey="y" type="monotone" dot={false} stroke="#d62728" strokeWidth={1.2} legendType="none" style={{ pointerEvents: 'none' }} />
               <Line data={lambdaMaxLine} dataKey="y" type="monotone" dot={false} stroke="#1f77b4" strokeWidth={1.2} legendType="none" style={{ pointerEvents: 'none' }} />
 
-              <Scatter data={scatterPh} r={2.8}>
+              <Scatter data={scatterPh}>
                 {scatterPh.map((entry, index) => (
                   <Cell
                     key={`cell-ph-mini-${index}`}

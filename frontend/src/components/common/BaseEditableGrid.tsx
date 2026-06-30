@@ -40,7 +40,6 @@ const EMPTY_ALERTS: ValidationAlert[] = [];
 
 const focusAndCursorAtEnd = (el: HTMLInputElement | HTMLSelectElement) => {
   el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-
   el.focus({ preventScroll: true });
   if (el.tagName === 'INPUT') {
     const input = el as HTMLInputElement;
@@ -103,27 +102,10 @@ function getCellTdStyle(
 
   if (alert) {
     const isCritical = alert.type === 'CRITICAL';
-    const isWarning = alert.type === 'WARNING';
-    const isVacio = alert.type === 'VACIO';
+    const alertColor = isCritical ? 'rgba(239, 68, 68, 0.85)' : 'rgba(245, 158, 11, 0.75)';
+    const alertBg = isCritical ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.12)';
 
-    let alertColor = '';
-    let alertBg = '';
-    let outlineStyle = 'solid';
-
-    if (isCritical) {
-      alertColor = 'rgba(239, 68, 68, 0.85)'; // Rojo sutil
-      alertBg = 'rgba(239, 68, 68, 0.15)';
-    } else if (isWarning) {
-      alertColor = 'rgba(245, 158, 11, 0.75)'; // Naranja/Amarillo
-      alertBg = 'rgba(245, 158, 11, 0.12)';
-    } else if (isVacio) {
-      // VACÍO: Contorno punteado (dashed) color Slate apagado de baja prioridad visual
-      alertColor = 'rgba(148, 163, 184, 0.35)'; // Gris Slate
-      alertBg = 'rgba(148, 163, 184, 0.04)'; // Fondo imperceptible
-      outlineStyle = 'dashed';
-    }
-
-    style.outline = `2px ${outlineStyle} ${alertColor}`;
+    style.outline = `2px solid ${alertColor}`;
     style.outlineOffset = '-2px';
     background = baseBg ? `linear-gradient(${alertBg}, ${alertBg}), ${baseBg}` : alertBg;
   } else if (baseBg) {
@@ -322,7 +304,7 @@ function GridRowInner<T>({
         return (
           <td
             key={colKeyStr}
-            id={`${idPrefix}-td-${alertRowIndex}-${colKeyStr}`} // <-- ID TD Semántico basado en BD
+            id={`${idPrefix}-td-${alertRowIndex}-${colKeyStr}`}
             className={`${isStickyAny ? 'bg-navy-950 text-center' : 'px-1'} ${col.cellClassName || ''}`}
             style={cellStyle}
             onClick={() => {
@@ -348,7 +330,7 @@ function GridRowInner<T>({
               </span>
             ) : col.type === 'select' ? (
               <select
-                id={`${idPrefix}-${alertRowIndex}-${colKeyStr}`} // <-- ID SELECT Semántico basado en BD
+                id={`${idPrefix}-${alertRowIndex}-${colKeyStr}`}
                 value={String(row[col.key as keyof T] ?? '-1')}
                 onChange={(e) => onCellChange(rowIndex, col.key as keyof T, e.target.value)}
                 onKeyDown={(e) => handleKeyDown(e, col.key as keyof T)}
@@ -361,7 +343,7 @@ function GridRowInner<T>({
               </select>
             ) : (
               <input
-                id={`${idPrefix}-${alertRowIndex}-${colKeyStr}`} // <-- ID INPUT Semántico basado en BD
+                id={`${idPrefix}-${alertRowIndex}-${colKeyStr}`}
                 type={col.type}
                 step={col.step}
                 min={col.min}
@@ -468,11 +450,13 @@ export default function BaseEditableGrid<T>({
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
       if (!activeColRef.current) return;
+      // --- SOLUCIÓN: Capturar la clave de la columna de forma semántica estable ---
+      const colKeyCap = activeColRef.current.key;
       const deltaX = moveEvent.clientX - activeColRef.current.startX;
       const newWidth = Math.max(45, activeColRef.current.startWidth + deltaX);
       setColWidths(prev => ({
         ...prev,
-        [activeColRef.current!.key]: newWidth
+        [colKeyCap]: newWidth
       }));
     };
 

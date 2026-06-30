@@ -36,27 +36,26 @@ def validate_row(corrida: Dict[str, Any] = Body(...)):
 @router.get("/dashboard/rqd-summary")
 def get_dashboard_rqd_summary(db: Session = Depends(get_db)):
     try:
+        # MIGRACIÓN SÍNCRONA: Query adaptada al esquema físico de GEMA con LEFT JOIN
         rows = db.execute(text("""
             SELECT
-                t.numero            AS numero,
-                a.anio              AS anio,
-                r.de                AS de_m,
-                r.a                 AS a_m,
-                p.longitud_recuperada_m     AS rec_m,
-                p.frags_mayor_10_cm         AS rqd_m,
-                p.longitud_roca_fracturada_m AS lrf_m,
-                p.sum_frac_nat              AS frac_nat,
-                gf.frf                      AS frf,
-                gf.n_fracturas_mecanicas    AS mec_frac
-            FROM Taladro t
-            JOIN Anio a         ON t.anio_id      = a.id
-            JOIN Registro r     ON r.taladro_id   = t.id
-            JOIN ParametrosTaladroLG p  ON p.registro_id = r.id
-            LEFT JOIN GradoFracturamiento gf ON gf.parametrosTaladroLG_id = p.id
-            ORDER BY a.anio, t.numero, r.de
+                s.CodigoSondaje           AS codigo_sondaje,
+                c.NombreCampaña           AS campania,
+                lgg.IntervaloDe           AS de_m,
+                lgg.IntervaloA            AS a_m,
+                lgg.LongitudRecuperada    AS rec_m,
+                lgg.SumaFragmentos10cm    AS rqd_m,
+                lgg.LongitudRocaFracturada AS lrf_m,
+                lgg.NumFracturasNaturales AS frac_nat,
+                lgg.FRF                   AS frf,
+                0                         AS mec_frac
+            FROM dbo.Sondajes s
+            LEFT JOIN dbo.Campañas c                 ON s.CampañaID = c.CampañaID
+            JOIN dbo.LogueoGeotecnicoGeneral lgg     ON lgg.SondajeID = s.SondajeID
+            ORDER BY c.NombreCampaña, s.CodigoSondaje, lgg.IntervaloDe
         """)).fetchall()
     except Exception as e:
-        print("Error en SQL Server RQD query:", e)
+        print("Error en SQL Server RQD query adaptada a GEMA:", e)
         return {"points_rqd_esp": [], "points_ff_rqd": [], "taladros": []}
 
     points_rqd_esp = []
@@ -64,22 +63,27 @@ def get_dashboard_rqd_summary(db: Session = Depends(get_db)):
     taladros_set   = {}
 
     for row in rows:
-        numero, anio, de_m, a_m, rec_m, rqd_m, lrf_m, frac_nat, frf_db, mec_frac = row
+        name = row[0] or "TALADRO"
+        campania = str(row[1] or "2026")
+        de_m = float(row[2] or 0.0)
+        a_m = float(row[3] or 0.0)
+        rec_m = float(row[4] or 0.0)
+        rqd_m = float(row[5] or 0.0)
+        lrf_m = float(row[6] or 0.0)
+        frac_nat = int(row[7] or 0)
+        frf_db = row[8]
+        mec_frac = int(row[9] or 0)
 
-        name = make_taladro_name("FEGT", anio, numero)
-
-        perf = round(float(a_m) - float(de_m), 4)
-        if perf <= 0 or perf > 1.6:
+        perf = round(a_m - de_m, 4)
+        
+        # MODIFICACIÓN: Cambiamos de 1.6m a 5.0m para evitar descartar taladros con barril de 3.0m diamantino.
+        if perf <= 0 or perf > 5.0:
             continue
-
-        rec_m  = float(rec_m  or 0)
-        rqd_m  = float(rqd_m  or 0)
-        lrf_m  = float(lrf_m  or 0)
-        frac_nat = int(frac_nat or 0)
 
         if rec_m > perf or rqd_m > rec_m:
             continue
 
+        # Resolver FRF dinámicamente si es nulo
         if frf_db is not None and frf_db >= 0:
             frf = int(frf_db)
         else:
@@ -105,8 +109,14 @@ def get_dashboard_rqd_summary(db: Session = Depends(get_db)):
         points_ff_rqd.append(point_esp)
 
         if name not in taladros_set:
-            taladros_set[name] = {"name": name, "count_rqd_esp": 0, "count_ff_rqd": 0,
-                                   "rqd_sum": 0.0, "spacing_sum": 0.0, "ff_sum": 0.0}
+            taladros_set[name] = {
+                "name": name, 
+                "count_rqd_esp": 0, 
+                "count_ff_rqd": 0,
+                "rqd_sum": 0.0, 
+                "spacing_sum": 0.0, 
+                "ff_sum": 0.0
+            }
         taladros_set[name]["count_rqd_esp"] += 1
         taladros_set[name]["count_ff_rqd"]  += 1
         taladros_set[name]["rqd_sum"]        += rqd_pct

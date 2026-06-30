@@ -70,6 +70,7 @@ export function phTeoricoFn(ff: number): number {
 }
 
 export function interpolateY(ctrlPoints: { x: number; y: number }[], targetX: number, isLog: boolean = false): number {
+  if (!ctrlPoints || ctrlPoints.length === 0) return 0;
   if (targetX <= ctrlPoints[0].x) return ctrlPoints[0].y;
   if (targetX >= ctrlPoints[ctrlPoints.length - 1].x) return ctrlPoints[ctrlPoints.length - 1].y;
 
@@ -110,7 +111,10 @@ export function getDrillColor(name: string): string {
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
   }
-  const DRILL_COLORS = ['#38bdf8', '#a78bfa', '#f472b6', '#fb923c', '#4ade80'];
+  const DRILL_COLORS = [
+    '#38bdf8', '#a78bfa', '#f472b6', '#fb923c', '#4ade80',
+    '#60a5fa', '#facc15', '#2dd4bf', '#f87171', '#fb7185'
+  ];
   return DRILL_COLORS[Math.abs(hash) % DRILL_COLORS.length];
 }
 
@@ -121,7 +125,7 @@ interface UseRmrStateProps {
 }
 
 export function useRmrState({
-  corridas,
+  corridas = [],
   waterTableM,
   activeTaladroName
 }: UseRmrStateProps) {
@@ -154,9 +158,14 @@ export function useRmrState({
 
   // Filtrado de corridas reactivo
   const filteredCorridas = useMemo(() => {
-    return corridas.filter(row => {
-      if (appliedLito && row.lito1 !== appliedLito) {
-        return false;
+    const safeCorridas = Array.isArray(corridas) ? corridas : [];
+    return safeCorridas.filter(row => {
+      if (appliedLito) {
+        const rowLitoClean = (row.lito1 || '').trim().toUpperCase();
+        const filterLitoClean = appliedLito.trim().toUpperCase();
+        if (rowLitoClean !== filterLitoClean) {
+          return false;
+        }
       }
       const maxD = appliedMaxDepth ? parseFloat(appliedMaxDepth) : Infinity;
       if (row.a > maxD) {

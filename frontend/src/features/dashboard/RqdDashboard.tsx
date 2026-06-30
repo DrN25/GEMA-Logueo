@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo, useCallback, useTransition, Component, type ReactNode } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, useTransition, Component, type ReactNode } from 'react';
 import {
-  ComposedChart, Scatter, Line, XAxis, YAxis, CartesianGrid,
+  ComposedChart, Scatter, Line, XAxis, YAxis, ZAxis, CartesianGrid,
   ResponsiveContainer, Label, Cell
 } from 'recharts';
 import { BarChart2, ChevronLeft, ChevronRight, ListFilter, Info } from 'lucide-react';
@@ -161,14 +161,51 @@ function bandStatus(rqd: number, spacingMm: number): 'dentro' | 'sobre' | 'bajo'
   if (!spacingMm || spacingMm <= 0 || !isFinite(spacingMm)) return 'dentro';
   if (spacingMm < 14) return 'sobre';
 
-  // Declarar primero las variables de interpolación de curvas
   const rMin = interpolateY(BIENIAWSKI_CTRL_MIN, spacingMm, true);
   const rMax = interpolateY(BIENIAWSKI_CTRL_MAX, spacingMm, true);
 
-  // Ejecutar comparaciones de forma segura con las variables ya declaradas
   if (rqd > rMax) return 'sobre';
   if (rqd < rMin) return 'bajo';
   return 'dentro';
+}
+
+// Algoritmo de Compresión de Rejilla Geotécnica Ultra-Rápido por Coordenadas
+function downsampleScatterData(points: DashPoint[], xKey: 'spacing_mm' | 'ff_per_m', yKey: 'rqd_pct'): any[] {
+  const totalPoints = points.length;
+  if (totalPoints < 600) {
+    return points.map(p => ({ ...p, x: p[xKey], y: p[yKey] }));
+  }
+
+  // Cuadrícula dinámica adaptada a la escala del gráfico
+  const binScale = xKey === 'spacing_mm' ? 40 : 1.2;
+  const seen = new Set<string>();
+  const downsampled: any[] = [];
+
+  for (const p of points) {
+    const yBin = Math.round(p[yKey] / 2.5); // Bins de 2.5% vertical (40 divisiones)
+    let xBin = 0;
+
+    if (xKey === 'spacing_mm') {
+      const val = p.spacing_mm;
+      xBin = val > 0 ? Math.round(Math.log10(val) * binScale) : 0;
+    } else {
+      const val = p.ff_per_m;
+      xBin = Math.round(val * binScale);
+    }
+
+    // Compresión por coordenada única (Oculta círculos encimados invisibles)
+    const key = `${xBin}_${yBin}`;
+
+    if (!seen.has(key)) {
+      seen.add(key);
+      downsampled.push({
+        ...p,
+        x: p[xKey],
+        y: p[yKey]
+      });
+    }
+  }
+  return downsampled;
 }
 
 function rqdClass(rqd: number): { label: string; color: string } {
@@ -211,7 +248,7 @@ function computePointsFromCorridas(corridas: Corrida[], taladroName: string): Da
   return points;
 }
 
-// ─── COMPONENTE MEMOIZADO DE TABLAS DETALLADAS (Omitido al mover el mouse) ───
+// ─── COMPONENTE MEMOIZADO DE TABLAS DETALLADAS ───
 const DetailedAnalysisSection = React.memo(({
   visiblePoints,
   allTaladrosInfo
@@ -362,7 +399,6 @@ const DetailedAnalysisSection = React.memo(({
 DetailedAnalysisSection.displayName = 'DetailedAnalysisSection';
 
 // ─── Error Boundary ───
-
 class DashboardErrorBoundary extends Component<
   { children: ReactNode },
   { hasError: boolean; errorMsg: string }
@@ -396,33 +432,20 @@ class DashboardErrorBoundary extends Component<
   }
 }
 
-// ─── Componente Principal de Datos del Dashboard ───
+// ─── Componente Principal de Datos de RqdDashboard Modernizado con useTransition (React 18) ───
+function DashboardRQD({ activeTaladro, taladros }: Props) {
+  // Estados concurrentes de filtrado inmediato vs diferido
+  const [immediateSelected, setImmediateSelected] = useState<Set<string>>(new Set());
+  const [deferredSelected, setDeferredSelected] = useState<Set<string>>(new Set());
+  const [isPending, startTransition] = useTransition();
 
-class DashboardRQDInner extends Component<
-  Props,
-  {
-    selectedDrills: Set<string>;
-    allPoints: DashPoint[];
-    loadingAll: boolean;
-    allTaladrosInfo: { name: string; count_rqd_esp: number; rqd_avg: number; spacing_avg: number; ff_avg: number }[];
-  }
-> {
-  constructor(props: Props) {
-    super(props);
-    this.state = {
-      selectedDrills: new Set(), // MOSTRAR TODOS POR DEFECTO AL CARGAR
-      allPoints: [],
-      loadingAll: false,
-      allTaladrosInfo: []
-    };
-  }
+  const [allPoints, setAllPoints] = useState<DashPoint[]>([]);
+  const [loadingAll, setLoadingAll] = useState(false);
+  const [allTaladrosInfo, setAllTaladrosInfo] = useState<any[]>([]);
+  const hasInitialized = useRef(false);
 
-  componentDidMount() {
-    this.fetchAllData();
-  }
-
-  // --- NUEVA OPTIMIZACIÓN DE ALTO NIVEL: MANIPULACIÓN DIRECTA DEL DOM PARA HOVER DE TOOLTIPS (0ms REACT OVERHEAD) ---
-  showTooltip = (e: any, d: any, type: 'bien' | 'ph') => {
+  // --- FLOATING TOOLTIPS (0ms REACT OVERHEAD) ---
+  const showTooltip = (e: any, d: any, type: 'bien' | 'ph') => {
     const tooltipEl = document.getElementById(`${type}-floating-tooltip`);
     if (!tooltipEl) return;
 
@@ -498,7 +521,7 @@ class DashboardRQDInner extends Component<
     }
   };
 
-  moveTooltip = (e: any, type: 'bien' | 'ph') => {
+  const moveTooltip = (e: any, type: 'bien' | 'ph') => {
     const tooltipEl = document.getElementById(`${type}-floating-tooltip`);
     if (!tooltipEl) return;
     const parentEl = tooltipEl.parentElement;
@@ -511,554 +534,591 @@ class DashboardRQDInner extends Component<
     }
   };
 
-  hideTooltip = (type: 'bien' | 'ph') => {
+  const hideTooltip = (type: 'bien' | 'ph') => {
     const tooltipEl = document.getElementById(`${type}-floating-tooltip`);
     if (tooltipEl) {
       tooltipEl.style.display = 'none';
     }
   };
 
-  fetchAllData = async () => {
-    const API_BASE = (import.meta as any).env?.VITE_API_BASE || "";
-    this.setState({ loadingAll: true });
-    try {
-      const res = await fetch(`${API_BASE}/api/dashboard/rqd-summary`);
-      if (res.ok) {
-        const data = await res.json();
-        this.setState({
-          allPoints: data.points_rqd_esp || [],
-          allTaladrosInfo: data.taladros || []
-        });
-      } else {
-        throw new Error('Backend no disponible');
-      }
-    } catch {
-      const summaries: TaladroSummary[] = JSON.parse(localStorage.getItem('geolog_taladros_summaries') || '[]');
-      const pts: DashPoint[] = [];
-      const infos: any[] = [];
-      for (const s of summaries) {
-        const cached = localStorage.getItem(`geolog_taladro_${s.name}`);
-        if (!cached) continue;
-        const parsed = JSON.parse(cached);
-        const p = computePointsFromCorridas(parsed.corridas || [], s.name);
-        pts.push(...p);
-        const n = p.length;
-        if (n > 0) {
-          infos.push({
-            name: s.name,
-            count_rqd_esp: n,
-            rqd_avg: parseFloat((p.reduce((a, b) => a + b.rqd_pct, 0) / n).toFixed(1)),
-            spacing_avg: parseFloat((p.reduce((a, b) => a + b.spacing_mm, 0) / n).toFixed(0)),
-            ff_avg: parseFloat((p.reduce((a, b) => a + b.ff_per_m, 0) / n).toFixed(2)),
-          });
-        }
-      }
-      this.setState({
-        allPoints: pts,
-        allTaladrosInfo: infos
-      });
-    } finally {
-      this.setState({ loadingAll: false });
-    }
-  };
+  // --- RENDERING DOTS SIN REACT MOUNT OVERHEAD ---
+  const renderCustomDot = useCallback((type: 'bien' | 'ph') => {
+    return (props: any) => {
+      const { cx, cy, payload } = props;
+      if (cx === undefined || cy === undefined) return null;
+      return (
+        <circle
+          cx={cx}
+          cy={cy}
+          r={1.8}
+          fill={getDrillColor(payload.taladro)}
+          onMouseEnter={(e) => showTooltip(e, payload, type)}
+          onMouseMove={(e) => moveTooltip(e, type)}
+          onMouseLeave={() => hideTooltip(type)}
+          style={{ cursor: 'pointer' }}
+        />
+      );
+    };
+  }, []);
 
-  toggleDrill = (name: string) => {
-    this.setState(prevState => {
-      const next = new Set(prevState.selectedDrills);
+  const renderBienDot = useMemo(() => renderCustomDot('bien'), [renderCustomDot]);
+  const renderPhDot = useMemo(() => renderCustomDot('ph'), [renderCustomDot]);
+
+  // Carga asíncrona de datos con inicialización por defecto (primeros 10)
+  useEffect(() => {
+    const fetchAllData = async () => {
+      const API_BASE = (import.meta as any).env?.VITE_API_BASE || "";
+      setLoadingAll(true);
+      try {
+        const res = await fetch(`${API_BASE}/api/dashboard/rqd-summary`);
+        if (res.ok) {
+          const data = await res.json();
+          const pts = data.points_rqd_esp || [];
+          const taladrosList = data.taladros || [];
+          setAllPoints(pts);
+          setAllTaladrosInfo(taladrosList);
+
+          if (taladrosList.length > 0 && !hasInitialized.current) {
+            const first10 = new Set(taladrosList.slice(0, 10).map((t: any) => t.name));
+            setImmediateSelected(first10);
+            startTransition(() => {
+              setDeferredSelected(first10);
+            });
+            hasInitialized.current = true;
+          }
+        } else {
+          throw new Error('Backend no disponible');
+        }
+      } catch {
+        const summaries: TaladroSummary[] = JSON.parse(localStorage.getItem('geolog_taladros_summaries') || '[]');
+        const pts: DashPoint[] = [];
+        const infos: any[] = [];
+        for (const s of summaries) {
+          const cached = localStorage.getItem(`geolog_taladro_${s.name}`);
+          if (!cached) continue;
+          const parsed = JSON.parse(cached);
+          const p = computePointsFromCorridas(parsed.corridas || [], s.name);
+          pts.push(...p);
+          const n = p.length;
+          if (n > 0) {
+            infos.push({
+              name: s.name,
+              count_rqd_esp: n,
+              rqd_avg: parseFloat((p.reduce((a, b) => a + b.rqd_pct, 0) / n).toFixed(1)),
+              spacing_avg: parseFloat((p.reduce((a, b) => a + b.spacing_mm, 0) / n).toFixed(0)),
+              ff_avg: parseFloat((p.reduce((a, b) => a + b.ff_per_m, 0) / n).toFixed(2)),
+            });
+          }
+        }
+        setAllPoints(pts);
+        setAllTaladrosInfo(infos);
+
+        if (infos.length > 0 && !hasInitialized.current) {
+          const first10 = new Set(infos.slice(0, 10).map((t: any) => t.name));
+          setImmediateSelected(first10);
+          startTransition(() => {
+            setDeferredSelected(first10);
+          });
+          hasInitialized.current = true;
+        }
+      } finally {
+        setLoadingAll(false);
+      }
+    };
+    fetchAllData();
+  }, []);
+
+  const toggleDrill = useCallback((name: string) => {
+    setImmediateSelected(prev => {
+      const next = new Set(prev);
       if (next.has(name)) {
         next.delete(name);
       } else {
         next.add(name);
       }
-      return { selectedDrills: next };
+      // Procesamos el filtrado pesado en segundo plano (0ms de lag de clic)
+      startTransition(() => {
+        setDeferredSelected(next);
+      });
+      return next;
     });
-  };
+  }, []);
 
-  selectAll = () => {
-    this.setState({
-      selectedDrills: new Set()
+  const selectAll = useCallback(() => {
+    const all = new Set<string>();
+    setImmediateSelected(all);
+    startTransition(() => {
+      setDeferredSelected(all);
     });
-    this.hideTooltip('bien');
-    this.hideTooltip('ph');
-  };
+  }, []);
 
-  selectOnly = (name: string) => {
-    this.setState({
-      selectedDrills: new Set([name])
+  const selectOnly = useCallback((name: string) => {
+    const only = new Set([name]);
+    setImmediateSelected(only);
+    startTransition(() => {
+      setDeferredSelected(only);
     });
-    this.hideTooltip('bien');
-    this.hideTooltip('ph');
-  };
+  }, []);
 
-  render() {
-    const { activeTaladro } = this.props;
-    const { selectedDrills, allPoints, loadingAll, allTaladrosInfo } = this.state;
+  // Procesar puntos de datos de la corrida activa local
+  const activePoints = useMemo(() => {
+    return activeTaladro ? computePointsFromCorridas(activeTaladro.corridas, activeTaladro.name) : [];
+  }, [activeTaladro]);
 
-    // Procesar puntos de datos de la corrida activa local
-    const activePoints = activeTaladro ? computePointsFromCorridas(activeTaladro.corridas, activeTaladro.name) : [];
-
-    // Combinar corridas en memoria
-    const mergedPoints = activeTaladro
+  // Combinar corridas en memoria basadas en la selección diferida (asíncrona)
+  const visiblePoints = useMemo(() => {
+    const merged = activeTaladro
       ? [...allPoints.filter(p => p.taladro !== activeTaladro.name), ...activePoints]
       : allPoints;
 
-    // Filtrar los puntos según la selección de píldoras
-    const visiblePoints = selectedDrills.size === 0
-      ? mergedPoints
-      : mergedPoints.filter(p => selectedDrills.has(p.taladro));
+    return deferredSelected.size === 0
+      ? merged
+      : merged.filter(p => deferredSelected.has(p.taladro));
+  }, [allPoints, activePoints, deferredSelected, activeTaladro]);
 
-    // Cuadrícula de promedios para KPIs
-    const stats = (() => {
-      const pts = visiblePoints;
-      if (pts.length === 0) return null;
-      const n = pts.length;
-      const rqdAvg = pts.reduce((a, b) => a + b.rqd_pct, 0) / n;
-      const espAvg = pts.reduce((a, b) => a + b.spacing_mm, 0) / n;
-      const dentro = pts.filter(p => bandStatus(p.rqd_pct, p.spacing_mm) === 'dentro').length;
-      const sobre = pts.filter(p => bandStatus(p.rqd_pct, p.spacing_mm) === 'sobre').length;
-      const bajo = pts.filter(p => bandStatus(p.rqd_pct, p.spacing_mm) === 'bajo').length;
-      const rqdStd = Math.sqrt(pts.reduce((a, b) => a + Math.pow(b.rqd_pct - rqdAvg, 2), 0) / n);
-      const rqdMin = Math.min(...pts.map(p => p.rqd_pct));
-      const rqdMax = Math.max(...pts.map(p => p.rqd_pct));
-      return { n, rqdAvg, espAvg, dentro, sobre, bajo, rqdStd, rqdMin, rqdMax };
-    })();
+  // Cuadrícula de promedios para KPIs
+  const stats = useMemo(() => {
+    const pts = visiblePoints;
+    if (pts.length === 0) return null;
+    const n = pts.length;
+    const rqdAvg = pts.reduce((a, b) => a + b.rqd_pct, 0) / n;
+    const espAvg = pts.reduce((a, b) => a + b.spacing_mm, 0) / n;
+    const dentro = pts.filter(p => bandStatus(p.rqd_pct, p.spacing_mm) === 'dentro').length;
+    const sobre = pts.filter(p => bandStatus(p.rqd_pct, p.spacing_mm) === 'sobre').length;
+    const bajo = pts.filter(p => bandStatus(p.rqd_pct, p.spacing_mm) === 'bajo').length;
+    const rqdStd = Math.sqrt(pts.reduce((a, b) => a + Math.pow(b.rqd_pct - rqdAvg, 2), 0) / n);
+    const rqdMin = Math.min(...pts.map(p => p.rqd_pct));
+    const rqdMax = Math.max(...pts.map(p => p.rqd_pct));
+    return { n, rqdAvg, espAvg, dentro, sobre, bajo, rqdStd, rqdMin, rqdMax };
+  }, [visiblePoints]);
 
-    const drillNames = Array.from(new Set([...allPoints.map(p => p.taladro), ...(activeTaladro ? [activeTaladro.name] : [])])).sort();
-    const isAllSelected = selectedDrills.size === 0;
+  const drillNames = useMemo(() => {
+    return Array.from(new Set([...allPoints.map(p => p.taladro), ...(activeTaladro ? [activeTaladro.name] : [])])).sort();
+  }, [allPoints, activeTaladro]);
 
-    const singleSelected = selectedDrills.size === 1 ? [...selectedDrills][0] : null;
-    const drillIndex = singleSelected ? drillNames.indexOf(singleSelected) : -1;
+  const isAllSelected = immediateSelected.size === 0;
+  const singleSelected = immediateSelected.size === 1 ? [...immediateSelected][0] : null;
+  const drillIndex = singleSelected ? drillNames.indexOf(singleSelected) : -1;
 
-    const goPrev = () => {
-      if (isAllSelected || !singleSelected) { this.selectOnly(drillNames[drillNames.length - 1]); return; }
-      const idx = drillNames.indexOf(singleSelected);
-      if (idx <= 0) this.selectAll();
-      else this.selectOnly(drillNames[idx - 1]);
-    };
+  const goPrev = () => {
+    if (isAllSelected || !singleSelected) { selectOnly(drillNames[drillNames.length - 1]); return; }
+    const idx = drillNames.indexOf(singleSelected);
+    if (idx <= 0) selectAll();
+    else selectOnly(drillNames[idx - 1]);
+  };
 
-    const goNext = () => {
-      if (isAllSelected || !singleSelected) { this.selectOnly(drillNames[0]); return; }
-      const idx = drillNames.indexOf(singleSelected);
-      if (idx >= drillNames.length - 1) this.selectAll();
-      else this.selectOnly(drillNames[idx + 1]);
-    };
+  const goNext = () => {
+    if (isAllSelected || !singleSelected) { selectOnly(drillNames[0]); return; }
+    const idx = drillNames.indexOf(singleSelected);
+    if (idx >= drillNames.length - 1) selectAll();
+    else selectOnly(drillNames[idx + 1]);
+  };
 
-    const scatterBien = visiblePoints.map(p => ({ ...p, x: p.spacing_mm, y: p.rqd_pct }));
-    const scatterPh = visiblePoints.map(p => ({ ...p, x: p.ff_per_m, y: p.rqd_pct }));
+  // Compresión dinámica de coordenadas por cuadrícula (Solo cuando cambia la data seleccionada)
+  const scatterBien = useMemo(() => {
+    return downsampleScatterData(visiblePoints, 'spacing_mm', 'rqd_pct');
+  }, [visiblePoints]);
 
-    const bienMinLine = BIENIAWSKI_CTRL_MIN;
-    const bienMaxLine = BIENIAWSKI_CTRL_MAX;
-    const bienMidLine = BIENIAWSKI_CTRL_MID;
+  const scatterPh = useMemo(() => {
+    return downsampleScatterData(visiblePoints, 'ff_per_m', 'rqd_pct');
+  }, [visiblePoints]);
 
-    const lambdaMinLine = LAMBDA_CTRL_MIN;
-    const lambdaMaxLine = LAMBDA_CTRL_MAX;
+  const bienMinLine = BIENIAWSKI_CTRL_MIN;
+  const bienMaxLine = BIENIAWSKI_CTRL_MAX;
+  const bienMidLine = BIENIAWSKI_CTRL_MID;
 
-    const phSuaveLine = (() => {
-      const pts = [];
-      for (let ff = 0; ff <= 40; ff += 0.5) {
-        pts.push({ x: ff, y: parseFloat(phTeoricoFn(ff).toFixed(2)) });
-      }
-      return pts;
-    })();
+  const lambdaMinLine = LAMBDA_CTRL_MIN;
+  const lambdaMaxLine = LAMBDA_CTRL_MAX;
 
-    return (
-      <div className="flex flex-col gap-6 pb-10">
+  const phSuaveLine = useMemo(() => {
+    const pts = [];
+    for (let ff = 0; ff <= 40; ff += 0.5) {
+      pts.push({ x: ff, y: parseFloat(phTeoricoFn(ff).toFixed(2)) });
+    }
+    return pts;
+  }, []);
 
-        {/* ── Header ─────────────────────────────────────────────── */}
-        <div className="glass-panel rounded-xl border border-navy-800 p-5 flex items-center justify-between bg-navy-950/20">
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <BarChart2 size={22} className="text-cyan-400" />
-              <h1 className="text-xl font-black text-slate-100 tracking-wide">Dashboard RQD &amp; Espaciamiento</h1>
+  return (
+    <div className="flex flex-col gap-6 pb-10">
+
+      {/* ── Header ─────────────────────────────────────────────── */}
+      <div className="glass-panel rounded-xl border border-navy-800 p-5 flex items-center justify-between bg-navy-950/20">
+        <div>
+          <div className="flex items-center gap-3 mb-1">
+            <BarChart2 size={22} className="text-cyan-400" />
+            <h1 className="text-xl font-black text-slate-100 tracking-wide">Dashboard RQD &amp; Espaciamiento</h1>
+          </div>
+          <p className="text-xs text-slate-500 ml-9">Correlación según Bieniawski (1989) — Clasificación RMR · Priest &amp; Hudson (1976)</p>
+        </div>
+      </div>
+
+      {/* ── KPI Stats Grid ───────────────────────────────────────── */}
+      {loadingAll && visiblePoints.length === 0 ? (
+        <div className="glass-panel rounded-xl border border-navy-800 p-6 text-center text-slate-500 text-sm bg-navy-950">
+          <span className="animate-pulse text-cyan-400">⏳ Cargando datos geomecánicos de todos los taladros…</span>
+        </div>
+      ) : stats ? (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          {[
+            { label: 'Muestras', value: stats.n, unit: '', sub: `${drillNames.length} taladros disponibles`, isDynamic: false },
+            { label: 'RQD Promedio', value: stats.rqdAvg.toFixed(1), unit: '%', sub: rqdClass(stats.rqdAvg).label, color: rqdClass(stats.rqdAvg).color, isDynamic: true },
+            { label: 'Espaciamiento Medio', value: Math.round(stats.espAvg), unit: 'mm', sub: spacingClass(stats.espAvg).label, color: spacingClass(stats.espAvg).color, isDynamic: true },
+            { label: 'Dentro de Banda', value: stats.dentro, unit: '', sub: `${Math.round(stats.dentro / stats.n * 100)}% del total`, isDynamic: false },
+            { label: 'Sobre Banda', value: stats.sobre, unit: '', sub: 'Por encima de RQD máx', isDynamic: false },
+            { label: 'Bajo Banda', value: stats.bajo, unit: '', sub: 'Por debajo de RQD mín', isDynamic: false },
+          ].map((card, i) => (
+            <div key={i} className="glass-panel rounded-xl border border-navy-800 p-4 flex flex-col gap-1 bg-navy-950/40">
+              <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">{card.label}</span>
+              <span
+                className="text-2xl font-black"
+                style={{ color: card.isDynamic ? (card.color as string) : undefined }}
+              >
+                {card.value}{card.unit}
+              </span>
+              <span className="text-xs text-slate-500">{(card as any).sub}</span>
             </div>
-            <p className="text-xs text-slate-500 ml-9">Correlación según Bieniawski (1989) — Clasificación RMR · Priest &amp; Hudson (1976)</p>
+          ))}
+        </div>
+      ) : (
+        <div className="glass-panel rounded-xl border border-navy-800 p-6 text-center text-slate-500 text-sm bg-navy-950">
+          <span>No hay corridas con datos válidos. Registra corridas en LGG primero.</span>
+        </div>
+      )}
+
+      {/* ── Drill Navigator ────────────────── */}
+      <div className="glass-panel rounded-xl border border-navy-800 p-4 flex flex-col gap-3 bg-navy-950/20">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+            <ListFilter size={14} className="text-cyan-400" /> Selección de Taladros
+          </span>
+          <div className="flex items-center gap-2">
+            <button onClick={goPrev} className="p-1.5 rounded-lg bg-navy-900 border border-navy-800 text-slate-400 hover:text-cyan-400 transition-colors" title="Anterior">
+              <ChevronLeft size={16} />
+            </button>
+            <div className="px-4 py-1.5 rounded-lg bg-navy-900 border border-navy-800 min-w-[260px] md:min-w-[360px] text-center whitespace-nowrap overflow-hidden text-ellipsis">
+              {isAllSelected ? (
+                <span className="text-cyan-400 font-bold text-sm">≡ Todos ({drillNames.length} taladros)</span>
+              ) : immediateSelected.size === 1 ? (
+                <div className="flex items-center justify-center gap-2">
+                  <span className="text-slate-100 font-bold text-sm overflow-hidden text-ellipsis max-w-[160px] md:max-w-[240px]" title={singleSelected || ""}>📍 {singleSelected}</span>
+                  <span className="text-slate-500 text-xs shrink-0">{drillIndex + 1}/{drillNames.length}</span>
+                </div>
+              ) : (
+                <span className="text-violet-400 font-bold text-sm">
+                  {immediateSelected.size} taladros seleccionados
+                </span>
+              )}
+            </div>
+            <button onClick={goNext} className="p-1.5 rounded-lg bg-navy-900 border border-navy-800 text-slate-400 hover:text-cyan-400 transition-colors" title="Siguiente">
+              <ChevronRight size={16} />
+            </button>
+            <button
+              onClick={selectAll}
+              className={`px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider border transition-all active:scale-95 ${isAllSelected
+                ? 'bg-cyan-500/10 text-cyan-400/90 border-cyan-500/30'
+                : 'bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.25)] animate-pulse'
+                }`}
+              title="Restablecer filtro para ver todos los taladros"
+            >
+              Mostrar Todos
+            </button>
           </div>
         </div>
 
-        {/* ── KPI Stats Grid ───────────────────────────────────────── */}
-        {loadingAll && visiblePoints.length === 0 ? (
-          <div className="glass-panel rounded-xl border border-navy-800 p-6 text-center text-slate-500 text-sm bg-navy-950">
-            <span className="animate-pulse text-cyan-400">⏳ Cargando datos geomecánicos de todos los taladros…</span>
-          </div>
-        ) : stats ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-            {[
-              { label: 'Muestras', value: stats.n, unit: '', sub: `${drillNames.length} taladros disponibles`, isDynamic: false },
-              { label: 'RQD Promedio', value: stats.rqdAvg.toFixed(1), unit: '%', sub: rqdClass(stats.rqdAvg).label, color: rqdClass(stats.rqdAvg).color, isDynamic: true },
-              { label: 'Espaciamiento Medio', value: Math.round(stats.espAvg), unit: 'mm', sub: spacingClass(stats.espAvg).label, color: spacingClass(stats.espAvg).color, isDynamic: true },
-              { label: 'Dentro de Banda', value: stats.dentro, unit: '', sub: `${Math.round(stats.dentro / stats.n * 100)}% del total`, isDynamic: false },
-              { label: 'Sobre Banda', value: stats.sobre, unit: '', sub: 'Por encima de RQD máx', isDynamic: false },
-              { label: 'Bajo Banda', value: stats.bajo, unit: '', sub: 'Por debajo de RQD mín', isDynamic: false },
-            ].map((card, i) => (
-              <div key={i} className="glass-panel rounded-xl border border-navy-800 p-4 flex flex-col gap-1 bg-navy-950/40">
-                <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">{card.label}</span>
-                <span
-                  className="text-2xl font-black"
-                  style={{ color: card.isDynamic ? (card.color as string) : undefined }}
+        {/* Pills multi-select interactivos de respuesta inmediata (0ms lag) */}
+        <div className="flex flex-wrap gap-2">
+          {drillNames.map(name => {
+            const active = immediateSelected.has(name);
+            const isCurrent = name === activeTaladro?.name;
+            return (
+              <div
+                key={name}
+                className={`flex items-center rounded-full text-xs font-bold border transition-all h-8 ${active
+                  ? 'bg-cyan-500/15 text-cyan-400 border-cyan-500/35 shadow-sm'
+                  : 'bg-navy-900/60 text-slate-400 border-navy-800 hover:text-slate-200 hover:border-navy-700'
+                  }`}
+              >
+                <button
+                  onClick={() => selectOnly(name)}
+                  className="pl-3.5 pr-2 py-1 flex items-center gap-1.5 hover:text-cyan-300 transition-colors h-full rounded-l-full"
+                  title={`Ver únicamente el taladro ${name}`}
                 >
-                  {card.value}{card.unit}
-                </span>
-                <span className="text-xs text-slate-500">{(card as any).sub}</span>
+                  {isCurrent && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block shrink-0 animate-pulse" title="Taladro activo actual" />
+                  )}
+                  <span>{name}</span>
+                </button>
+
+                {active ? (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleDrill(name);
+                    }}
+                    className="pr-3 pl-2 h-full flex items-center hover:text-red-400 border-l border-cyan-500/20 text-cyan-400/60 transition-colors rounded-r-full hover:bg-red-500/10"
+                    title={`Quitar ${name} de la consulta`}
+                  >
+                    ✕
+                  </button>
+                ) : (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleDrill(name);
+                    }}
+                    className="pr-3 pl-2 h-full flex items-center hover:text-cyan-300 border-l border-navy-800 text-slate-500 transition-colors rounded-r-full hover:bg-cyan-500/5"
+                    title={`Añadir ${name} a la consulta`}
+                  >
+                    ＋
+                  </button>
+                )}
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="glass-panel rounded-xl border border-navy-800 p-6 text-center text-slate-500 text-sm bg-navy-950">
-            <span>No hay corridas con datos válidos. Registra corridas en LGG primero.</span>
+            );
+          })}
+          {drillNames.length === 0 && (
+            <span className="text-xs text-slate-600 italic">Sin taladros cargados</span>
+          )}
+        </div>
+
+        <p className="text-[11px] text-slate-400 font-semibold mt-1 flex items-center gap-1.5">
+          <Info size={14} className="text-cyan-400 shrink-0" />
+          <span>Haz clic en el nombre para ver <strong>solo ese</strong> taladro · Haz clic en <strong>[ ＋ ]</strong> para añadir taladros a la consulta · Haz clic en <strong>[ ✕ ]</strong> para removerlos.</span>
+        </p>
+      </div>
+
+      {/* CONTENEDOR DE GRÁFICOS CON MÁSCARA DE CARGA CONCURRENTE ASÍNCRONA */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 relative">
+        {/* Máscara de carga inteligente que no bloquea la navegación de clics */}
+        {isPending && (
+          <div className="absolute inset-0 bg-navy-950/20 backdrop-blur-[1px] z-50 flex items-center justify-center rounded-2xl">
+            <div className="bg-navy-950/90 border border-navy-800 rounded-xl px-4 py-2.5 shadow-2xl flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+              <span className="text-cyan-400 font-extrabold text-xxs tracking-wider uppercase animate-pulse">Procesando correlación geomecánica...</span>
+            </div>
           </div>
         )}
 
-        {/* ── Drill Navigator ────────────────── */}
-        <div className="glass-panel rounded-xl border border-navy-800 p-4 flex flex-col gap-3 bg-navy-950/20">
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-              <ListFilter size={14} className="text-cyan-400 animate-pulse" /> Selección de Taladros
-            </span>
-            <div className="flex items-center gap-2">
-              <button onClick={goPrev} className="p-1.5 rounded-lg bg-navy-900 border border-navy-800 text-slate-400 hover:text-cyan-400 transition-colors" title="Anterior">
-                <ChevronLeft size={16} />
-              </button>
-              <div className="px-4 py-1.5 rounded-lg bg-navy-900 border border-navy-800 min-w-[260px] md:min-w-[360px] text-center whitespace-nowrap overflow-hidden text-ellipsis">
-                {isAllSelected ? (
-                  <span className="text-cyan-400 font-bold text-sm">≡ Todos ({drillNames.length} taladros)</span>
-                ) : selectedDrills.size === 1 ? (
-                  <div className="flex items-center justify-center gap-2">
-                    <span className="text-slate-100 font-bold text-sm overflow-hidden text-ellipsis max-w-[160px] md:max-w-[240px]" title={singleSelected || ""}>📍 {singleSelected}</span>
-                    <span className="text-slate-500 text-xs shrink-0">{drillIndex + 1}/{drillNames.length}</span>
-                  </div>
-                ) : (
-                  <span className="text-violet-400 font-bold text-sm">
-                    {selectedDrills.size} taladros seleccionados
-                  </span>
-                )}
-              </div>
-              <button onClick={goNext} className="p-1.5 rounded-lg bg-navy-900 border border-navy-800 text-slate-400 hover:text-cyan-400 transition-colors" title="Siguiente">
-                <ChevronRight size={16} />
-              </button>
-              <button
-                onClick={this.selectAll}
-                className={`px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider border transition-all active:scale-95 ${isAllSelected
-                  ? 'bg-cyan-500/10 text-cyan-400/90 border-cyan-500/30'
-                  : 'bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.25)] animate-pulse'
-                  }`}
-                title="Restablecer filtro para ver todos los taladros"
+        {/* Gráfico 1: Bieniawski */}
+        <section className="glass-panel rounded-xl border border-navy-800 p-5 bg-navy-950/40 relative">
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-0.5">
+              <h2 className="text-base font-bold text-slate-100">Espaciamiento de Discontinuidades vs RQD</h2>
+              {!isAllSelected && (
+                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                  📍 {immediateSelected.size === 1 ? singleSelected : `${immediateSelected.size} taladros`}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-500">Espaciamiento de Discontinuidades vs RQD — Bieniawski (1989) Chart D</p>
+          </div>
+
+          <div className="relative">
+            <ResponsiveContainer width="100%" height={360}>
+              <ComposedChart
+                margin={{ top: 10, right: 20, bottom: 40, left: 20 }}
+                onMouseLeave={() => hideTooltip('bien')}
               >
-                Mostrar Todos
-              </button>
-            </div>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e3a5f22" style={{ pointerEvents: 'none' }} />
+                <XAxis
+                  dataKey="x"
+                  type="number"
+                  scale="log"
+                  domain={[0.8, 2200]}
+                  ticks={[1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000]}
+                  interval={0}
+                  allowDataOverflow={true}
+                  tick={{ fill: '#64748b', fontSize: 10 }}
+                  tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`}
+                >
+                  <Label value="Espaciamiento (mm)" position="insideBottom" offset={-25} fill="#64748b" fontSize={12} />
+                </XAxis>
+
+                <YAxis dataKey="y" domain={[-2, 102]} ticks={[0, 20, 40, 60, 80, 100]} allowDataOverflow={true} tick={{ fill: '#64748b', fontSize: 11 }}>
+                  <Label value="RQD (%)" angle={-90} position="insideLeft" offset={10} fill="#64748b" fontSize={12} />
+                </YAxis>
+
+                {/* Curvas de control de Bieniawski sin animaciones */}
+                <Line data={bienMinLine} dataKey="y" type="monotone" dot={false} stroke="#1f77b4" strokeWidth={2} strokeDasharray="8 4" legendType="none" style={{ pointerEvents: 'none' }} isAnimationActive={false} />
+                <Line data={bienMaxLine} dataKey="y" type="monotone" dot={false} stroke="#ff7f0e" strokeWidth={2} strokeDasharray="8 4" legendType="none" style={{ pointerEvents: 'none' }} isAnimationActive={false} />
+                <Line data={bienMidLine} dataKey="y" type="monotone" dot={false} stroke="#2ca02c" strokeWidth={2} strokeDasharray="6 4" legendType="none" style={{ pointerEvents: 'none' }} isAnimationActive={false} />
+
+                <Scatter name="Ctrl mínimo" data={bienMinLine} fill="none" stroke="#1f77b4" strokeWidth={1.2} r={3} legendType="none" style={{ pointerEvents: 'none' }} isAnimationActive={false} />
+                <Scatter name="Ctrl máximo" data={bienMaxLine} fill="none" stroke="#ff7f0e" strokeWidth={1.2} r={3} legendType="none" style={{ pointerEvents: 'none' }} isAnimationActive={false} />
+
+                {/* Scatter de puntos ultra optimizado (0ms React overhead) */}
+                <Scatter
+                  data={scatterBien}
+                  isAnimationActive={false}
+                  shape={renderBienDot}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+
+            {/* Contenedor del Tooltip flotante administrado directamente en el DOM */}
+            <div
+              id="bien-floating-tooltip"
+              className="absolute z-50 pointer-events-none bg-navy-950/95 border border-navy-700 rounded-xl p-3 text-xs shadow-2xl backdrop-blur-sm space-y-1.5 w-64 text-left font-sans"
+              style={{ display: 'none', transform: 'translate(-50%, -100%)', marginTop: '-12px' }}
+            />
           </div>
 
-          {/* Pills multi-select interactivos */}
-          <div className="flex flex-wrap gap-2">
-            {drillNames.map(name => {
-              const active = selectedDrills.has(name);
-              const isCurrent = name === activeTaladro?.name;
-              return (
-                <div
-                  key={name}
-                  className={`flex items-center rounded-full text-xs font-bold border transition-all h-8 ${active
-                    ? 'bg-cyan-500/15 text-cyan-400 border-cyan-500/35 shadow-sm'
-                    : 'bg-navy-900/60 text-slate-400 border-navy-800 hover:text-slate-200 hover:border-navy-700'
-                    }`}
-                >
-                  <button
-                    onClick={() => this.selectOnly(name)}
-                    className="pl-3.5 pr-2 py-1 flex items-center gap-1.5 hover:text-cyan-300 transition-colors h-full rounded-l-full"
-                    title={`Ver únicamente el taladro ${name}`}
-                  >
-                    {isCurrent && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block shrink-0 animate-pulse" title="Taladro activo actual" />
-                    )}
-                    <span>{name}</span>
-                  </button>
+          {/* KPIs de Clasificación */}
+          <div className="flex flex-col xl:flex-row xl:items-stretch gap-3 mt-4 pt-4 border-t border-navy-800/60">
+            <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-2">
+              {[
+                { esp: '> 2.0 m', rating: 'RMR: 20 pts', desc: 'Muy Ancho', color: 'emerald' },
+                { esp: '0.6 – 2.0 m', rating: 'RMR: 15 pts', desc: 'Ancho', color: 'blue' },
+                { esp: '200 – 600 mm', rating: 'RMR: 10 pts', desc: 'Moderado', color: 'cyan' },
+                { esp: '60 – 200 mm', rating: 'RMR: 8 pts', desc: 'Cerrado', color: 'amber' },
+                { esp: '< 60 mm', rating: 'RMR: 5 pts', desc: 'Muy Cerrado', color: 'red' },
+              ].map((z, i) => {
+                const cc = getGeomechColorClasses(z.color);
+                return (
+                  <div key={i} className={`rounded-xl px-2 py-2.5 bg-navy-950/80 border ${cc.border} flex flex-col justify-center items-center text-center min-h-[82px] h-auto`}>
+                    <p className={`font-black text-sm ${cc.text} leading-none`}>{z.esp}</p>
+                    <p className="text-slate-400 font-bold text-[11px] mt-1 leading-none">{z.rating}</p>
+                    <p className="text-slate-200 font-bold text-xs mt-1.5 leading-tight px-1 break-words">{z.desc}</p>
+                  </div>
+                );
+              })}
+            </div>
 
-                  {active ? (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        this.toggleDrill(name);
-                      }}
-                      className="pr-3 pl-2 h-full flex items-center hover:text-red-400 border-l border-cyan-500/20 text-cyan-400/60 transition-colors rounded-r-full hover:bg-red-500/10"
-                      title={`Quitar ${name} de la consulta`}
-                    >
-                      ✕
-                    </button>
-                  ) : (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        this.toggleDrill(name);
-                      }}
-                      className="pr-3 pl-2 h-full flex items-center hover:text-cyan-300 border-l border-navy-800 text-slate-500 transition-colors rounded-r-full hover:bg-cyan-500/5"
-                      title={`Añadir ${name} a la consulta`}
-                    >
-                      ＋
-                    </button>
-                  )}
+            <div className="w-full xl:w-56 shrink-0 flex flex-col justify-center bg-navy-900/35 border border-navy-800 rounded-xl p-3 text-xs shadow-md">
+              <p className="font-extrabold text-slate-300 border-b border-navy-800/85 pb-1.5 mb-2 text-center uppercase tracking-wider text-[10px]">LEYENDA</p>
+              <div className="flex flex-col gap-2 justify-center h-full">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-8 flex items-center shrink-0"><span className="w-full border-t-2 border-dashed border-[#1f77b4]" /></span>
+                  <span className="text-slate-300 font-medium">RQD Mínimo</span>
                 </div>
-              );
-            })}
-            {drillNames.length === 0 && (
-              <span className="text-xs text-slate-600 italic">Sin taladros cargados</span>
-            )}
+                <div className="flex items-center gap-2.5">
+                  <span className="w-8 flex items-center shrink-0"><span className="w-full border-t-2 border-dashed border-[#ff7f0e]" /></span>
+                  <span className="text-slate-300 font-medium">RQD Máximo</span>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <span className="w-8 flex items-center shrink-0"><span className="w-full border-t-2 border-dashed border-[#2ca02c]" /></span>
+                  <span className="text-slate-300 font-medium">Línea Media</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Gráfico 2: Priest & Hudson */}
+        <section className="glass-panel rounded-xl border border-navy-800 p-5 bg-navy-950/40 relative">
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-0.5">
+              <h2 className="text-base font-bold text-slate-100">Frecuencia de Fracturas por Metro vs RQD</h2>
+              {!isAllSelected && (
+                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                  📍 {immediateSelected.size === 1 ? singleSelected : `${immediateSelected.size} taladros`}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-500">Priest &amp; Hudson (1976) — Curvas empíricas de Bieniawski (1989)</p>
           </div>
 
-          <p className="text-[11px] text-slate-400 font-semibold mt-1 flex items-center gap-1.5">
-            <Info size={14} className="text-cyan-400 shrink-0" />
-            <span>Haz clic en el nombre para ver <strong>solo ese</strong> taladro · Haz clic en <strong>[ ＋ ]</strong> para añadir taladros a la consulta · Haz clic en <strong>[ ✕ ]</strong> para removerlos.</span>
-          </p>
-        </div>
+          <div className="relative">
+            <ResponsiveContainer width="100%" height={360}>
+              <ComposedChart
+                margin={{ top: 10, right: 20, bottom: 40, left: 20 }}
+                onMouseLeave={() => hideTooltip('ph')}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e3a5f22" style={{ pointerEvents: 'none' }} />
+                <XAxis dataKey="x" type="number" domain={[-0.8, 40.8]} ticks={[0, 5, 10, 15, 20, 25, 30, 35, 40]} allowDataOverflow={true} tick={{ fill: '#64748b', fontSize: 11 }}>
+                  <Label value="Frecuencia de fracturas (fract/m)" position="insideBottom" offset={-25} fill="#64748b" fontSize={12} />
+                </XAxis>
 
-        {/* CONTENEDOR DE GRÁFICOS OPTIMIZADOS (ANIMATIONS DISABLED FOR FLUIDITY) */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <YAxis dataKey="y" domain={[-2, 102]} ticks={[0, 20, 40, 60, 80, 100]} allowDataOverflow={true} tick={{ fill: '#64748b', fontSize: 11 }}>
+                  <Label value="RQD (%)" angle={-90} position="insideLeft" offset={10} fill="#64748b" fontSize={12} />
+                </YAxis>
 
-          {/* Gráfico 1: Bieniawski */}
-          <section className="glass-panel rounded-xl border border-navy-800 p-5 bg-navy-950/40">
-            <div className="mb-4">
-              <div className="flex items-center gap-2 mb-0.5">
-                <h2 className="text-base font-bold text-slate-100">Espaciamiento de Discontinuidades vs RQD</h2>
-                {!isAllSelected && (
-                  <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-                    📍 {selectedDrills.size === 1 ? singleSelected : `${selectedDrills.size} taladros`}
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-slate-500">Espaciamiento de Discontinuidades vs RQD — Bieniawski (1989) Chart D</p>
+                {/* Curvas Priest & Hudson sin animaciones síncronas */}
+                <Line data={phSuaveLine} dataKey="y" type="monotone" dot={false} stroke="#e2e8f0" strokeWidth={2} strokeDasharray="8 4" legendType="none" style={{ pointerEvents: 'none' }} isAnimationActive={false} />
+                <Line data={lambdaMinLine} dataKey="y" type="monotone" dot={false} stroke="#d62728" strokeWidth={2} legendType="none" style={{ pointerEvents: 'none' }} isAnimationActive={false} />
+                <Line data={lambdaMaxLine} dataKey="y" type="monotone" dot={false} stroke="#1f77b4" strokeWidth={2} legendType="none" style={{ pointerEvents: 'none' }} isAnimationActive={false} />
+
+                <Scatter name="Ctrl mínimo" data={lambdaMinLine} fill="none" stroke="#d62728" strokeWidth={1.2} r={3} legendType="none" style={{ pointerEvents: 'none' }} isAnimationActive={false} />
+                <Scatter name="Ctrl máximo" data={lambdaMaxLine} fill="none" stroke="#1f77b4" strokeWidth={1.2} r={3} legendType="none" style={{ pointerEvents: 'none' }} isAnimationActive={false} />
+
+                {/* Scatter de puntos ultra optimizado (0ms React overhead) */}
+                <Scatter
+                  data={scatterPh}
+                  isAnimationActive={false}
+                  shape={renderPhDot}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+
+            {/* Contenedor del Tooltip flotante administrado directamente en el DOM */}
+            <div
+              id="ph-floating-tooltip"
+              className="absolute z-50 pointer-events-none bg-navy-950/95 border border-navy-700 rounded-xl p-3 text-xs shadow-2xl backdrop-blur-sm space-y-1.5 w-64 text-left font-sans"
+              style={{ display: 'none', transform: 'translate(-50%, -100%)', marginTop: '-12px' }}
+            />
+          </div>
+
+          {/* Leyenda de zonas */}
+          <div className="flex flex-col xl:flex-row xl:items-stretch gap-3 mt-4 pt-4 border-t border-navy-800/60">
+            <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {[
+                { ff: 'FF < 2', esp_ph: '> 500 mm', desc: 'Muy Amplio', rqd: '> 81%', color: 'emerald' },
+                { ff: 'FF 2–5', esp_ph: '200–500 mm', desc: 'Amplio', rqd: '45–81%', color: 'blue' },
+                { ff: 'FF 5–16', esp_ph: '60–200 mm', desc: 'Moderado', rqd: '3–45%', color: 'amber' },
+                { ff: 'FF > 16', esp_ph: '< 60 mm', desc: 'Muy Cerrado', rqd: '< 3%', color: 'red' },
+              ].map((z, i) => {
+                const cc = getGeomechColorClasses(z.color);
+                return (
+                  <div key={i} className={`rounded-xl px-2 py-2.5 bg-navy-950/80 border ${cc.border} flex flex-col justify-center items-center text-center min-h-[82px] h-auto`}>
+                    <p className={`font-black text-sm ${cc.text} leading-none`}>{z.ff}</p>
+                    <p className="text-slate-400 font-bold text-[11px] mt-1 leading-none">{z.esp_ph}</p>
+                    <p className="text-slate-200 font-bold text-xs mt-1.5 leading-tight px-1 break-words">
+                      {z.desc} <span className="opacity-80 text-[10px] font-normal block">({z.rqd})</span>
+                    </p>
+                  </div>
+                );
+              })}
             </div>
 
-            <div className="relative">
-              <ResponsiveContainer width="100%" height={360}>
-                <ComposedChart
-                  margin={{ top: 10, right: 20, bottom: 40, left: 20 }}
-                  onMouseLeave={() => this.hideTooltip('bien')}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e3a5f22" style={{ pointerEvents: 'none' }} />
-                  <XAxis
-                    dataKey="x"
-                    type="number"
-                    scale="log"
-                    domain={[0.8, 2200]}
-                    ticks={[1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000]}
-                    interval={0}
-                    allowDataOverflow={true}
-                    tick={{ fill: '#64748b', fontSize: 10 }}
-                    tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`}
-                  >
-                    <Label value="Espaciamiento (mm)" position="insideBottom" offset={-25} fill="#64748b" fontSize={12} />
-                  </XAxis>
-
-                  <YAxis dataKey="y" domain={[-2, 102]} ticks={[0, 20, 40, 60, 80, 100]} allowDataOverflow={true} tick={{ fill: '#64748b', fontSize: 11 }}>
-                    <Label value="RQD (%)" angle={-90} position="insideLeft" offset={10} fill="#64748b" fontSize={12} />
-                  </YAxis>
-
-                  {/* Curvas de control de Bieniawski sin animaciones */}
-                  <Line data={bienMinLine} dataKey="y" type="monotone" dot={false} stroke="#1f77b4" strokeWidth={2} strokeDasharray="8 4" legendType="none" style={{ pointerEvents: 'none' }} isAnimationActive={false} />
-                  <Line data={bienMaxLine} dataKey="y" type="monotone" dot={false} stroke="#ff7f0e" strokeWidth={2} strokeDasharray="8 4" legendType="none" style={{ pointerEvents: 'none' }} isAnimationActive={false} />
-                  <Line data={bienMidLine} dataKey="y" type="monotone" dot={false} stroke="#2ca02c" strokeWidth={2} strokeDasharray="6 4" legendType="none" style={{ pointerEvents: 'none' }} isAnimationActive={false} />
-
-                  <Scatter name="Ctrl mínimo" data={bienMinLine} fill="none" stroke="#1f77b4" strokeWidth={1.2} r={3} legendType="none" style={{ pointerEvents: 'none' }} isAnimationActive={false} />
-                  <Scatter name="Ctrl máximo" data={bienMaxLine} fill="none" stroke="#ff7f0e" strokeWidth={1.2} r={3} legendType="none" style={{ pointerEvents: 'none' }} isAnimationActive={false} />
-
-                  {/* Scatter de puntos sin animación activa (Previene lag de CPU) */}
-                  <Scatter
-                    data={scatterBien}
-                    r={3.5}
-                    isAnimationActive={false}
-                    onMouseLeave={() => this.hideTooltip('bien')}
-                  >
-                    {scatterBien.map((entry, index) => (
-                      <Cell
-                        key={`cell-bien-${index}`}
-                        fill={getDrillColor(entry.taladro)}
-                        onMouseEnter={(e: any) => this.showTooltip(e, entry, 'bien')}
-                        onMouseMove={(e: any) => this.moveTooltip(e, 'bien')}
-                        onMouseLeave={() => this.hideTooltip('bien')}
-                        style={{ cursor: 'pointer' }}
-                      />
-                    ))}
-                  </Scatter>
-                </ComposedChart>
-              </ResponsiveContainer>
-
-              {/* Contenedor del Tooltip flotante administrado directamente en el DOM */}
-              <div
-                id="bien-floating-tooltip"
-                className="absolute z-50 pointer-events-none bg-navy-950/95 border border-navy-700 rounded-xl p-3 text-xs shadow-2xl backdrop-blur-sm space-y-1.5 w-64 text-left font-sans"
-                style={{ display: 'none', transform: 'translate(-50%, -100%)', marginTop: '-12px' }}
-              />
-            </div>
-
-            {/* KPIs de Clasificación */}
-            <div className="flex flex-col xl:flex-row xl:items-stretch gap-3 mt-4 pt-4 border-t border-navy-800/60">
-              <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-2">
-                {[
-                  { esp: '> 2.0 m', rating: 'RMR: 20 pts', desc: 'Muy Ancho', color: 'emerald' },
-                  { esp: '0.6 – 2.0 m', rating: 'RMR: 15 pts', desc: 'Ancho', color: 'blue' },
-                  { esp: '200 – 600 mm', rating: 'RMR: 10 pts', desc: 'Moderado', color: 'cyan' },
-                  { esp: '60 – 200 mm', rating: 'RMR: 8 pts', desc: 'Cerrado', color: 'amber' },
-                  { esp: '< 60 mm', rating: 'RMR: 5 pts', desc: 'Muy Cerrado', color: 'red' },
-                ].map((z, i) => {
-                  const cc = getGeomechColorClasses(z.color);
-                  return (
-                    <div key={i} className={`rounded-xl px-2 py-2.5 bg-navy-950/80 border ${cc.border} flex flex-col justify-center items-center text-center min-h-[82px] h-auto`}>
-                      <p className={`font-black text-sm ${cc.text} leading-none`}>{z.esp}</p>
-                      <p className="text-slate-400 font-bold text-[11px] mt-1 leading-none">{z.rating}</p>
-                      <p className="text-slate-200 font-bold text-xs mt-1.5 leading-tight px-1 break-words">{z.desc}</p>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="w-full xl:w-56 shrink-0 flex flex-col justify-center bg-navy-900/35 border border-navy-800 rounded-xl p-3 text-xs shadow-md">
-                <p className="font-extrabold text-slate-300 border-b border-navy-800/85 pb-1.5 mb-2 text-center uppercase tracking-wider text-[10px]">LEYENDA</p>
-                <div className="flex flex-col gap-2 justify-center h-full">
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-8 flex items-center shrink-0"><span className="w-full border-t-2 border-dashed border-[#1f77b4]" /></span>
-                    <span className="text-slate-300 font-medium">RQD Mínimo</span>
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-8 flex items-center shrink-0"><span className="w-full border-t-2 border-dashed border-[#ff7f0e]" /></span>
-                    <span className="text-slate-300 font-medium">RQD Máximo</span>
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-8 flex items-center shrink-0"><span className="w-full border-t-2 border-dashed border-[#2ca02c]" /></span>
-                    <span className="text-slate-300 font-medium">Línea Media</span>
-                  </div>
+            <div className="w-full xl:w-56 shrink-0 flex flex-col justify-center bg-navy-900/35 border border-navy-800 rounded-xl p-3 text-xs shadow-md">
+              <p className="font-extrabold text-slate-300 border-b border-navy-800/85 pb-1.5 mb-2 text-center uppercase tracking-wider text-[10px]">LEYENDA</p>
+              <div className="flex flex-col gap-2 justify-center h-full">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-8 flex items-center shrink-0"><span className="w-full border-t-2 border-solid border-[#d62728]" /></span>
+                  <span className="text-slate-300 font-medium">RQD Mínimo</span>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <span className="w-8 flex items-center shrink-0"><span className="w-full border-t-2 border-solid border-[#1f77b4]" /></span>
+                  <span className="text-slate-300 font-medium">RQD Máximo</span>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <span className="w-8 flex items-center shrink-0"><span className="w-full border-t-2 border-dashed border-[#e2e8f0]" /></span>
+                  <span className="text-slate-300 font-medium">Teórica P&H</span>
                 </div>
               </div>
             </div>
-          </section>
-
-          {/* Gráfico 2: Priest & Hudson */}
-          <section className="glass-panel rounded-xl border border-navy-800 p-5 bg-navy-950/40">
-            <div className="mb-4">
-              <div className="flex items-center gap-2 mb-0.5">
-                <h2 className="text-base font-bold text-slate-100">Frecuencia de Fracturas por Metro vs RQD</h2>
-                {!isAllSelected && (
-                  <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-                    📍 {selectedDrills.size === 1 ? singleSelected : `${selectedDrills.size} taladros`}
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-slate-500">Priest &amp; Hudson (1976) — Curvas empíricas de Bieniawski (1989)</p>
-            </div>
-
-            <div className="relative">
-              <ResponsiveContainer width="100%" height={360}>
-                <ComposedChart
-                  margin={{ top: 10, right: 20, bottom: 40, left: 20 }}
-                  onMouseLeave={() => this.hideTooltip('ph')}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e3a5f22" style={{ pointerEvents: 'none' }} />
-                  <XAxis dataKey="x" type="number" domain={[-0.8, 40.8]} ticks={[0, 5, 10, 15, 20, 25, 30, 35, 40]} allowDataOverflow={true} tick={{ fill: '#64748b', fontSize: 11 }}>
-                    <Label value="Frecuencia de fracturas (fract/m)" position="insideBottom" offset={-25} fill="#64748b" fontSize={12} />
-                  </XAxis>
-
-                  <YAxis dataKey="y" domain={[-2, 102]} ticks={[0, 20, 40, 60, 80, 100]} allowDataOverflow={true} tick={{ fill: '#64748b', fontSize: 11 }}>
-                    <Label value="RQD (%)" angle={-90} position="insideLeft" offset={10} fill="#64748b" fontSize={12} />
-                  </YAxis>
-
-                  {/* Curvas Priest & Hudson sin animaciones síncronas */}
-                  <Line data={phSuaveLine} dataKey="y" type="monotone" dot={false} stroke="#e2e8f0" strokeWidth={2} strokeDasharray="8 4" legendType="none" style={{ pointerEvents: 'none' }} isAnimationActive={false} />
-                  <Line data={lambdaMinLine} dataKey="y" type="monotone" dot={false} stroke="#d62728" strokeWidth={2} legendType="none" style={{ pointerEvents: 'none' }} isAnimationActive={false} />
-                  <Line data={lambdaMaxLine} dataKey="y" type="monotone" dot={false} stroke="#1f77b4" strokeWidth={2} legendType="none" style={{ pointerEvents: 'none' }} isAnimationActive={false} />
-
-                  <Scatter name="Ctrl mínimo" data={lambdaMinLine} fill="none" stroke="#d62728" strokeWidth={1.2} r={3} legendType="none" style={{ pointerEvents: 'none' }} isAnimationActive={false} />
-                  <Scatter name="Ctrl máximo" data={lambdaMaxLine} fill="none" stroke="#1f77b4" strokeWidth={1.2} r={3} legendType="none" style={{ pointerEvents: 'none' }} isAnimationActive={false} />
-
-                  {/* Scatter de puntos sin animación activa (Previene lag de CPU) */}
-                  <Scatter
-                    data={scatterPh}
-                    r={3.5}
-                    isAnimationActive={false}
-                    onMouseLeave={() => this.hideTooltip('ph')}
-                  >
-                    {scatterPh.map((entry, index) => (
-                      <Cell
-                        key={`cell-ph-${index}`}
-                        fill={getDrillColor(entry.taladro)}
-                        onMouseEnter={(e: any) => this.showTooltip(e, entry, 'ph')}
-                        onMouseMove={(e: any) => this.moveTooltip(e, 'ph')}
-                        onMouseLeave={() => this.hideTooltip('ph')}
-                        style={{ cursor: 'pointer' }}
-                      />
-                    ))}
-                  </Scatter>
-                </ComposedChart>
-              </ResponsiveContainer>
-
-              {/* Contenedor del Tooltip flotante administrado directamente en el DOM */}
-              <div
-                id="ph-floating-tooltip"
-                className="absolute z-50 pointer-events-none bg-navy-950/95 border border-navy-700 rounded-xl p-3 text-xs shadow-2xl backdrop-blur-sm space-y-1.5 w-64 text-left font-sans"
-                style={{ display: 'none', transform: 'translate(-50%, -100%)', marginTop: '-12px' }}
-              />
-            </div>
-
-            {/* Leyenda de zonas */}
-            <div className="flex flex-col xl:flex-row xl:items-stretch gap-3 mt-4 pt-4 border-t border-navy-800/60">
-              <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {[
-                  { ff: 'FF < 2', esp_ph: '> 500 mm', desc: 'Muy Amplio', rqd: '> 81%', color: 'emerald' },
-                  { ff: 'FF 2–5', esp_ph: '200–500 mm', desc: 'Amplio', rqd: '45–81%', color: 'blue' },
-                  { ff: 'FF 5–16', esp_ph: '60–200 mm', desc: 'Moderado', rqd: '3–45%', color: 'amber' },
-                  { ff: 'FF > 16', esp_ph: '< 60 mm', desc: 'Muy Cerrado', rqd: '< 3%', color: 'red' },
-                ].map((z, i) => {
-                  const cc = getGeomechColorClasses(z.color);
-                  return (
-                    <div key={i} className={`rounded-xl px-2 py-2.5 bg-navy-950/80 border ${cc.border} flex flex-col justify-center items-center text-center min-h-[82px] h-auto`}>
-                      <p className={`font-black text-sm ${cc.text} leading-none`}>{z.ff}</p>
-                      <p className="text-slate-400 font-bold text-[11px] mt-1 leading-none">{z.esp_ph}</p>
-                      <p className="text-slate-200 font-bold text-xs mt-1.5 leading-tight px-1 break-words">
-                        {z.desc} <span className="opacity-80 text-[10px] font-normal block">({z.rqd})</span>
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="w-full xl:w-56 shrink-0 flex flex-col justify-center bg-navy-900/35 border border-navy-800 rounded-xl p-3 text-xs shadow-md">
-                <p className="font-extrabold text-slate-300 border-b border-navy-800/85 pb-1.5 mb-2 text-center uppercase tracking-wider text-[10px]">LEYENDA</p>
-                <div className="flex flex-col gap-2 justify-center h-full">
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-8 flex items-center shrink-0"><span className="w-full border-t-2 border-solid border-[#d62728]" /></span>
-                    <span className="text-slate-300 font-medium">RQD Mínimo</span>
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-8 flex items-center shrink-0"><span className="w-full border-t-2 border-solid border-[#1f77b4]" /></span>
-                    <span className="text-slate-300 font-medium">RQD Máximo</span>
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-8 flex items-center shrink-0"><span className="w-full border-t-2 border-dashed border-[#e2e8f0]" /></span>
-                    <span className="text-slate-300 font-medium">Teórica P&H</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-        </div>
-
-        {/* ── SECCIÓN DE ANÁLISIS DETALLADO MEMOIZADO (OPTIMIZACIÓN CLAVE) ── */}
-        <DetailedAnalysisSection
-          visiblePoints={visiblePoints}
-          allTaladrosInfo={allTaladrosInfo}
-        />
-
-        {/* ── Footer ──────────────────────────────────────────────── */}
-        <footer className="text-center text-xs text-slate-600 pb-2 mt-4 no-print">
-          Basado en Bieniawski (1989) — Rock Mechanics Design in Mining and Tunneling · Priest &amp; Hudson (1976)
-        </footer>
+          </div>
+        </section>
       </div>
-    );
-  }
+
+      {/* ── SECCIÓN DE ANÁLISIS DETALLADO MEMOIZADO ── */}
+      <DetailedAnalysisSection
+        visiblePoints={visiblePoints}
+        allTaladrosInfo={allTaladrosInfo}
+      />
+
+      {/* ── Footer ──────────────────────────────────────────────── */}
+      <footer className="text-center text-xs text-slate-600 pb-2 mt-4 no-print">
+        Basado en Bieniawski (1989) — Rock Mechanics Design in Mining and Tunneling · Priest &amp; Hudson (1976)
+      </footer>
+    </div>
+  );
 }
 
 // ─── Export con ErrorBoundary ─────────────────────────────────────────
-
 export default function DashboardRQDSafe(props: Props) {
   return (
     <DashboardErrorBoundary>
-      <DashboardRQDInner {...props} />
+      <DashboardRQD {...props} />
     </DashboardErrorBoundary>
   );
 }

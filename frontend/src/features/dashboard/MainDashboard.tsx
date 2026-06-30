@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Search, MapPin, User, LayoutGrid, Trash2, Construction, TrendingUp } from 'lucide-react';
 
 interface TaladroSummary {
@@ -10,6 +10,7 @@ interface TaladroSummary {
   fecha_registro: string;
   corridas_count: number;
   surveys_count: number;
+  perf_total?: number;
 }
 
 interface DashboardProps {
@@ -27,7 +28,25 @@ export default function Dashboard({
 }: DashboardProps) {
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
-  
+
+  // Real-time Database KPIs
+  const [dbKpis, setDbKpis] = useState({
+    total_taladros: 0,
+    perf_total_hoy: 0.0,
+    rmr_promedio: 0.0
+  });
+
+  // Fetch real-time geotech KPIs on mount
+  useEffect(() => {
+    fetch(`${import.meta.env.VITE_API_BASE || ""}/api/taladros/dashboard-stats`)
+      .then(res => {
+        if (res.ok) return res.json();
+        throw new Error();
+      })
+      .then(data => setDbKpis(data))
+      .catch(err => console.error("Error cargando KPIs en tiempo real del servidor:", err));
+  }, [taladros]); // Refrescar si la lista de taladros sufre cambios
+
   // Form state
   const [name, setName] = useState('');
   const [proyecto, setProyecto] = useState('Proyecto A');
@@ -48,13 +67,11 @@ export default function Dashboard({
       inclinacion,
       campana,
       fecha_registro: new Date().toISOString().split('T')[0],
-      // Proyectado
       collar_este_proyectado: 0.0,
       collar_norte_proyectado: 0.0,
       collar_cota_proyectado: 0.0,
       prof_final_eoh_proyectada: 0.0,
       comentarios_proyectado: '',
-      // Oficial
       collar_este: 0.0,
       collar_norte: 0.0,
       collar_cota: 0.0,
@@ -70,16 +87,11 @@ export default function Dashboard({
     setName('');
   };
 
-  // Cálculos dinámicos para el Mockup operacional diario
-  const totalMetrosHoy = taladros.reduce((acc, t) => acc + (t.corridas_count * 1.5), 0);
-  
   const taladroPredominante = taladros.length > 0
     ? [...taladros].sort((a, b) => b.corridas_count - a.corridas_count)[0].name
     : 'Ninguno';
 
-  const rmrPromedio = taladros.length > 0 ? 68 : 0;
-
-  const filtered = taladros.filter(t => 
+  const filtered = taladros.filter(t =>
     t.name.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -125,15 +137,15 @@ export default function Dashboard({
         <div className="glass-panel p-5 rounded-xl border border-navy-800 flex items-center justify-between">
           <div className="space-y-1">
             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Total Taladros</span>
-            <span className="text-2xl font-black text-slate-100 block">{taladros.length}</span>
+            <span className="text-2xl font-black text-slate-100 block">{dbKpis.total_taladros || taladros.length}</span>
           </div>
           <LayoutGrid size={24} className="text-cyan-500/40" />
         </div>
-        
+
         <div className="glass-panel p-5 rounded-xl border border-navy-800 flex items-center justify-between">
           <div className="space-y-1">
             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Perf. Total Hoy</span>
-            <span className="text-2xl font-black text-slate-100 block">{totalMetrosHoy.toFixed(1)} m</span>
+            <span className="text-2xl font-black text-slate-100 block">{dbKpis.perf_total_hoy.toFixed(1)} m</span>
           </div>
           <Construction size={24} className="text-cyan-500/40" />
         </div>
@@ -149,7 +161,7 @@ export default function Dashboard({
         <div className="glass-panel p-5 rounded-xl border border-navy-800 flex items-center justify-between">
           <div className="space-y-1">
             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">RMR Promedio</span>
-            <span className="text-2xl font-black text-emerald-400 block">{rmrPromedio}</span>
+            <span className="text-2xl font-black text-emerald-400 block">{dbKpis.rmr_promedio || '—'}</span>
           </div>
           <TrendingUp size={24} className="text-emerald-500/40" />
         </div>
@@ -168,42 +180,43 @@ export default function Dashboard({
           />
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-sm">
-            <thead>
-              <tr className="text-xs text-slate-500 font-bold uppercase tracking-wider border-b border-navy-800">
-                <th className="py-3 px-4">Taladro / Sondaje</th>
-                <th className="py-3 px-4 text-center">Perf. Hoy (m)</th>
-                <th className="py-3 px-4">Geólogo</th>
-                <th className="py-3 px-4 text-center">Diámetro</th>
-                <th className="py-3 px-4 text-center">Inclinación</th>
-                <th className="py-3 px-4 text-center">Corridas</th>
-                <th className="py-3 px-4 text-center">Acciones</th>
+        {/* CONTAINER CON SCROLLBAR VERTICAL INTERNA OPTIMIZADA */}
+        <div className="overflow-y-auto max-h-[500px] border border-navy-900/50 rounded-xl scrollbar-thin pr-1">
+          <table className="w-full text-left border-collapse text-xs table-fixed min-w-[800px]">
+            <thead className="sticky top-0 bg-navy-950 z-10">
+              <tr className="text-xxs text-slate-500 font-bold uppercase tracking-wider border-b border-navy-800 bg-navy-950">
+                <th className="py-2.5 px-4 w-1/4">Taladro / Sondaje</th>
+                <th className="py-2.5 px-4 text-center">Metraje Logueado (m)</th>
+                <th className="py-2.5 px-4">Geólogo</th>
+                <th className="py-2.5 px-4 text-center">Diámetro</th>
+                <th className="py-2.5 px-4 text-center">Inclinación</th>
+                <th className="py-2.5 px-4 text-center">Corridas</th>
+                <th className="py-2.5 px-4 text-center w-48">Acciones</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map(t => (
-                <tr 
+                <tr
                   key={t.name}
                   onClick={() => onSelectTaladro(t.name)}
                   className="border-b border-navy-900/60 hover:bg-navy-900/10 cursor-pointer transition-colors"
                 >
-                  <td className="py-3.5 px-4 font-bold text-slate-100 tracking-wide">{t.name}</td>
-                  <td className="py-3.5 px-4 text-center text-slate-300 font-bold">{(t.corridas_count * 1.5).toFixed(1)} m</td>
-                  <td className="py-3.5 px-4 text-slate-400">
+                  <td className="py-2 px-4 font-bold text-slate-100 tracking-wide text-xs">{t.name}</td>
+                  <td className="py-2 px-4 text-center text-slate-300 font-bold">{(t.perf_total || 0).toFixed(1)} m</td>
+                  <td className="py-2 px-4 text-slate-400">
                     <div className="flex items-center gap-1.5">
                       <User size={12} className="text-slate-500" />
                       <span>{t.geologo}</span>
                     </div>
                   </td>
-                  <td className="py-3.5 px-4 text-center text-slate-300 font-semibold">{t.diametro}</td>
-                  <td className="py-3.5 px-4 text-center text-slate-400">{t.inclinacion}&deg;</td>
-                  <td className="py-3.5 px-4 text-center">
+                  <td className="py-2 px-4 text-center text-slate-300 font-semibold">{t.diametro}</td>
+                  <td className="py-2 px-4 text-center text-slate-400">{t.inclinacion}&deg;</td>
+                  <td className="py-2 px-4 text-center">
                     <span className="bg-navy-800 text-slate-300 px-2 py-0.5 rounded text-xs font-bold">
                       {t.corridas_count}
                     </span>
                   </td>
-                  <td className="py-3.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                  <td className="py-2 px-4 text-center" onClick={(e) => e.stopPropagation()}>
                     <div className="flex gap-2 justify-center">
                       <button
                         onClick={() => onSelectTaladro(t.name)}
@@ -213,7 +226,7 @@ export default function Dashboard({
                       </button>
                       <button
                         onClick={() => onDeleteTaladro(t.name)}
-                        className="p-1.5 rounded-lg border border-red-200 dark:border-red-500/20 bg-red-50 dark:bg-red-500/5 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/15 hover:text-red-700 dark:hover:text-red-300 transition-all duration-200 shadow-sm active:scale-90 flex items-center justify-center mx-auto"
+                        className="p-1.5 rounded-lg border border-red-200 dark:border-red-500/20 bg-red-50 dark:bg-red-500/5 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/15 hover:text-red-700 dark:hover:text-red-300 transition-all duration-200 shadow-sm active:scale-90 flex items-center justify-center"
                         title="Eliminar taladro"
                       >
                         <Trash2 size={14} />
@@ -241,7 +254,7 @@ export default function Dashboard({
             <h3 className="text-lg font-bold text-slate-100 tracking-wide border-b border-navy-800 pb-2 uppercase text-sm">
               Registrar Nuevo Taladro
             </h3>
-            
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-1">
                 <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Código del Taladro</label>

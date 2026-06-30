@@ -12,95 +12,100 @@ router = APIRouter(
 
 @router.get("")
 def get_catalogs(db: Session = Depends(get_db)):
-    """Catálogos dinámicos cargados directamente de la base de datos relacional."""
+    """
+    Retorna los catálogos geotécnicos dinámicos consultando directamente 
+    las tablas físicas del esquema GEMA en SQL Server.
+    """
     try:
-        resistencia = [r.abreviatura for r in db.query(models.ResistenciaISRM).all()]
+        # 1. Resistencia ISRM (R0 a R7)
+        resistencias_db = db.query(models.ResistenciaISRM).order_by(models.ResistenciaISRM.ResistenciaISRM_ID).all()
+        resistencia = [r.Codigo.strip() for r in resistencias_db]
         if "-1" not in resistencia:
             resistencia.append("-1")
             
-        estructuras = [e.code for e in db.query(models.TipoEstructura).all()]
-        
-        tipo_rellenos = db.query(models.TipoRelleno).all()
-        rellenos = []
-        for tr in tipo_rellenos:
-            code = tr.code
-            name = tr.descripcion
+        # 2. Tipos de Estructuras Geológicas (esquema dbo)
+        estructuras_db = db.query(models.TipoEstructura).order_by(models.TipoEstructura.CodigoEstructura).all()
+        estructuras = [e.CodigoEstructura.strip() for e in estructuras_db]
+        if "-1" not in estructuras:
+            estructuras.append("-1")
             
-            if code == "cwf" or code == "-1":
-                cls = 3
-            elif code in ['FBX', 'SIO', 'QZ', 'SU', 'OX', 'ep']:
-                cls = 2
-            else:
-                cls = 1
-                
-            rellenos.append({
-                "code": code,
-                "name": name,
-                "class": cls
-            })
-            
-        weathering = [w.code for w in db.query(models.GradoIntemperismo).all()]
-        agua = [a.code for a in db.query(models.PresenAgua).all()]
-        litologias = [l.nombre.strip() for l in db.query(models.Litologia3).all()]
+        # 3. Litologías Maestras (esquema dbo)
+        litologias_db = db.query(models.Litologia).order_by(models.Litologia.CodigoLitologia).all()
+        litologias = [l.CodigoLitologia.strip() for l in litologias_db]
         
-        tipo_ensayo_plt = [
-            {"code": "D", "name": "Diametral"},
-            {"code": "A", "name": "Axial"},
-            {"code": "B", "name": "Bloques"},
-            {"code": "I", "name": "Irregular"}
+        # 4. Diámetros de Perforación (esquema cat)
+        diametros_db = db.query(models.DiametroPerfora).order_by(models.DiametroPerfora.DiametroID).all()
+        diametros_perforacion = [{"code": d.Codigo.strip(), "value": float(d.DiametroNominal_mm)} for d in diametros_db]
+        
+        # 5. Tipos de Ensayo PLT (esquema cat)
+        ensayos_db = db.query(models.TipoEnsayoPLT).order_by(models.TipoEnsayoPLT.TipoEnsayoPLT_ID).all()
+        tipo_ensayo_plt = [{"code": t.Codigo.strip(), "name": t.Descripcion.strip()} for t in ensayos_db]
+        
+        # 6. Direcciones de Ruptura PLT (esquema cat)
+        direcciones_db = db.query(models.DireccionRuptura).order_by(models.DireccionRuptura.DireccionID).all()
+        direccion_roturas = [{"code": d.Codigo.strip(), "name": d.Descripcion.strip()} for d in direcciones_db]
+        
+        # 7. Tipos de Fracturas PLT (esquema cat)
+        fracturas_db = db.query(models.TipoFracturaPLT).order_by(models.TipoFracturaPLT.TipoFracturaPLT_ID).all()
+        tipo_roturas = [{"code": f.Codigo.strip(), "name": f.Descripcion.strip()} for f in fracturas_db]
+        
+        # 8. Catálogo de Turnos de GEMA (esquema cat - ¡NUEVO!)
+        turnos_db = db.query(models.Turno).order_by(models.Turno.TurnoID).all()
+        turnos_list = [{"id": t.TurnoID, "code": t.Codigo.strip(), "name": t.Descripcion.strip()} for t in turnos_db]
+
+        # 9. Presencia de Agua (Lectura dinámica desde dbo.ClasificacionPresenciaAgua)
+        agua = []
+        try:
+            agua_db = db.execute(text("SELECT CodigoAgua FROM dbo.ClasificacionPresenciaAgua")).fetchall()
+            agua = [r[0].strip() for r in agua_db]
+        except Exception:
+            agua = ["CDC", "DPH", "WTM", "DGE", "FGF"]
+            
+        if "-1" not in agua:
+            agua.append("-1")
+
+        # 10. Tipos de Relleno y su Clasificación de Dureza RMR
+        # GEMA no requiere tabla de relleno por almacenarse como texto en Logueos,
+        # pero el frontend requiere esta estructura de clases para el motor de cálculo.
+        rellenos = [
+            {"code": "ca", "name": "Calcita", "class": 1},
+            {"code": "sand", "name": "Arena", "class": 1},
+            {"code": "ch", "name": "Clorita", "class": 1},
+            {"code": "cl", "name": "Arcilla", "class": 1},
+            {"code": "gy", "name": "Yeso", "class": 1},
+            {"code": "RXF", "name": "Roca triturada", "class": 1},
+            {"code": "GOU", "name": "Panizo (Gouge)", "class": 1},
+            {"code": "PAT", "name": "Patinas / Recubrimientos", "class": 1},
+            {"code": "FBX", "name": "Brecha de falla", "class": 2},
+            {"code": "SIO", "name": "Silicatos", "class": 2},
+            {"code": "QZ", "name": "Cuarzo", "class": 2},
+            {"code": "SU", "name": "Sulfuros", "class": 2},
+            {"code": "OX", "name": "Óxido de cobre", "class": 2},
+            {"code": "ep", "name": "Epidota", "class": 2},
+            {"code": "cwf", "name": "Limpia, sin relleno", "class": 3},
+            {"code": "-1", "name": "Sin dato / Vacío", "class": 3}
         ]
-        
-        diametros_perforacion = []
-        try:
-            diametros_perforacion = [{"code": d.nominacion.strip(), "value": d.diametro_nominal_mm} for d in db.query(models.DiametroPerforacion).all()]
-        except Exception:
-            pass
-            
-        tipo_roturas = []
-        try:
-            tipo_roturas = [{"code": r.code.strip(), "name": r.descripcion.strip()} for r in db.query(models.TipoRotura).all()]
-        except Exception:
-            pass
-            
-        direccion_roturas = []
-        try:
-            direccion_roturas = [{"code": r.code.strip(), "name": r.descripcion.strip()} for r in db.query(models.DireccionRotura).all()]
-        except Exception:
-            pass
-            
+
+        # 11. Grados de Intemperismo (ISRM)
+        weathering = ["UWF", "SWD", "MWM", "HWA", "CWC", "RS", "-1"]
+
+        # 12. Tabla de Matriz de Litología y Factor K de Ensayos PLT (cat.FactorK_PLT)
         tabla_litologia = []
         try:
-            litos_db = db.execute(
-                text(
-                    "SELECT gl.nombre, l1.nombre, l2.nombre, l3.nombre, l3.factor_k "
-                    "FROM Litologia3 l3 "
-                    "JOIN Litologia2 l2 ON l3.litologia2_id = l2.id "
-                    "JOIN Litologia1 l1 ON l2.litologia1_id = l1.id "
-                    "JOIN GrupoLitologico gl ON l1.unidad_geotecnica_id = gl.id"
-                )
+            litos_factor_db = db.execute(
+                text("SELECT UnidadGeotecnica, Lito1, Lito2, Lito3, FactorK FROM cat.FactorK_PLT")
             ).fetchall()
-            for row in litos_db:
-                clase = row[0].strip()
-                if clase.upper() == "INTRUSIVOS":
-                    clase = "Intrusivas"
-                elif clase.upper() == "SEDIMENTARIOS":
-                    clase = "Sedimentarias"
-                elif clase.upper() == "METAMORFICAS":
-                    clase = "Metamórficas"
-                elif clase.upper() == "BRECHAS":
-                    clase = "Brechas"
-                elif clase.upper() == "ENDOSKARN":
-                    clase = "Endoskarn"
+            for row in litos_factor_db:
                 tabla_litologia.append({
-                    "clase": clase,
-                    "l1": row[1].strip(),
-                    "l2": row[2].strip() if row[2].strip() != "-1" else "-",
-                    "l3": row[3].strip() if row[3].strip() != "-1" else "-",
-                    "k": row[4]
+                    "clase": row[0].strip() if row[0] else "",
+                    "l1": row[1].strip() if row[1] else "",
+                    "l2": row[2].strip() if row[2] else "-",
+                    "l3": row[3].strip() if row[3] else "-",
+                    "k": float(row[4]) if row[4] is not None else 10.0
                 })
         except Exception as e:
-            print("Error loading Litologia list for catalogs:", e)
-        
+            print("Error loading FactorK_PLT for catalogs:", e)
+
         return {
             "resistencia": resistencia,
             "estructuras": estructuras,
@@ -112,18 +117,21 @@ def get_catalogs(db: Session = Depends(get_db)):
             "diametros_perforacion": diametros_perforacion,
             "tipo_roturas": tipo_roturas,
             "direccion_roturas": direccion_roturas,
-            "tabla_litologia": tabla_litologia
+            "tabla_litologia": tabla_litologia,
+            "turnos": turnos_list
         }
+
     except Exception as e:
+        # Fallback de contingencia idéntico al sistema anterior si falla la conexión
         return {
             "resistencia": ["R0", "R1", "R2", "R3", "R4", "R5", "R6", "-1"],
-            "estructuras": ["JN", "F-10", "SZ", "BED", "VN", "CON", "SE", "F+10", "RF"],
+            "estructuras": ["JN", "F-10", "SZ", "BED", "VN", "CON", "SE", "F+10", "RF", "-1"],
             "rellenos": [
                 {"code": "ca", "name": "Calcita", "class": 1},
                 {"code": "cwf", "name": "Limpia, sin relleno", "class": 3}
             ],
             "weathering": ["UWF", "SWD", "MWM", "HWA", "CWC", "RS", "-1"],
-            "agua": ["CDC", "DPH", "WTM", "DGE", "FGF"],
+            "agua": ["CDC", "DPH", "WTM", "DGE", "FGF", "-1"],
             "litologias": ["LMT"],
             "tipo_ensayo_plt": [
                 {"code": "D", "name": "Diametral"},
@@ -147,5 +155,10 @@ def get_catalogs(db: Session = Depends(get_db)):
                 {"code": "Pe", "name": "Perpendicular a los planos de debilidad (estratificacion, foliacion)"},
                 {"code": "NA", "name": "No aplica (rocas masivas sin planos de debilidad)"}
             ],
-            "tabla_litologia": []
+            "tabla_litologia": [],
+            "turnos": [
+                {"id": 1, "code": "D", "name": "Día / Day Shift"},
+                {"id": 2, "code": "N", "name": "Noche / Night Shift"}
+            ],
+            "error_db": str(e)
         }

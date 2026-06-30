@@ -292,12 +292,12 @@ export default function App() {
           collar_norte_proyectado: 8432.8,
           collar_cota_proyectado: 4120.0,
           prof_final_eoh_proyectada: 150.0,
-          comentarios_proyectado: "Ubicación proyectada inicial",
+          comentarios_proyectado: "",
           collar_este: 1205.4,
           collar_norte: 8432.8,
           collar_cota: 4120.0,
           prof_final_eoh: 150.0,
-          comentarios: "Coordenadas oficiales validadas",
+          comentarios: "",
           turno: "D",
           surveys: [
             { depth: 0, dip: -60.0, azimuth: 120.0 },
@@ -678,8 +678,8 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(activeTaladro)
       });
+
       if (res.ok) {
-        // If there was a rename, delete the old one from the DB
         if (originalName && originalName !== activeTaladro.name) {
           try {
             await fetch(`${API_BASE}/api/taladros/${originalName}`, {
@@ -691,13 +691,17 @@ export default function App() {
         }
         setOriginalName(activeTaladro.name);
         setSyncStatus('synced');
-        setSyncMessage("Cambios guardados y auditados en SQL Server.");
+        setSyncMessage("Cambios guardados y auditados con éxito en SQL Server.");
       } else {
-        throw new Error();
+        // CAPTURA DE ERROR DE BASE DE DATOS O SERVIDOR (ej. 500 Internal Server Error)
+        const errorData = await res.json().catch(() => ({ detail: "Error interno del servidor SQL Server." }));
+        setSyncStatus('offline');
+        setSyncMessage(`Fallo al guardar: ${errorData.detail || "Error de consistencia o de restricciones en la base de datos."}`);
       }
     } catch (e) {
+      // CAPTURA DE ERROR DE CONEXIÓN O RED
       setSyncStatus('offline');
-      setSyncMessage("Backend desconectado. Cambios resguardados en caché local.");
+      setSyncMessage("Fallo en la conexión: No se pudo establecer comunicación con el servidor.");
     }
   };
 
@@ -872,6 +876,9 @@ export default function App() {
 
   const handleSurveysChange = (updatedSurveys: Survey[]) => {
     if (!activeTaladro) return;
+    const hasChanged = JSON.stringify(activeTaladro.surveys) !== JSON.stringify(updatedSurveys);
+    if (!hasChanged) return; // Salir de inmediato si no hay un cambio real
+
     setActiveTaladro({
       ...activeTaladro,
       surveys: updatedSurveys
@@ -881,6 +888,8 @@ export default function App() {
 
   const handleCorridasChange = (updatedCorridas: Corrida[]) => {
     if (!activeTaladro) return;
+    const hasChanged = JSON.stringify(activeTaladro.corridas) !== JSON.stringify(updatedCorridas);
+    if (!hasChanged) return; // Salir de inmediato si no hay un cambio real
 
     // Auto-update structural discontinuities runs on depth changes
     const updatedDiscs = activeTaladro.discontinuidades.map(disc => {
@@ -908,6 +917,9 @@ export default function App() {
 
   const handleDiscontinuidadesChange = (updatedDiscs: Discontinuidad[]) => {
     if (!activeTaladro) return;
+    const hasChanged = JSON.stringify(activeTaladro.discontinuidades) !== JSON.stringify(updatedDiscs);
+    if (!hasChanged) return; // Salir de inmediato si no hay un cambio real
+
     setActiveTaladro({
       ...activeTaladro,
       discontinuidades: updatedDiscs
@@ -917,6 +929,9 @@ export default function App() {
 
   const handleEnsayosPltChange = (updatedPlts: EnsayoPlt[]) => {
     if (!activeTaladro) return;
+    const hasChanged = JSON.stringify(activeTaladro.ensayos_plt) !== JSON.stringify(updatedPlts);
+    if (!hasChanged) return; // Salir de inmediato si no hay un cambio real
+
     setActiveTaladro({
       ...activeTaladro,
       ensayos_plt: updatedPlts
@@ -1232,7 +1247,7 @@ export default function App() {
 
           {/* 3. VISTAS LIGERAS CONDICIONALES (Se montan bajo demanda) */}
           {activeTaladro && currentView === 'rmr' && (
-            <div className="flex-1 overflow-y-auto">
+            <div className={currentView === 'rmr' ? "flex-1 flex flex-col min-h-0" : "hidden"}>
               <RmrAnalysis
                 corridas={activeTaladro.corridas}
                 waterTableM={97.0}
