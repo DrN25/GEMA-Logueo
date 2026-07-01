@@ -150,21 +150,29 @@ def get_taladro(name: str, db: Session = Depends(get_db)):
     corridas_list = []
     db_corridas = db.query(models.LogueoGeotecnicoGeneral).filter_by(SondajeID=s.SondajeID).order_by(models.LogueoGeotecnicoGeneral.IntervaloDe).all()
     for idx, c in enumerate(db_corridas):
+        # Conversión segura a punto flotante
+        rec_val = float(c.LongitudRecuperada) if c.LongitudRecuperada is not None else 0.0
+        rqd_val = float(c.SumaFragmentos10cm) if c.SumaFragmentos10cm is not None else 0.0
+        lrf_val = float(c.LongitudRocaFracturada) if c.LongitudRocaFracturada is not None else 0.0
+        
+        # Reconstrucción matemática del balance de fragmentos del testigo
+        calculated_small_frag = max(0.0, round(rec_val - rqd_val - lrf_val, 2))
+
         corridas_list.append(CorridaSchema(
             corrida=c.NumeroRegistro,
             de=float(c.IntervaloDe),
             a=float(c.IntervaloA),
-            rec_m=float(c.LongitudRecuperada) if c.LongitudRecuperada is not None else 0.0,
-            rqd_m=float(c.SumaFragmentos10cm) if c.SumaFragmentos10cm is not None else 0.0,
-            lrf_m=float(c.LongitudRocaFracturada) if c.LongitudRocaFracturada is not None else 0.0,
-            small_frag_m=0.0,
-            mec_frac=0,
+            rec_m=rec_val,
+            rqd_m=rqd_val,
+            lrf_m=lrf_val,
+            small_frag_m=calculated_small_frag, # Campo calculado dinámicamente
+            mec_frac=0,                         # Campo opcional por defecto
             lito1=lito_map.get(c.Litologia1ID, "LMT"),
             lito2=lito_map.get(c.Litologia2ID, "-1"),
             lito3=lito_map.get(c.Litologia3ID, "-1"),
             resistencia=c.ResistenciaEstimada or "-1",
-            orientacion="N",
-            offset=0.0,
+            orientacion="X",                    # Campo opcional por defecto
+            offset=0.0,                         # Campo opcional por defecto
             tipo_est1=est_map.get(c.TipoEstructura1ID, "-1"),
             tipo_est2=est_map.get(c.TipoEstructura2ID, "-1"),
             frac_nat=c.NumFracturasNaturales or 0,
@@ -172,7 +180,6 @@ def get_taladro(name: str, db: Session = Depends(get_db)):
             frac_buz60=c.NumFrac30a60 or 0,
             frac_buz90=c.NumFracBuz60 or 0,
             abertura=float(c.Abertura) if c.Abertura is not None else 0.0,
-            text_nll_distillation_target_log_prob=0.0,
             rugosidad=int(c.Rugosidad) if (c.Rugosidad and c.Rugosidad.isdigit()) else 1,
             jrc10=int(c.JRC10) if c.JRC10 is not None else 0,
             intemperismo=c.GradoIntemperismo or "UWF",

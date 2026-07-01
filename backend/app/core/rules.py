@@ -268,7 +268,7 @@ MASTER_ERROR_RULES = [
     },
     {
         "code": "R204",
-        "msg": "El ángulo Alfa es inválido. Debe estar entre 0° y 90° o ser -1.",
+        "msg": "El ángulo Alfa es inválido. Debe estar entre 0° y 90°",
         "severity": "ALERTA",
         "group": "Estructural"
     },
@@ -280,7 +280,7 @@ MASTER_ERROR_RULES = [
     },
     {
         "code": "R206",
-        "msg": "El ángulo Beta es inválido. Debe estar entre 0° y 360° o ser -1.",
+        "msg": "El ángulo Beta es inválido. Debe estar entre 0° y 360°",
         "severity": "ALERTA",
         "group": "Estructural"
     },

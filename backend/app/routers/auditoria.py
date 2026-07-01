@@ -109,11 +109,11 @@ def simplify_message(msg):
     if "FUERA DEL TRAMO" in msg_up or "TRAMO DE CORRIDA ESPECIFICADO" in msg_up:
         return "La profundidad se encuentra fuera del tramo de corrida especificado."
     if "ALFA" in msg_up and ("INVÁLIDO" in msg_up or "INVALIDO" in msg_up):
-        return "El ángulo Alfa es inválido. Debe estar entre 0° y 90° o ser -1."
+        return "El ángulo Alfa es inválido. Debe estar entre 0° y 90°."
     if "ALFA" in msg_up and "ENTERO" in msg_up:
         return "El ángulo Alfa debería ser un número entero."
     if "BETA" in msg_up and ("INVÁLIDO" in msg_up or "INVALIDO" in msg_up):
-        return "El ángulo Beta es inválido. Debe estar entre 0° y 360° o ser -1."
+        return "El ángulo Beta es inválido. Debe estar entre 0° y 360°."
     if "BETA" in msg_up and "ENTERO" in msg_up:
         return "El ángulo Beta debería ser un número entero."
     if "DIP" in msg_up:

@@ -504,15 +504,24 @@ export default function BaseEditableGrid<T>({
           })}
         </colgroup>
 
-        <thead className="sticky top-0 z-20 text-slate-400 dark:text-slate-300 font-bold uppercase tracking-wider text-center select-none text-xs">
+        <thead className="sticky top-0 z-20 text-slate-400 dark:text-slate-300 font-bold uppercase tracking-wider text-center select-none text-xxs shrink-0">
           <tr>
             {columns.map((col, colIdx) => (
               <th
                 key={String(col.key)}
-                className={`py-2 relative ${col.headerBgClass || ''}`}
+                className={`relative vertical-align-middle ${col.headerBgClass || ''}`}
                 style={headerStyles[colIdx]}
               >
-                <div className="px-2 truncate">{col.label}</div>
+                {/* 
+                  Contenedor Multilínea Adaptativo:
+                  - whitespace-normal & break-words: permite que el texto largo salte de línea.
+                  - line-clamp-3: limita el renderizado a un máximo de 3 líneas.
+                  - flex & h-12: asegura una altura fija unificada (48px) para que todas las cabeceras estén alineadas verticalmente.
+                */}
+                <div className="px-1.5 h-12 flex items-center justify-center text-center leading-tight whitespace-normal break-words line-clamp-3">
+                  {col.label}
+                </div>
+
                 {col.key !== 'accion' && (
                   <div
                     onMouseDown={(e) => handleResizeStart(e, String(col.key))}

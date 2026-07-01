@@ -55,7 +55,7 @@ export const getResistenciaStyle = (val: string, darkMode: boolean) => {
   }
   const score = item.score;
   if (darkMode) {
-    const bg = score >= 12 ? "#1a3a1a" : score >= 7 ? "#2a2a0a" : score >= 4 ? "#2a1a0a" : "#3a1a1a";
+    const bg = score >= 12 ? "#071f07" : score >= 7 ? "#1f1a00" : score >= 4 ? "#1f0f00" : "#1f0a0a";
     const fg = score >= 12 ? "#86efac" : score >= 7 ? "#fcd34d" : score >= 4 ? "#fb923c" : "#fca5a5";
     return { backgroundColor: bg, color: fg };
   } else {
@@ -155,14 +155,14 @@ export function getLggColumns({
     },
     {
       key: 'de',
-      label: 'de: (m)',
+      label: 'de:',
       width: 'w-24',
       type: 'number',
       step: '0.01'
     },
     {
       key: 'a',
-      label: 'a: (m)',
+      label: 'a:',
       width: 'w-24',
       type: 'number',
       step: '0.01'
@@ -176,57 +176,66 @@ export function getLggColumns({
       renderCell: (row) => <div className="text-center font-bold text-blue-400 py-1.5">{(row.a - row.de).toFixed(2)}</div>
     },
     {
-      key: 'rec_m',
-      label: 'Rec. (m)',
-      width: 'w-24',
-      type: 'number',
-      step: '0.01',
-      headerBgClass: 'bg-blue-500/5 dark:bg-blue-500/10 text-blue-600 dark:text-blue-300'
-    },
-    {
-      key: 'rec_pct' as any,
-      label: 'Rec. (%)',
+      key: 'alert_sum_control' as any,
+      label: 'Perf./LR',
       width: 'w-24',
       type: 'readonly',
       headerBgClass: 'bg-blue-500/5 dark:bg-blue-500/10 text-blue-600 dark:text-blue-300',
-      renderCell: (row) => <div className="text-center font-bold text-slate-400 py-1.5">{row.isErr ? '-' : `${row.rec_pct}%`}</div>
+      renderCell: (row) => {
+        const perf = parseFloat((row.a - row.de).toFixed(2));
+        const rec = row.rec_m || 0;
+        const hasError = rec > perf;
+        return (
+          <div className="flex justify-center items-center py-1.5">
+            {hasError ? (
+              <span className="inline-flex items-center justify-center p-0.5 rounded-full bg-red-500/10 text-red-500" title="La longitud recuperada supera el avance">
+                <X size={14} className="stroke-[3]" />
+              </span>
+            ) : (
+              <span className="inline-flex items-center justify-center p-0.5 rounded-full bg-emerald-500/10 text-emerald-500">
+                <Check size={14} className="stroke-[3]" />
+              </span>
+            )}
+          </div>
+        );
+      }
+    },
+    {
+      key: 'rec_m',
+      label: 'Longitud Recuperada (m)',
+      width: 'w-44',
+      type: 'number',
+      step: '0.01',
+      headerBgClass: 'bg-blue-500/5 dark:bg-blue-500/10 text-blue-600 dark:text-blue-300'
     },
     {
       key: 'rqd_m',
-      label: 'RQD (m)',
-      width: 'w-24',
+      label: '(RQD) ∑ Frag\'s ≥ 10 cm (m)',
+      width: 'w-52',
       type: 'number',
       step: '0.01',
       headerBgClass: 'bg-blue-500/5 dark:bg-blue-500/10 text-blue-600 dark:text-blue-300'
     },
     {
-      key: 'rqd_pct' as any,
-      label: 'RQD (%)',
-      width: 'w-24',
-      type: 'readonly',
-      headerBgClass: 'bg-blue-500/5 dark:bg-blue-500/10 text-blue-600 dark:text-blue-300',
-      renderCell: (row) => <div className="text-center font-bold text-slate-400 py-1.5">{row.isErr ? '-' : `${row.rqd_pct}%`}</div>
-    },
-    {
       key: 'lrf_m',
-      label: 'LRF (m)',
-      width: 'w-24',
+      label: 'Longitud Roca Fracturada (m)',
+      width: 'w-48',
       type: 'number',
       step: '0.01',
       headerBgClass: 'bg-blue-500/5 dark:bg-blue-500/10 text-blue-600 dark:text-blue-300'
     },
     {
       key: 'small_frag_m',
-      label: 'Frag <10cm',
-      width: 'w-24',
+      label: '∑ Frag\'s < 10 cm (m)',
+      width: 'w-44',
       type: 'number',
       step: '0.01',
       headerBgClass: 'bg-blue-500/5 dark:bg-blue-500/10 text-blue-600 dark:text-blue-300'
     },
     {
       key: 'sum_control' as any,
-      label: 'Σ RQD+LRF+F',
-      width: 'w-28',
+      label: '∑ RQD+LRF+∑ Frag\'s<10',
+      width: 'w-48',
       type: 'readonly',
       headerBgClass: 'bg-blue-500/5 dark:bg-blue-500/10 text-blue-600 dark:text-blue-300',
       renderCell: (row) => {
@@ -235,20 +244,20 @@ export function getLggColumns({
       }
     },
     {
-      key: 'alert_sum_control' as any,
-      label: 'Bal. Fis.',
-      width: 'w-24',
+      key: 'sum_control_check' as any,
+      label: 'LR/RQD+LRF',
+      width: 'w-28',
       type: 'readonly',
       headerBgClass: 'bg-blue-500/5 dark:bg-blue-500/10 text-blue-600 dark:text-blue-300',
       renderCell: (row) => {
         const sum = parseFloat(((row.rqd_m || 0) + (row.lrf_m || 0) + (row.small_frag_m || 0)).toFixed(2));
         const perf = parseFloat((row.a - row.de).toFixed(2));
         const rec = row.rec_m || 0;
-        const hasError = sum > perf || row.rqd_m > rec || rec > perf;
+        const hasError = sum > perf || row.rqd_m > rec;
         return (
           <div className="flex justify-center items-center py-1.5">
             {hasError ? (
-              <span className="inline-flex items-center justify-center p-0.5 rounded-full bg-red-500/10 text-red-500" title="Inconsistencia de Balance Físico">
+              <span className="inline-flex items-center justify-center p-0.5 rounded-full bg-red-500/10 text-red-500" title="La sumatoria física no coincide con la recuperación o avance">
                 <X size={14} className="stroke-[3]" />
               </span>
             ) : (
@@ -262,14 +271,14 @@ export function getLggColumns({
     },
     {
       key: 'mec_frac',
-      label: 'Frac Mec',
-      width: 'w-24',
+      label: 'N° Fracturas mecánicas',
+      width: 'w-40',
       type: 'number',
       headerBgClass: 'bg-purple-500/5 dark:bg-purple-500/10 text-purple-600 dark:text-purple-300'
     },
     {
       key: 'lito1',
-      label: 'Lito 1',
+      label: 'LITO 1',
       width: 'w-28',
       type: 'select',
       renderCell: (row, _idx, isSelected) => {
@@ -284,7 +293,7 @@ export function getLggColumns({
         return (
           <div className="w-full h-full flex items-center justify-center px-1" style={style}>
             <select
-              id={`lgg-cell-${row.originalIndex}-lito1`} // <-- ID Semántico
+              id={`lgg-cell-${row.originalIndex}-lito1`}
               value={row.lito1}
               onChange={(e) => handleCellChange(row.originalIndex, 'lito1', e.target.value)}
               className="w-full bg-transparent border-0 py-1 text-center font-bold focus:outline-none cursor-pointer text-xs"
@@ -302,7 +311,7 @@ export function getLggColumns({
     },
     {
       key: 'lito2',
-      label: 'Lito 2',
+      label: 'LITO 2',
       width: 'w-28',
       type: 'select',
       renderCell: (row, _idx, isSelected) => {
@@ -319,7 +328,7 @@ export function getLggColumns({
         return (
           <div className="w-full h-full flex items-center justify-center px-1" style={style}>
             <select
-              id={`lgg-cell-${row.originalIndex}-lito2`} // <-- ID Semántico
+              id={`lgg-cell-${row.originalIndex}-lito2`}
               value={row.lito2 || '-1'}
               onChange={(e) => handleCellChange(row.originalIndex, 'lito2', e.target.value)}
               className="w-full bg-transparent border-0 py-1 text-center font-bold focus:outline-none cursor-pointer text-xs"
@@ -338,7 +347,7 @@ export function getLggColumns({
     },
     {
       key: 'lito3',
-      label: 'Lito 3',
+      label: 'LITO 3',
       width: 'w-28',
       type: 'select',
       renderCell: (row, _idx, isSelected) => {
@@ -355,7 +364,7 @@ export function getLggColumns({
         return (
           <div className="w-full h-full flex items-center justify-center px-1" style={style}>
             <select
-              id={`lgg-cell-${row.originalIndex}-lito3`} // <-- ID Semántico
+              id={`lgg-cell-${row.originalIndex}-lito3`}
               value={row.lito3 || '-1'}
               onChange={(e) => handleCellChange(row.originalIndex, 'lito3', e.target.value)}
               className="w-full bg-transparent border-0 py-1 text-center font-bold focus:outline-none cursor-pointer text-xs"
@@ -374,8 +383,8 @@ export function getLggColumns({
     },
     {
       key: 'resistencia',
-      label: 'Resist ISRM',
-      width: 'w-28',
+      label: 'Resist. Máx. Estimada (ISRM)',
+      width: 'w-48',
       type: 'select',
       renderCell: (row, _idx, isSelected) => {
         const style = getResistenciaStyle(row.resistencia, isDark);
@@ -391,7 +400,7 @@ export function getLggColumns({
         return (
           <div className="w-full h-full flex items-center justify-center px-1" style={style}>
             <select
-              id={`lgg-cell-${row.originalIndex}-resistencia`} // <-- ID Semántico
+              id={`lgg-cell-${row.originalIndex}-resistencia`}
               value={row.resistencia}
               onChange={(e) => handleCellChange(row.originalIndex, 'resistencia', e.target.value)}
               className="w-full bg-transparent border-0 py-1 text-center font-bold focus:outline-none cursor-pointer text-xs"
@@ -409,60 +418,60 @@ export function getLggColumns({
     },
     {
       key: 'orientacion',
-      label: 'Ori',
-      width: 'w-24',
+      label: 'Linea de orientación',
+      width: 'w-36',
       type: 'select',
       options: ['N', 'S', 'X']
     },
     {
       key: 'offset',
-      label: 'Offset',
-      width: 'w-24',
+      label: 'Desplazamiento 0°-360° (OFFSET)',
+      width: 'w-48',
       type: 'number',
       step: '0.1'
     },
     {
       key: 'tipo_est1',
-      label: 'Tipo Est 1',
-      width: 'w-28',
+      label: 'Tipo de estruct.',
+      width: 'w-32',
       type: 'select',
       options: ['JN', 'F-10', 'SZ', 'BED', 'VN', 'CON', 'SE', 'F+10', '-1']
     },
     {
       key: 'tipo_est2',
-      label: 'Tipo Est 2',
-      width: 'w-28',
+      label: 'Tipo de estruct. 2',
+      width: 'w-32',
       type: 'select',
       options: ['JN', 'F-10', 'SZ', 'BED', 'VN', 'CON', 'SE', 'F+10', '-1']
     },
     {
       key: 'frac_nat',
-      label: 'Frac Nat',
-      width: 'w-24',
+      label: 'N° de Frac. Naturales',
+      width: 'w-36',
       type: 'number'
     },
     {
       key: 'frac_buz30',
-      label: 'Buz <30°',
-      width: 'w-24',
+      label: 'N° Frac. Nat. (Buz<30°)',
+      width: 'w-36',
       type: 'number'
     },
     {
       key: 'frac_buz60',
-      label: '30°-60°',
-      width: 'w-24',
+      label: 'N° Frac. N (30°<Buz<60°)',
+      width: 'w-36',
       type: 'number'
     },
     {
       key: 'frac_buz90',
-      label: 'Buz >60°',
-      width: 'w-24',
+      label: 'N° Frac. Nat. (Buz>60°)',
+      width: 'w-36',
       type: 'number'
     },
     {
       key: 'sum_frac_nat' as any,
-      label: 'Σ Bins',
-      width: 'w-24',
+      label: '∑ Fracturas Naturales',
+      width: 'w-36',
       type: 'readonly',
       renderCell: (row) => {
         const sum = (row.frac_buz30 || 0) + (row.frac_buz60 || 0) + (row.frac_buz90 || 0);
@@ -471,7 +480,7 @@ export function getLggColumns({
     },
     {
       key: 'alert_fn' as any,
-      label: 'N° FN',
+      label: 'N\' FN',
       width: 'w-24',
       type: 'readonly',
       renderCell: (row) => {
@@ -480,7 +489,7 @@ export function getLggColumns({
         return (
           <div className="flex justify-center items-center py-1.5">
             {hasError ? (
-              <span className="inline-flex items-center justify-center p-0.5 rounded-full bg-red-500/10 text-red-500" title="La sumatoria de bins no coincide con Frac Nat">
+              <span className="inline-flex items-center justify-center p-0.5 rounded-full bg-red-500/10 text-red-500" title="La sumatoria no coincide con Frac Nat">
                 <X size={14} className="stroke-[3]" />
               </span>
             ) : (
@@ -494,27 +503,27 @@ export function getLggColumns({
     },
     {
       key: 'abertura',
-      label: 'Abertura',
-      width: 'w-24',
+      label: 'Abertura (mm.)',
+      width: 'w-28',
       type: 'number',
       step: '0.01'
     },
     {
       key: 'rugosidad',
-      label: 'Rug',
-      width: 'w-24',
+      label: 'Rugosidad (ISRM)',
+      width: 'w-32',
       type: 'number'
     },
     {
       key: 'jrc10',
-      label: 'Jrc10',
+      label: 'JRC10',
       width: 'w-24',
       type: 'number'
     },
     {
       key: 'intemperismo',
-      label: 'Intemp',
-      width: 'w-28',
+      label: 'Grado Intemp. (ISRM)',
+      width: 'w-36',
       type: 'select',
       renderCell: (row, _idx, isSelected) => {
         const style = getIntemperismoStyle(row.intemperismo, isDark);
@@ -530,7 +539,7 @@ export function getLggColumns({
         return (
           <div className="w-full h-full flex items-center justify-center px-1" style={style}>
             <select
-              id={`lgg-cell-${row.originalIndex}-intemperismo`} // <-- ID Semántico
+              id={`lgg-cell-${row.originalIndex}-intemperismo`}
               value={row.intemperismo}
               onChange={(e) => handleCellChange(row.originalIndex, 'intemperismo', e.target.value)}
               className="w-full bg-transparent border-0 py-1 text-center font-bold focus:outline-none cursor-pointer text-xs"
@@ -548,15 +557,15 @@ export function getLggColumns({
     },
     {
       key: 'relleno1',
-      label: 'Relleno 1',
-      width: 'w-28',
+      label: 'Tipo de Relleno 1',
+      width: 'w-32',
       type: 'select',
       options: RELLENO_OPTIONS
     },
     {
       key: 'relleno2',
-      label: 'Relleno 2',
-      width: 'w-28',
+      label: 'Tipo de Relleno 2',
+      width: 'w-32',
       type: 'select',
       renderCell: (row, _idx, isSelected) => {
         if (!isSelected) {
@@ -568,7 +577,7 @@ export function getLggColumns({
         }
         return (
           <select
-            id={`lgg-cell-${row.originalIndex}-relleno2`} // <-- ID Semántico
+            id={`lgg-cell-${row.originalIndex}-relleno2`}
             value={row.relleno2 || '-1'}
             onChange={(e) => handleCellChange(row.originalIndex, 'relleno2', e.target.value)}
             className="w-full bg-transparent border-0 px-1 py-1 text-center text-slate-300 focus:outline-none cursor-pointer focus:ring-1 focus:ring-blue-500 rounded text-xs"
@@ -583,14 +592,14 @@ export function getLggColumns({
     },
     {
       key: 'espesor',
-      label: 'Espesor',
-      width: 'w-24',
+      label: 'Espesor Relleno (mm)',
+      width: 'w-36',
       type: 'number',
       step: '0.1'
     },
     {
       key: 'alert_abert_rell' as any,
-      label: 'Abert/Rell',
+      label: 'Abert./Rel',
       width: 'w-24',
       type: 'readonly',
       renderCell: (row) => {
@@ -612,8 +621,8 @@ export function getLggColumns({
     },
     {
       key: 'agua_obs',
-      label: 'Agua',
-      width: 'w-28',
+      label: 'Presen. Agua (ISRM)',
+      width: 'w-36',
       type: 'select',
       renderCell: (row, _idx, isSelected) => {
         const style = getAguaStyle(row.agua_obs, isDark);
@@ -629,7 +638,7 @@ export function getLggColumns({
         return (
           <div className="w-full h-full flex items-center justify-center px-1" style={style}>
             <select
-              id={`lgg-cell-${row.originalIndex}-agua_obs`} // <-- ID Semántico
+              id={`lgg-cell-${row.originalIndex}-agua_obs`}
               value={row.agua_obs}
               onChange={(e) => handleCellChange(row.originalIndex, 'agua_obs', e.target.value)}
               className="w-full bg-transparent border-0 py-1 text-center font-bold focus:outline-none cursor-pointer text-xs"
@@ -647,7 +656,7 @@ export function getLggColumns({
     },
     {
       key: 'geologo' as any,
-      label: 'Geólogo',
+      label: 'Geotécnico',
       width: 'w-28',
       type: 'readonly',
       renderCell: (row) => <span className="w-full block px-2 py-1.5 text-center text-slate-400 font-medium">{row.turno ? lastRowGeologo(row.originalIndex) : "RD/RB"}</span>
@@ -674,7 +683,7 @@ export function getLggColumns({
         }
         return (
           <select
-            id={`lgg-cell-${row.originalIndex}-turno`} // <-- ID Semántico
+            id={`lgg-cell-${row.originalIndex}-turno`}
             value={row.turno || 'D'}
             onChange={(e) => handleCellChange(row.originalIndex, 'turno', e.target.value)}
             className="w-full bg-transparent border-0 py-1 text-center text-slate-300 focus:outline-none cursor-pointer focus:ring-1 focus:ring-blue-500 rounded text-xs"
@@ -728,7 +737,7 @@ export function getLggColumns({
         }
         return (
           <div className="flex justify-center items-center py-1.5">
-            <span className={`px-2.5 py-0.5 rounded text-xs font-black border ${score >= 81 ? 'bg-emerald-500/25 text-emerald-600 dark:text-emerald-300 border-emerald-500/30' : score >= 61 ? 'bg-blue-500/25 text-blue-600 dark:text-cyan-300 border-blue-500/30' : score >= 41 ? 'bg-amber-500/25 text-amber-600 dark:text-amber-300 border-amber-500/30' : 'bg-red-500/25 text-red-600 dark:text-red-400 border-red-500/30'}`}>
+            <span className={`px-2.5 py-0.5 rounded text-xs font-black border ${score >= 81 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border-emerald-500/20' : score >= 61 ? 'bg-blue-500/10 text-blue-600 dark:text-cyan-400 border-blue-500/20' : score >= 41 ? 'bg-amber-500/10 text-amber-600 dark:text-amber-300 border-amber-500/20' : 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20'}`}>
               {score}
             </span>
           </div>
@@ -742,25 +751,26 @@ export function getLggColumns({
       type: 'readonly',
       isStickyRight: true,
       stickyRight: 0,
+      headerBgClass: 'bg-navy-900',
       renderCell: (row, _idx, isSelected) => {
         if (!isSelected) {
           return null;
         }
         return (
-          <div className="flex justify-center items-center gap-1.5 py-1.5 bg-navy-950/95">
+          <div className="flex justify-center items-center gap-1.5 h-full bg-navy-950/95">
             <button
               onClick={() => insertCorridaRow(row.originalIndex)}
-              className="text-cyan-500 hover:text-cyan-400 p-1 hover:bg-cyan-500/10 rounded transition-colors"
+              className="p-1.5 rounded bg-navy-800 hover:bg-navy-700 text-cyan-400 hover:text-cyan-300 border border-navy-700/30 transition-all active:scale-90"
               title="Clonar esta corrida abajo"
             >
-              <Copy size={15} />
+              <Copy size={12} />
             </button>
             <button
               onClick={() => deleteCorridaRow(row.originalIndex)}
-              className="text-red-500 hover:text-red-400 p-1 hover:bg-red-500/10 rounded transition-colors"
+              className="p-1.5 rounded bg-red-950/20 hover:bg-red-950/50 text-red-400 hover:text-red-300 border border-red-900/20 transition-all active:scale-90"
               title="Eliminar esta corrida"
             >
-              <Trash2 size={15} />
+              <Trash2 size={12} />
             </button>
           </div>
         );

@@ -13,14 +13,14 @@ class CorridaSchema(BaseModel):
     rec_m: float
     rqd_m: float
     lrf_m: float
-    small_frag_m: float
-    mec_frac: int
+    small_frag_m: Optional[float] = 0.0  # Campo virtual para balance de fragmentos
+    mec_frac: Optional[int] = 0          # Opcional (No está en BD física)
     lito1: str
     lito2: Optional[str] = "-1"
     lito3: Optional[str] = "-1"
     resistencia: str
-    orientacion: str
-    offset: Optional[float] = 0.0
+    orientacion: Optional[str] = "X"     # Opcional (No está en BD física)
+    offset: Optional[float] = 0.0        # Opcional (No está en BD física)
     tipo_est1: str
     tipo_est2: Optional[str] = "-1"
     frac_nat: int
