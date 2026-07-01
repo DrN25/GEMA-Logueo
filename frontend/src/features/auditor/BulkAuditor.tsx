@@ -3,7 +3,7 @@ import {
   FileSpreadsheet, AlertTriangle, Database, ShieldCheck, Download,
   Loader2, Info, RefreshCw, Trash2, X
 } from 'lucide-react';
-import SheetSelectModal from './SheetSelectModal';
+import BulkImportWizard from './BulkImportWizard';
 
 // Subcomponent imports
 import AuditHistory from './components/AuditHistory';
@@ -278,54 +278,28 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
     }
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const selectedFile = e.target.files[0];
-      setFile(selectedFile);
-      setStatus('uploading');
-      setMessage('Analizando hojas disponibles en el libro de Excel...');
+  // Reemplaza los estados de SheetSelectModal por estos:
+  const [isWizardOpen, setIsWizardOpen] = useState<boolean>(false);
 
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-
-      try {
-        const res = await fetch(`${apiBase}/api/logueo/sheets`, {
-          method: 'POST',
-          body: formData
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setSheetList(data.sheets);
-          setUploadedFilename(data.filename);
-          setIsModalOpen(true);
-          setStatus('idle');
-          setMessage('');
-        } else {
-          const errData = await res.json();
-          setStatus('error');
-          setMessage(errData.detail || 'Error al analizar el libro de Excel.');
-        }
-      } catch (e) {
-        setStatus('error');
-        setMessage('No se pudo establecer conexión con el backend para leer las hojas.');
-      }
-    }
-  };
-
-  const handleConfirmSheets = async (lggSheet: string, estSheet: string) => {
-    setIsModalOpen(false);
+  // Reemplaza handleFileChange y handleConfirmSheets por esta única función:
+  const handleWizardConfirm = async (payload: any) => {
+    setIsWizardOpen(false);
     setStatus('processing');
-    setMessage('Ejecutando auditoría geotécnica en segundo plano...');
+    setMessage('Ejecutando auditoría geotécnica cruzada en segundo plano...');
+
+    const formData = new FormData();
+    formData.append('file_lgg_est', payload.files.lgg_est);
+    if (payload.files.collar) formData.append('file_collar', payload.files.collar);
+    if (payload.files.survey) formData.append('file_survey', payload.files.survey);
+
+    // Convertir el diccionario de configuración de mapeos a JSON string
+    formData.append('config_json', JSON.stringify(payload.config));
 
     try {
-      const res = await fetch(`${apiBase}/api/logueo/importar-excel-bulk`, {
+      // AQUÍ ESTAMOS APUNTANDO AL BACKEND, LO ACTUALIZAREMOS EN EL SIGUIENTE PASO
+      const res = await fetch(`${apiBase}/api/logueo/importar-excel-bulk-v2`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          filename: uploadedFilename,
-          lgg_sheet: lggSheet,
-          est_sheet: estSheet
-        })
+        body: formData
       });
       if (res.ok) {
         const data = await res.json();
@@ -431,14 +405,10 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
     <div className="space-y-6 text-left animate-fade-in text-slate-200 min-h-screen p-4 bg-navy-950/20 backdrop-blur-md">
 
       {/* Modales */}
-      <SheetSelectModal
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setStatus('idle');
-        }}
-        sheets={sheetList}
-        onConfirm={handleConfirmSheets}
+      <BulkImportWizard
+        isOpen={isWizardOpen}
+        onClose={() => setIsWizardOpen(false)}
+        onConfirm={handleWizardConfirm}
       />
 
       {/* HISTORIAL DE AUDITORÍAS PASADAS */}
@@ -489,7 +459,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
         </div>
       )}
 
-      {/* ÁREA DE CARGA INICIAL (Arrastrar Archivo) */}
+      {/* ÁREA DE CARGA INICIAL (Botón para abrir Wizard) */}
       {status !== 'loaded' && !selectedAuditId && status !== 'uploading' && status !== 'processing' && (
         <div className="rounded-2xl border border-cyan-500/15 p-10 space-y-8 max-w-xl mx-auto bg-gradient-to-b from-[#0e172a]/60 to-[#090f1d]/90 shadow-2xl mt-12 relative overflow-hidden backdrop-blur-md shadow-[0_0_50px_rgba(6,182,212,0.05)]">
           <div className="absolute -top-24 -left-24 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl"></div>
@@ -500,34 +470,29 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
               <Database size={28} />
             </div>
             <div>
-              <h3 className="text-xs font-black uppercase tracking-widest text-slate-100">Auditoría Geomecánica Masiva</h3>
+              <h3 className="text-xs font-black uppercase tracking-widest text-slate-100">Revisión Geomecánica Avanzada</h3>
               <p className="text-xs text-slate-400 max-w-sm mx-auto mt-2 leading-relaxed font-semibold">
-                Arrastra tu archivo de Excel o búscalo localmente para auditar de forma automática la consistencia espacial, litológica e integridad de corridas y discontinuidades.
+                Cruza y revisa masivamente la consistencia entre Logueo General, Estructural, Metadatos de Collar y Trayectorias (Surveys).
               </p>
             </div>
           </div>
 
-          <div className="border border-dashed border-slate-700 hover:border-cyan-500/40 hover:bg-cyan-500/5 rounded-2xl p-8 text-center bg-slate-950/40 transition-all cursor-pointer relative group shadow-inner">
-            <input
-              type="file"
-              accept=".xlsx, .xls"
-              onChange={handleFileChange}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-            />
-            <div className="flex flex-col items-center gap-3">
-              <div className="p-3 bg-slate-900/60 rounded-xl group-hover:bg-cyan-500/10 transition-colors">
-                <FileSpreadsheet size={36} className="text-slate-500 group-hover:text-cyan-400 transition-colors" />
-              </div>
-              <div>
-                <span className="text-xs font-black text-slate-200 block group-hover:text-cyan-300 transition-colors">
-                  {file ? file.name : 'Selecciona o arrastra tu libro Excel'}
-                </span>
-                <span className="text-xs text-slate-500 block mt-1 font-bold">
-                  Soporta formatos estándar .xlsx y .xls
-                </span>
-              </div>
+          <button
+            onClick={() => setIsWizardOpen(true)}
+            className="w-full border border-dashed border-cyan-500/40 hover:border-cyan-400 bg-cyan-500/5 hover:bg-cyan-500/10 rounded-2xl p-8 text-center transition-all cursor-pointer relative group shadow-inner flex flex-col items-center gap-3"
+          >
+            <div className="p-3 bg-slate-900/80 rounded-xl group-hover:bg-cyan-500/20 transition-colors shadow-sm">
+              <FileSpreadsheet size={36} className="text-cyan-500 group-hover:text-cyan-300 transition-colors" />
             </div>
-          </div>
+            <div>
+              <span className="text-sm font-black text-slate-200 block group-hover:text-cyan-300 transition-colors">
+                Iniciar Asistente de Revisión
+              </span>
+              <span className="text-xs text-slate-500 block mt-1 font-bold">
+                Soporta subida multi-archivo (.xlsx)
+              </span>
+            </div>
+          </button>
 
           {status === 'error' && (
             <div className="p-3.5 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs text-center font-bold flex items-center justify-center gap-2 relative z-10">

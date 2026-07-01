@@ -10,11 +10,13 @@ from openpyxl.utils import get_column_letter
 import time
 from datetime import datetime
 from collections import Counter, defaultdict
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks, Form
 from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
 
 from app.core.rules import MASTER_ERROR_RULES, get_rule_by_msg
-from app.validator import validate_logueo_bulk_sheets, safe_float, safe_int, safe_str
+from app.validator import validate_logueo_bulk_sheets, validate_revision_bulk_v2, safe_float, safe_int, safe_str
 
 router = APIRouter(prefix="/api", tags=["Auditoria"])
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -25,7 +27,7 @@ temp_dir = os.path.join(uploads_dir, "temp")
 os.makedirs(history_dir, exist_ok=True)
 os.makedirs(temp_dir, exist_ok=True)
 
-# Helper to normalize/clean error messages for grouping
+# Helper para normalizar, limpiar y agrupar mensajes de error para dashboards y KPIs
 def simplify_message(msg):
     msg_clean = str(msg or "").strip()
     msg_up = msg_clean.upper()
@@ -39,35 +41,35 @@ def simplify_message(msg):
         return "La longitud recuperada es mayor que el avance perforado."
     if "RQD" in msg_up and "RECUPERADA" in msg_up:
         return "Metraje RQD es mayor que la longitud recuperada."
-    if "ROCA FRACTURADA LRF" in msg_up and "RECUPERADA" in msg_up:
+    if "LRF" in msg_up and "RECUPERADA" in msg_up:
         return "La longitud de roca fracturada LRF es mayor que la longitud recuperada."
     if "SUMA DE FRAGMENTOS" in msg_up:
         return "La suma de fragmentos físicos supera el avance perforado."
     if "BUZAMIENTO" in msg_up and "COINCIDE" in msg_up:
         return "La sumatoria de fracturas por buzamiento no coincide con el conteo general."
-    if "ESPESOR DE RELLENO" in msg_up and ("ABERTURA ES 0MM" in msg_up or "ABERTURA ES 0 MM" in msg_up or "LA ABERTURA ES 0" in msg_up):
+    if "ESPESOR DE RELLENO" in msg_up and ("ABERTURA ES 0MM" in msg_up or "ABERTURA ES 0 MM" in msg_up or "LA ABERTURA ES 0" in msg_up or "ABERTURA ES 0" in msg_up):
         return "Se declaró espesor de relleno de junta pero la abertura es 0mm."
     if "ABERTURA DE JUNTA" in msg_up and "ESPESOR DE RELLENO ES 0" in msg_up:
         return "La abertura de junta es mayor a 0mm pero no se ha registrado espesor de relleno."
-    if "RESISTENCIA ISRM NO VÁLIDO" in msg_up or "RESISTENCIA ISRM NO VALIDO" in msg_up:
+    if "RESISTENCIA ISRM NO VÁLIDO" in msg_up or "RESISTENCIA ISRM NO VALIDO" in msg_up or "RESISTENCIA ISRM" in msg_up and "INVALIDO" in msg_up:
         return "Código de Resistencia ISRM no válido."
-    if "METEORIZACIÓN NO VÁLIDO" in msg_up or "METEORIZACION NO VALIDO" in msg_up:
+    if "METEORIZACIÓN NO VÁLIDO" in msg_up or "METEORIZACION NO VALIDO" in msg_up or "METEORIZACION" in msg_up and "INVALIDO" in msg_up:
         return "Código de Meteorización no válido."
-    if "TIPO DE RELLENO NO VÁLIDO" in msg_up or "TIPO DE RELLENO NO VALIDO" in msg_up:
+    if "TIPO DE RELLENO NO VÁLIDO" in msg_up or "TIPO DE RELLENO NO VALIDO" in msg_up or "TIPO DE RELLENO" in msg_up and "INVALIDO" in msg_up:
         return "Código de Tipo de Relleno no válido."
-    if "PRESENCIA DE AGUA NO VÁLIDO" in msg_up or "PRESENCIA DE AGUA NO VALIDO" in msg_up:
+    if "PRESENCIA DE AGUA NO VÁLIDO" in msg_up or "PRESENCIA DE AGUA NO VALIDO" in msg_up or "PRESENCIA DE AGUA" in msg_up and "INVALIDO" in msg_up:
         return "Código de Presencia de Agua no válido."
-    if "ESTRUCTURA 1 NO VÁLIDO" in msg_up or "ESTRUCTURA 1 NO VALIDO" in msg_up:
+    if "ESTRUCTURA 1 NO VÁLIDO" in msg_up or "ESTRUCTURA 1 NO VALIDO" in msg_up or "ESTRUCTURA 1" in msg_up and "INVALIDO" in msg_up:
         return "Código de estructura 1 no válido."
-    if "ESTRUCTURA 2 NO VÁLIDO" in msg_up or "ESTRUCTURA 2 NO VALIDO" in msg_up:
+    if "ESTRUCTURA 2 NO VÁLIDO" in msg_up or "ESTRUCTURA 2 NO VALIDO" in msg_up or "ESTRUCTURA 2" in msg_up and "INVALIDO" in msg_up:
         return "Código de estructura 2 no válido."
-    if "RUGOSIDAD NO VÁLIDO" in msg_up or "RUGOSIDAD NO VALIDO" in msg_up:
+    if "RUGOSIDAD NO VÁLIDO" in msg_up or "RUGOSIDAD NO VALIDO" in msg_up or "RUGOSIDAD" in msg_up and "INVALIDO" in msg_up:
         return "Código de Rugosidad no válido."
-    if "JRC10" in msg_up and "RANGO" in msg_up:
+    if "JRC10" in msg_up and "RANGO" in msg_up or "JRC10" in msg_up and "INVÁLIDO" in msg_up or "JRC10" in msg_up and "INVALIDO" in msg_up:
         return "El valor de JRC10 es inválido. No se permiten valores mayores a 20."
     if "JRC10" in msg_up and "NEGATIVO" in msg_up:
         return "El valor de JRC10 no puede ser negativo."
-    if "FORMA DE JUNTA NO VÁLIDA" in msg_up or "FORMA DE JUNTA NO VALIDA" in msg_up:
+    if "FORMA DE JUNTA NO VÁLIDA" in msg_up or "FORMA DE JUNTA NO VALIDA" in msg_up or "FORMA DE JUNTA" in msg_up and "INVALIDO" in msg_up:
         return "Forma de junta no válida. Permitidos: Plano (1) a Irregular (6)."
     if "ESPESOR DE RELLENO" in msg_up and ("MAYOR" in msg_up or "SUPERA" in msg_up):
         if "EXCEPTO" in msg_up or "ESTRUCTURAS" in msg_up:
@@ -75,10 +77,10 @@ def simplify_message(msg):
         return "El espesor de relleno no puede ser mayor que la abertura de junta."
     if "SIN DEFINIR" in msg_up:
         return "Se declaró espesor de relleno pero el tipo de relleno está sin definir."
-    if "TIPO DE RELLENO" in msg_up and ("ABERTURA DE JUNTA ES 0" in msg_up or "ABERTURA ES 0" in msg_up):
+    if "TIPO DE RELLENO" in msg_up and ("ABERTURA DE JUNTA ES 0" in msg_up or "ABERTURA ES 0" in msg_up or "ABERTURA DE JUNTA ES 0" in msg_up):
         return "El tipo de relleno está definido pero la abertura de junta es 0mm."
     if "DUREZA DE PARED" in msg_up and ("SUPERA" in msg_up or "INCOMPATIBILIDAD GEOLÓGICA" in msg_up or "INCOMPATIBILIDAD GEOLOGICA" in msg_up):
-        return "Incompatibilidad geológica (Dureza de pared de junta supera la resistencia intacta de la corrida)."
+        return "Dureza de pared de junta en Estructural supera la resistencia maxima estimada de la corrida en LGG."
     if "LITOLOGÍA" in msg_up or "LITOLOGIA" in msg_up:
         return "Incompatibilidad de litología entre la corrida y la junta."
     if "VACÍO" in msg_up or "VACIO" in msg_up:
@@ -107,6 +109,10 @@ def simplify_message(msg):
         if "ENTERO" in msg_up:
             return "El valor de FRF debe ser un número entero."
         return "El valor de FRF no coincide con el calculado por la fórmula."
+    if "PROFUNDIDADES FINALES" in msg_up or "COINCIDEN ENTRE MÓDULOS" in msg_up:
+        return "Las profundidades finales del taladro no coinciden entre módulos (LGG, Estructural, Collar, Survey)."
+    if "EXCEDE EL LÍMITE FINAL REGISTRADO EN LGG" in msg_up:
+        return "La profundidad en logueo estructural excede el límite final registrado en LGG."
     if "ENTERO" in msg_up:
         return "El valor del campo debe ser un número entero."
     if "NEGATIV" in msg_up:
@@ -225,8 +231,8 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
     ws_dash.title = "📊 Dashboard Ejecutivo"
     ws_dash.views.sheetView[0].showGridLines = True
     
-    ws_dash.cell(row=2, column=2, value="SISTEMA DE AUDITORÍA DE LOGUEO").font = font_title
-    ws_dash.cell(row=3, column=2, value="Dashboard de Control de Calidad y Consistencia de Logueo General y Estructural").font = font_subtitle
+    ws_dash.cell(row=2, column=2, value="SISTEMA DE REVISIÓN Y AUDITORÍA").font = font_title
+    ws_dash.cell(row=3, column=2, value="Dashboard de Control de Calidad y Consistencia Geomecánica").font = font_subtitle
     
     total_filas = compact.get("familia1", {}).get("total_discontinuidades", 0)
     total_fields = compact.get("familia2", {}).get("total_fields", 0)
@@ -236,7 +242,6 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
     total_correctos = total_fields - (total_vacios + total_advertencias + total_alertas)
     pct_integridad = (total_correctos / max(1, total_fields)) * 100
 
-    # KPI Cards
     write_kpi_card_opt(ws_dash, 5, 2, "TALADROS EVALUADOS", len(compact.get("resumen_por_celda_padre", {})), fill_kpi_gray, font_kpi_val_blue)
     write_kpi_card_opt(ws_dash, 5, 4, "FILAS DE LOGUEO EVALUADAS", total_filas, fill_kpi_gray, font_kpi_val_blue)
     write_kpi_card_opt(ws_dash, 5, 6, "INTEGRIDAD GLOBAL DE CAMPOS", f"{pct_integridad:.2f}%", fill_accent_green, font_kpi_val_green)
@@ -439,7 +444,6 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
             "msg": rule_msg, "severity": rule["severity"], "matches": matches, "count": len(matches)
         })
         
-    # Safety net: add any incident msg that wasn't declared in MASTER_ERROR_RULES
     for msg_simplificado, matches in incidencias_por_error.items():
         if msg_simplificado not in processed_msgs:
             severity = "ALERTA"
@@ -751,18 +755,15 @@ def run_logueo_audit_pipeline(file_path: str, lgg_sheet: str, est_sheet: str, au
     print(f"[*] [{t_str()}] Inicio de validación geotécnica física y cruzada para el reporte {audit_id}", flush=True)
     print(f"[*] [{t_str()}] Hojas de trabajo: LGG='{lgg_sheet}', Estructural='{est_sheet}'", flush=True)
     
-    # 1. Ejecutar validación y guardar diagnóstico
     print(f"[*] [{t_str()}] Leyendo y cruzando datos de Excel...", flush=True)
     validate_logueo_bulk_sheets(file_path, lgg_sheet, est_sheet, raw_json_out)
     
     elapsed_val = round(time.time() - start_time, 2)
     print(f"[+] [{t_str()}] Finalización de validación y guardado de JSON diagnóstico en ({elapsed_val}s)", flush=True)
     
-    # Copiar diagnóstico público
     shutil.copyfile(raw_json_out, os.path.join(uploads_dir, "diagnostico_geomecanico.json"))
     
     print(f"[*] [{t_str()}] Inicio de compilación de KPIs y compactado del reporte para {audit_id}", flush=True)
-    # 2. Generar archivo compacto resumen
     with open(raw_json_out, "r", encoding="utf-8") as f:
         diag = json.load(f)
         
@@ -775,7 +776,7 @@ def run_logueo_audit_pipeline(file_path: str, lgg_sheet: str, est_sheet: str, au
     promedio_hijas = sum(x["total_hijas"] for x in resumen_celdas.values()) / max(1, num_celdas_padre)
     total_metros = sum(safe_float(x.get("dist_celda", 0.0)) for x in resumen_celdas.values())
     
-    total_fields = total_filas * 20  # estimado
+    total_fields = total_filas * 20
     total_vacios = sum(1 for i in incidencias if i.get("tipo_incidencia") == "VACIO")
     total_advertencias = sum(1 for i in incidencias if i.get("tipo_incidencia") == "ADVERTENCIA")
     total_alertas = sum(1 for i in incidencias if i.get("tipo_incidencia") == "ALERTA")
@@ -949,8 +950,21 @@ def verificar_estado_reporte(audit_id: str):
 @router.post("/logueo/cancelar-auditoria")
 def cancelar_auditoria(audit_id: str):
     """Cancela la auditoría eliminando archivos del historial."""
+    t_str = lambda: datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
     print(f"[*] [{t_str()}] Petición de cancelación recibida para {audit_id}", flush=True)
-    for ext in [".xlsx", "_diagnostico.json", "_compact.json", "_reporte_completo.xlsx"]:
+    
+    extensiones_a_limpiar = [
+        ".xlsx", 
+        "_diagnostico.json", 
+        "_compact.json", 
+        "_reporte_completo.xlsx",
+        "_lgg_est.xlsx", 
+        "_collar.xlsx", 
+        "_survey.xlsx"
+    ]
+    
+    for ext in extensiones_a_limpiar:
         path = os.path.join(history_dir, f"{audit_id}{ext}")
         if os.path.exists(path):
             try:
@@ -958,6 +972,7 @@ def cancelar_auditoria(audit_id: str):
                 print(f"[+] [{t_str()}] Archivo eliminado: {path}", flush=True)
             except Exception as e:
                 print(f"[-] [{t_str()}] No se pudo eliminar {path}: {e}", flush=True)
+                
     return {"status": "cancelado"}
 
 @router.post("/logueo/sheets")
@@ -1007,7 +1022,6 @@ async def importar_excel_bulk(
     audit_id = f"audit_logueo_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     file_path = os.path.join(history_dir, f"{audit_id}.xlsx")
     
-    # Mover archivo a su ubicación permanente
     shutil.move(temp_path, file_path)
     
     background_tasks.add_task(run_logueo_audit_pipeline, file_path, lgg_sheet, est_sheet, audit_id)
@@ -1043,12 +1057,18 @@ def obtener_resumen_ligero(audit_id: str = None, years: str = None):
     if audit_id:
         raw_file = os.path.join(history_dir, f"{audit_id}_diagnostico.json")
         compact_file = os.path.join(history_dir, f"{audit_id}_compact.json")
-        excel_file = os.path.join(history_dir, f"{audit_id}.xlsx")
+        excel_file_v1 = os.path.join(history_dir, f"{audit_id}.xlsx")
+        excel_file_v2 = os.path.join(history_dir, f"{audit_id}_lgg_est.xlsx")
         
         if not os.path.exists(compact_file) or not os.path.exists(raw_file):
-            if os.path.exists(excel_file):
+            if os.path.exists(excel_file_v1) or os.path.exists(excel_file_v2):
+                if os.path.exists(compact_file):
+                    with open(compact_file, "r", encoding="utf-8") as f:
+                        c_data = json.load(f)
+                        if c_data.get("status") == "error":
+                            return c_data
                 return JSONResponse(status_code=202, content={"status": "procesando", "message": "Revisión geotécnica en proceso..."})
-            raise HTTPException(status_code=404, detail="La auditoría no existe o fue eliminada.")
+            raise HTTPException(status_code=404, detail="La revisión no existe o fue eliminada.")
     else:
         raw_file = os.path.join(uploads_dir, "diagnostico_geomecanico.json")
         compact_file = os.path.join(uploads_dir, "resumen_geomecanico_ligero.json")
@@ -1064,6 +1084,9 @@ def obtener_resumen_ligero(audit_id: str = None, years: str = None):
 
     with open(raw_file, "r", encoding="utf-8") as f:
         diag = json.load(f)
+
+    if diag.get("status") == "error":
+        return diag
         
     incidencias = diag.get("incidencias", [])
     
@@ -1237,7 +1260,6 @@ def obtener_incidencias_paginadas(
         
     incidencias = diag.get("incidencias", [])
     
-    # Aplicar filtros
     if tipo:
         incidencias = [i for i in incidencias if i.get("tipo_incidencia") == tipo]
     if celda:
@@ -1297,7 +1319,6 @@ def descargar_reporte_markdown(audit_id: str = None, years: str = None):
     if isinstance(resumen, JSONResponse):
         return resumen
         
-    # Construir reporte markdown a mano con datos actualizados
     title = resumen.get("nombre_archivo", "Archivo de Logueo")
     m = resumen.get("metricas_globales", {})
     correct_pct = ((m.get("total_ok", 0) / max(1, m.get("total_celdas_hija_procesadas", 0))) * 100)
@@ -1349,3 +1370,255 @@ A continuación se detalla la cantidad de desviaciones encontradas agrupadas por
         'Content-Disposition': f'attachment; filename="Reporte_Auditoria_{resumen.get("audit_id", "logueo")}.md"'
     }
     return StreamingResponse(io.BytesIO(md_content.encode("utf-8")), media_type="text/markdown", headers=headers)
+
+@router.post("/logueo/importar-excel-bulk-v2")
+async def importar_excel_bulk_v2(
+    background_tasks: BackgroundTasks,
+    file_lgg_est: UploadFile = File(...),
+    file_collar: Optional[UploadFile] = File(None),
+    file_survey: Optional[UploadFile] = File(None),
+    config_json: str = Form(...)
+):
+    try:
+        config = json.loads(config_json)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="El objeto config_json no tiene un formato válido.")
+
+    audit_id = f"audit_logueo_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    paths = {}
+    
+    path_lgg = os.path.join(history_dir, f"{audit_id}_lgg_est.xlsx")
+    with open(path_lgg, "wb") as buffer:
+        shutil.copyfileobj(file_lgg_est.file, buffer)
+    paths["lgg_est"] = path_lgg
+    
+    if file_collar and file_collar.size > 0:
+        path_collar = os.path.join(history_dir, f"{audit_id}_collar.xlsx")
+        with open(path_collar, "wb") as buffer:
+            shutil.copyfileobj(file_collar.file, buffer)
+        paths["collar"] = path_collar
+        
+    if file_survey and file_survey.size > 0:
+        path_survey = os.path.join(history_dir, f"{audit_id}_survey.xlsx")
+        with open(path_survey, "wb") as buffer:
+            shutil.copyfileobj(file_survey.file, buffer)
+        paths["survey"] = path_survey
+        
+    background_tasks.add_task(run_revision_audit_pipeline, paths, config, audit_id, file_lgg_est.filename)
+    
+    return {"status": "procesando", "audit_id": audit_id}
+
+def run_revision_audit_pipeline(file_paths: dict, config: dict, audit_id: str, original_filename: str):
+    raw_json_out = os.path.join(history_dir, f"{audit_id}_diagnostico.json")
+    compact_json_out = os.path.join(history_dir, f"{audit_id}_compact.json")
+    excel_pregenerated_out = os.path.join(history_dir, f"{audit_id}_reporte_completo.xlsx")
+    
+    start_time = time.time()
+    t_str = lambda: datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    try:
+        print(f"[*] [{t_str()}] Inicio de revisión geotécnica cruzada (V2) para el reporte {audit_id}", flush=True)
+        
+        validate_revision_bulk_v2(file_paths, config, raw_json_out)
+        
+        elapsed_val = round(time.time() - start_time, 2)
+        print(f"[+] [{t_str()}] Finalización de validación y guardado de JSON diagnóstico en ({elapsed_val}s)", flush=True)
+        
+        shutil.copyfile(raw_json_out, os.path.join(uploads_dir, "diagnostico_geomecanico.json"))
+        
+        print(f"[*] [{t_str()}] Inicio de compilación de KPIs y compactado del reporte para {audit_id}", flush=True)
+        
+        with open(raw_json_out, "r", encoding="utf-8") as f:
+            diag = json.load(f)
+            
+        compact = {k: v for k, v in diag.items() if k != "incidencias"}
+        incidencias = diag.get("incidencias", [])
+        total_filas = diag.get("total_filas_procesadas", 0)
+        
+        resumen_celdas = diag.get("resumen_por_celda_padre", {})
+        num_celdas_padre = len(resumen_celdas)
+        promedio_hijas = sum(x["total_hijas"] for x in resumen_celdas.values()) / max(1, num_celdas_padre)
+        total_metros = sum(safe_float(x.get("dist_celda", 0.0)) for x in resumen_celdas.values())
+        
+        total_fields = total_filas * 20
+        total_vacios = sum(1 for i in incidencias if i.get("tipo_incidencia") == "VACIO")
+        total_advertencias = sum(1 for i in incidencias if i.get("tipo_incidencia") == "ADVERTENCIA")
+        total_alertas = sum(1 for i in incidencias if i.get("tipo_incidencia") == "ALERTA")
+        total_correctos = total_fields - (total_vacios + total_advertencias + total_alertas)
+        
+        row_errors = defaultdict(set)
+        for i in incidencias:
+            row_errors[f"{i['modulo']}_{i['fila_excel']}"].add(i["tipo_incidencia"])
+            
+        discs_con_alerta = sum(1 for row, errs in row_errors.items() if "ALERTA" in errs)
+        discs_con_advertencia = sum(1 for row, errs in row_errors.items() if "ADVERTENCIA" in errs and "ALERTA" not in errs)
+        discs_con_vacio = sum(1 for row, errs in row_errors.items() if "VACIO" in errs)
+        discs_correctas = total_filas - len(row_errors)
+        
+        camp_stats = defaultdict(lambda: {"vacios": 0, "advertencias": 0, "alertas": 0, "filas": set()})
+        geo_stats = defaultdict(lambda: {"vacios": 0, "advertencias": 0, "alertas": 0, "filas": set()})
+        sector_stats = defaultdict(lambda: {"vacios": 0, "advertencias": 0, "alertas": 0, "filas": set()})
+        
+        observaciones_por_año = defaultdict(lambda: defaultdict(lambda: {"incidents": 0, "stations": set()}))
+        top_stations_por_año = defaultdict(lambda: defaultdict(lambda: Counter()))
+        
+        for i in incidencias:
+            c = i.get("campania", "N/A")
+            if c == "N/A": continue
+            obs_key = simplify_message(i.get("mensaje", ""))
+            celda = i.get("celda_padre", "N/A")
+            
+            observaciones_por_año[c][obs_key]["incidents"] += 1
+            observaciones_por_año[c][obs_key]["stations"].add(celda)
+            top_stations_por_año[c][obs_key][celda] += 1
+            
+            camp_stats[c]["filas"].add(f"{i['modulo']}_{i['fila_excel']}")
+            geo_stats[g := i.get("geotecnico", "N/A")]["filas"].add(f"{i['modulo']}_{i['fila_excel']}")
+            sector_stats[s := i.get("sector_geotecnico", "N/A")]["filas"].add(f"{i['modulo']}_{i['fila_excel']}")
+            
+            tipo = i.get("tipo_incidencia")
+            if tipo == "VACIO":
+                camp_stats[c]["vacios"] += 1
+                geo_stats[g]["vacios"] += 1
+                sector_stats[s]["vacios"] += 1
+            elif tipo == "ADVERTENCIA":
+                camp_stats[c]["advertencias"] += 1
+                geo_stats[g]["advertencias"] += 1
+                sector_stats[s]["advertencias"] += 1
+            elif tipo == "ALERTA":
+                camp_stats[c]["alertas"] += 1
+                geo_stats[g]["alertas"] += 1
+                sector_stats[s]["alertas"] += 1
+                
+        consolidado_tabla = {}
+        for year, types in observaciones_por_año.items():
+            consolidado_tabla[year] = {}
+            total_inc_año = sum(v["incidents"] for k, v in types.items())
+            severity = "LEVE" if total_inc_año < 50 else ("MODERADO" if total_inc_año < 250 else "CRÍTICO")
+            consolidado_tabla[year]["severity"] = severity
+            consolidado_tabla[year]["total_incidents"] = total_inc_año
+            
+            for obs_key, stats in types.items():
+                worst = [{"celda": k, "count": v} for k, v in top_stations_por_año[year][obs_key].most_common(3)]
+                consolidado_tabla[year][obs_key] = {
+                    "incidents": stats["incidents"],
+                    "affected_stations": len(stats["stations"]),
+                    "top_stations": worst
+                }
+                
+        distribucion_campania = []
+        for c, stats in camp_stats.items():
+            rows_count = len(stats["filas"])
+            total_fields_group = rows_count * 20
+            distribucion_campania.append({
+                "campania": c, "discontinuidades": rows_count, "vacios_cant": stats["vacios"],
+                "vacios_pct": (stats["vacios"] / max(1, total_fields_group)) * 100,
+                "advertencias_cant": stats["advertencias"], "advertencias_pct": (stats["advertencias"] / max(1, total_fields_group)) * 100,
+                "alertas_cant": stats["alertas"], "alertas_pct": (stats["alertas"] / max(1, total_fields_group)) * 100
+            })
+            
+        distribucion_geotecnico = []
+        for g, stats in geo_stats.items():
+            rows_count = len(stats["filas"])
+            total_fields_group = rows_count * 20
+            distribucion_geotecnico.append({
+                "geotecnico": g, "discontinuidades": rows_count, "vacios_cant": stats["vacios"],
+                "vacios_pct": (stats["vacios"] / max(1, total_fields_group)) * 100,
+                "advertencias_cant": stats["advertencias"], "advertencias_pct": (stats["advertencias"] / max(1, total_fields_group)) * 100,
+                "alertas_cant": stats["alertas"], "alertas_pct": (stats["alertas"] / max(1, total_fields_group)) * 100
+            })
+            
+        distribucion_sector = []
+        for s, stats in sector_stats.items():
+            rows_count = len(stats["filas"])
+            total_fields_group = rows_count * 20
+            distribucion_sector.append({
+                "sector": s, "discontinuidades": rows_count, "vacios_cant": stats["vacios"],
+                "vacios_pct": (stats["vacios"] / max(1, total_fields_group)) * 100,
+                "advertencias_cant": stats["advertencias"], "advertencias_pct": (stats["advertencias"] / max(1, total_fields_group)) * 100,
+                "alertas_cant": stats["alertas"], "alertas_pct": (stats["alertas"] / max(1, total_fields_group)) * 100
+            })
+            
+        msg_alertas = Counter(simplify_message(i.get("mensaje")) for i in incidencias if i.get("tipo_incidencia") == "ALERTA")
+        msg_advertencias = Counter(simplify_message(i.get("mensaje")) for i in incidencias if i.get("tipo_incidencia") == "ADVERTENCIA")
+        
+        top_5_alertas = [{"mensaje": k, "cantidad": v, "pct": (v / max(1, total_alertas)) * 100} for k, v in msg_alertas.most_common(5)]
+        lista_alertas = [{"mensaje": k, "cantidad": v, "pct": (v / max(1, total_alertas)) * 100} for k, v in msg_alertas.most_common()]
+        lista_advertencias = [{"mensaje": k, "cantidad": v, "pct": (v / max(1, total_advertencias)) * 100} for k, v in msg_advertencias.most_common()]
+        
+        compact["audit_id"] = audit_id
+        compact["fecha_auditoria"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        compact["nombre_archivo"] = original_filename
+        compact["consolidado_observaciones"] = consolidado_tabla
+        
+        compact["familia1"] = {
+            "num_celdas_padre": num_celdas_padre,
+            "promedio_hijas": round(promedio_hijas, 2),
+            "total_discontinuidades": total_filas,
+            "total_metros": round(total_metros, 2)
+        }
+        compact["familia2"] = {"total_fields": total_fields, "total_vacios": total_vacios, "total_advertencias": total_advertencias, "total_alertas": total_alertas, "total_correctos": total_correctos}
+        compact["familia3"] = {"total_discontinuidades": total_filas, "discontinuidades_alertas": discs_con_alerta, "discontinuidades_advertencias": discs_con_advertencia, "discontinuidades_vacios": discs_con_vacio, "discontinuidades_correctas": discs_correctas}
+        compact["distribucion_campania"] = distribucion_campania
+        compact["distribucion_sector"] = distribucion_sector
+        compact["distribucion_geotecnico"] = distribucion_geotecnico
+        compact["top_5_alertas"] = top_5_alertas
+        compact["error_types_detailed"] = {"alertas": lista_alertas, "advertencias": lista_advertencias}
+        
+        sorted_worst = sorted(resumen_celdas.items(), key=lambda x: (x[1].get("alertas", 0), x[1].get("vacios", 0), x[1].get("advertencias", 0)), reverse=True)[:20]
+        compact["worst_cells"] = [{"celda": k, **v} for k, v in sorted_worst]
+        col_counter = Counter(i.get("columna", "Desconocido") for i in incidencias)
+        compact["top_column_errors"] = [{"columna": k, "cantidad": v} for k, v in col_counter.most_common(15)]
+        
+        compact_json_tmp = compact_json_out + ".tmp"
+        with open(compact_json_tmp, "w", encoding="utf-8") as f:
+            json.dump(compact, f, ensure_ascii=False)
+        safe_replace(compact_json_tmp, compact_json_out)
+        
+        public_compact = os.path.join(uploads_dir, "resumen_geomecanico_ligero.json")
+        public_compact_tmp = public_compact + ".tmp"
+        shutil.copyfile(compact_json_out, public_compact_tmp)
+        safe_replace(public_compact_tmp, public_compact)
+
+        print(f"[+] [{t_str()}] Finalización de compactado y guardado del resumen JSON en {compact_json_out}", flush=True)
+
+        print(f"[*] [{t_str()}] Inicio de pre-generación del libro Excel para {audit_id}", flush=True)
+        excel_start = time.time()
+        wb_rep = generar_excel_reporte_core(diag, compact, incidencias)
+        rep_tmp = excel_pregenerated_out + ".tmp"
+        wb_rep.save(rep_tmp)
+        safe_replace(rep_tmp, excel_pregenerated_out)
+        
+        public_excel = os.path.join(uploads_dir, "reporte_completo_ultimo.xlsx")
+        public_excel_tmp = public_excel + ".tmp"
+        shutil.copyfile(excel_pregenerated_out, public_excel_tmp)
+        safe_replace(public_excel_tmp, public_excel)
+        elapsed_excel = round(time.time() - excel_start, 2)
+        print(f"[+] [{t_str()}] Libro Excel generado y guardado en disco con éxito ({elapsed_excel}s)", flush=True)
+
+    except Exception as ex:
+        import traceback
+        error_msg = f"Error crítico en pipeline de auditoría: {str(ex)}\n{traceback.format_exc()}"
+        print(error_msg, flush=True)
+        
+        error_diag = {
+            "total_filas_procesadas": 0,
+            "incidencias": [],
+            "resumen_por_celda_padre": {},
+            "status": "error",
+            "message": "Fallo inesperado durante la lectura del Excel. Asegúrese de que el formato coincida con el estándar.",
+            "error_detail": str(ex)
+        }
+        with open(raw_json_out, "w", encoding="utf-8") as f:
+            json.dump(error_diag, f, ensure_ascii=False)
+
+        error_compact = {
+            "audit_id": audit_id,
+            "status": "error",
+            "message": "Fallo inesperado durante la lectura del Excel. Asegúrese de que el formato coincida con el estándar.",
+            "error_detail": str(ex),
+            "nombre_archivo": original_filename,
+            "fecha_auditoria": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        with open(compact_json_out, "w", encoding="utf-8") as f:
+            json.dump(error_compact, f, ensure_ascii=False)

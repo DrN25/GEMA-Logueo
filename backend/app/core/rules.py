@@ -337,6 +337,18 @@ MASTER_ERROR_RULES = [
         "msg": "Incompatibilidad de litología entre la corrida y la junta.",
         "severity": "ADVERTENCIA",
         "group": "Estructural"
+    },
+    {
+        "code": "R301",
+        "msg": "Las profundidades finales del taladro no coinciden entre módulos (LGG, Estructural, Collar, Survey).",
+        "severity": "ALERTA",
+        "group": "Cruce General"
+    },
+    {
+        "code": "R216",
+        "msg": "La profundidad en logueo estructural excede el límite final registrado en LGG.",
+        "severity": "ALERTA",
+        "group": "Estructural"
     }
 ]
 

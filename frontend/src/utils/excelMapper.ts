@@ -282,10 +282,18 @@ export const EXPECTED_PLT_FIELDS: MappingField[] = [
 ];
 
 export const EXPECTED_SURVEY_FIELDS: MappingField[] = [
-  { key: 'taladro', label: 'Taladro / Sondaje', required: true, synonyms: ['taladro', 'sondaje', 'drillhole', 'holeid', 'taladroid', 'hole_id', 'hole'] },
+  { key: 'taladro', label: 'Taladro / HOLEID', required: true, synonyms: ['taladro', 'sondaje', 'drillhole', 'holeid', 'taladroid', 'hole_id', 'hole'] },
   { key: 'depth', label: 'Profundidad (m)', required: true, synonyms: ['profundidad', 'depth', 'depthm', 'profundidadm', 'prof'] },
   { key: 'dip', label: 'Dip / Inclinación (°)', required: true, synonyms: ['dip', 'inclinacion', 'dipdeg', 'inclinaciondeg', 'inc'] },
   { key: 'azimuth', label: 'Azimut UTM (°)', required: true, synonyms: ['azimuth', 'azimut', 'azimutm', 'azim_utm', 'azimut_utm', 'azi', 'azm'] }
+];
+
+export const EXPECTED_COLLAR_FIELDS: MappingField[] = [
+  { key: 'taladro', label: 'Taladro / HOLEID', required: true, synonyms: ['taladro', 'sondaje', 'drillhole', 'holeid', 'taladroid', 'hole_id', 'hole'] },
+  { key: 'este', label: 'Este (EAST)', required: true, synonyms: ['este', 'east', 'x', 'este_m', 'east_m'] },
+  { key: 'norte', label: 'Norte (NORTH)', required: true, synonyms: ['norte', 'north', 'y', 'norte_m', 'north_m'] },
+  { key: 'cota', label: 'Cota (RL)', required: true, synonyms: ['cota', 'rl', 'z', 'elevacion', 'elevation', 'msnm'] },
+  { key: 'eoh', label: 'Prof. Final (EOH)', required: true, synonyms: ['eoh', 'profundidad_final', 'prof_final', 'max_depth', 'total_depth'] },
 ];
 
 export function findHeaderRowGeneric(rows: any[][], expectedFields: MappingField[]): number {
