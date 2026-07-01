@@ -7,7 +7,7 @@ HOST=127.0.0.1
 # DATABASE_URL=sqlite:///app/geolog.db
 
 DB_SERVER=localhost\SQLEXPRESS01
-DB_NAME=db_ingreso_data_v1
+DB_NAME=GEMA
 DB_TRUSTED=no
 DB_USER=sa
 DB_PASSWORD=Amphos2026

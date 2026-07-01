@@ -6,6 +6,7 @@ import {
 import { BarChart2, ChevronLeft, ChevronRight, ListFilter } from 'lucide-react';
 import { calculateRowRmr } from '../../utils/formulaEngine';
 import { LITHOLOGY_CATALOG } from '../../utils/catalogData';
+import RqdPorLitologiaTab from './RqdPorLitologiaTab';
 
 // ─── Control Points & Envelopes (Bieniawski Chart D) ───
 const BIENIAWSKI_CTRL_MIN = [
@@ -216,7 +217,7 @@ function getHeatmapBg(val: number): string {
 
 export default function RqdDashboard({ activeTaladro, taladros }: Props) {
   // Pestaña activa por defecto: correlaciones (Priest & Bieniawski)
-  const [activeTab, setActiveTab] = useState<'correlaciones' | 'propuesta'>('correlaciones');
+  const [activeTab, setActiveTab] = useState<'correlaciones' | 'propuesta' | 'lito_rqd'>('correlaciones');
 
   const [selectedDrills, setSelectedDrills] = useState<Set<string>>(new Set());
   const deferredSelected = useDeferredValue(selectedDrills);
@@ -648,6 +649,13 @@ export default function RqdDashboard({ activeTaladro, taladros }: Props) {
             className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${activeTab === 'propuesta' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
           >
             Dashboard de 6 Gráficos
+          </button>
+          {/* NUEVA OPCIÓN ADAPTADA A NUESTROS ESTILOS Y DATA */}
+          <button
+            onClick={() => setActiveTab('lito_rqd')}
+            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${activeTab === 'lito_rqd' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
+          >
+            RQD por Litología
           </button>
         </div>
       </div>
@@ -1198,6 +1206,11 @@ export default function RqdDashboard({ activeTaladro, taladros }: Props) {
             </div>
 
           </div>
+        )}
+
+        {/* ── PESTAÑA C: NUEVO DASHBOARD INDEPENDIENTE "RQD POR LITOLOGÍA" ── */}
+        {activeTab === 'lito_rqd' && (
+          <RqdPorLitologiaTab visiblePoints={visiblePoints} />
         )}
 
       </div>
