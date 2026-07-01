@@ -166,7 +166,7 @@ def sanitize_val(val, target_type):
         return None
     val_str = str(val).strip()
     val_upper = val_str.upper()
-    if val_str == "" or val_upper in ["-1", "-1.0", "N/A", "NAN", "NONE", "-", "-1,0"]:
+    if val_str == "" or val_upper in ["-1", "-1.0", "N/A", "NAN", "NONE", "-", "—", "-1,0"]:
         return None
     if target_type == str:
         return val_str
@@ -472,9 +472,14 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
                 except ValueError:
                     pass
                 if lrf_m is not None:
-                    calc_frf = math.floor(round(lrf_m * 100) / 5) if lrf_m > 0 else 0
+                    calc_frf = math.floor(round(lrf_m * 100) / 5) + 1 if lrf_m > 0 else 0
                     if frf_val != calc_frf:
-                        registrar_lgg_error("frf", frf_raw, "ALERTA", f"El valor de FRF ({frf_val}) no coincide con el calculado por la fórmula ({calc_frf}) basado en LRF ({lrf_m}m).")
+                        registrar_lgg_error(
+                            "frf", 
+                            frf_raw, 
+                            "ALERTA", 
+                            f"El valor de FRF ({frf_val}) no coincide con el calculado por la fórmula: FRF = PISO( REDOND(LRF * 100) / 5 ) + 1 (si LRF > 0, sino 0). Calculado: {calc_frf} basado en LRF ({lrf_m}m)."
+                        )
 
         if a is not None:
             resumen_celdas[celda_padre]["dist_celda"] = max(resumen_celdas[celda_padre]["dist_celda"], a)
@@ -844,28 +849,30 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
             else:
                 relleno1 = relleno1_can
 
-            if espesor > 0 and (not relleno1 or relleno1 in ["-1"]):
-                registrar_est_error("relleno1", relleno1, "ADVERTENCIA", f"Se declaró espesor de relleno pero el tipo de relleno está sin definir. Datos evaluados -> Espesor: {espesor}mm, Tipo Relleno: '{relleno1}'.")
-            elif relleno1 and relleno1 not in ["-1"] and abertura <= 0:
-                registrar_est_error("relleno1", relleno1, "ADVERTENCIA", f"El tipo de relleno está definido pero la abertura de junta es 0mm. Datos evaluados -> Tipo Relleno: '{relleno1}', Abertura de Junta: {abertura}mm, Espesor: {espesor}mm.")
+            if espesor > 0 and (not relleno1 or relleno1 in ["-1", "cwf"]):
+                registrar_est_error(
+                    "relleno1", 
+                    relleno1, 
+                    "ADVERTENCIA", 
+                    f"Se declaró espesor de relleno pero el tipo de relleno está sin definir o es CWF. Datos evaluados -> Espesor: {espesor}mm, Tipo Relleno: '{relleno1}'."
+                )
 
         if matching_run:
             raw_dureza = sanitize_val(row_dict.get("dureza_pared"), str)
-            if raw_dureza is not None:
-                dureza_can = get_canonical_value(raw_dureza, VALID_STRENGTHS)
-                if not dureza_can:
-                    registrar_est_error("dureza_pared", raw_dureza, "ALERTA", f"Código de Resistencia ISRM no válido. Permitidos: {', '.join(VALID_STRENGTHS)}")
-                    dureza_pared = "R4"
-                else:
-                    dureza_pared = dureza_can
-            else:
-                dureza_pared = "R4"
-
-            res_matriz = matching_run["resistencia"]
-            r_levels = {"R0":0, "R1":1, "R2":2, "R3":3, "R4":4, "R5":5, "R6":6}
-            if dureza_pared in r_levels and res_matriz in r_levels:
-                if r_levels[dureza_pared] > r_levels[res_matriz]:
-                    registrar_est_error("dureza_pared", raw_dureza, "ADVERTENCIA", f"Incompatibilidad geológica (Dureza de pared de junta supera la resistencia maxima estimada de la corrida). Datos evaluados -> Dureza de Pared de Junta en Estructural: {dureza_pared}, Resistencia Maxima Estimada en LGG: {res_matriz}.")
+            dureza_pared = get_canonical_value(raw_dureza, VALID_STRENGTHS) if raw_dureza is not None else None
+            
+            # Solo comparar si ambas durezas son válidas, no nulas y distintas de "-1"
+            if dureza_pared and dureza_pared != "-1":
+                res_matriz = matching_run["resistencia"]
+                r_levels = {"R0": 0, "R1": 1, "R2": 2, "R3": 3, "R4": 4, "R5": 5, "R6": 6}
+                if res_matriz and res_matriz != "-1" and dureza_pared in r_levels and res_matriz in r_levels:
+                    if r_levels[dureza_pared] > r_levels[res_matriz]:
+                        registrar_est_error(
+                            "dureza_pared", 
+                            raw_dureza, 
+                            "ADVERTENCIA", 
+                            f"Incompatibilidad geológica (Dureza de pared de junta supera la resistencia maxima estimada de la corrida). Datos evaluados -> Dureza de Pared de Junta en Estructural: {dureza_pared}, Resistencia Maxima Estimada en LGG: {res_matriz}."
+                        )
 
         if not row_has_errors:
             total_ok += 1
@@ -1140,9 +1147,9 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
                     except ValueError:
                         pass
                     if lrf_m is not None:
-                        calc_frf = math.floor(round(lrf_m * 100) / 5) if lrf_m > 0 else 0
+                        calc_frf = math.floor(round(lrf_m * 100) / 5) + 1 if lrf_m > 0 else 0
                         if frf_val != calc_frf:
-                            reg_err("frf", frf_raw, "ALERTA", f"El valor de FRF no coincide con el calculado por la fórmula. Datos evaluados -> FRF: {frf_val}, Calculado: {calc_frf} basado en LRF ({lrf_m}m).")
+                            reg_err("frf", frf_raw, "ALERTA", f"El valor de FRF ({frf_val}) no coincide con el calculado por la fórmula: FRF = PISO( REDOND(LRF * 100) / 5 ) + 1 (si LRF > 0, sino 0). Calculado: {calc_frf} basado en LRF ({lrf_m}m).")
 
             if de is not None and celda_padre in last_a_by_taladro:
                 prev_a = last_a_by_taladro[celda_padre]
@@ -1284,7 +1291,7 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
 
             raw_dureza = sanitize_val(row_dict.get("dureza_pared"), str)
             dureza_can = get_canonical_value(raw_dureza, VALID_STRENGTHS) if raw_dureza is not None else None
-            dureza_pared = dureza_can or "R4"
+            dureza_pared = dureza_can
 
             # --- 2. VALIDACIONES MAESTRAS (EST) ---
             if depth is not None:
@@ -1375,20 +1382,32 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
                 if espesor > abertura and tipo_est not in exceptions:
                     reg_err_est("espesor", espesor, "ALERTA", f"El espesor de relleno no puede ser mayor que la abertura de junta excepto en estructuras F, RF, VN, SZ, F+10 o BED. Datos evaluados -> Espesor: {espesor}mm (Tipo Relleno: '{relleno1}'), Abertura de Junta: {abertura}mm, Estructura: '{tipo_est}'.")
 
-                if espesor > 0 and (not relleno1 or relleno1 in ["-1"]):
-                    reg_err_est("relleno1", relleno1, "ADVERTENCIA", f"Se declaró espesor de relleno pero el tipo de relleno está sin definir. Datos evaluados -> Espesor: {espesor}mm, Tipo Relleno: '{relleno1}'.")
-                elif relleno1 and relleno1 not in ["-1"] and abertura <= 0:
+                if espesor > 0 and (not relleno1 or relleno1 in ["-1", "cwf"]):
+                    reg_err_est(
+                        "relleno1", 
+                        relleno1, 
+                        "ADVERTENCIA",  # <-- Parámetro posicional 'tipo' restaurado con éxito
+                        f"Se declaró espesor de relleno pero el tipo de relleno está sin definir o es CWF. Datos evaluados -> Espesor: {espesor}mm, Tipo Relleno: '{relleno1}'."
+                    )
+                elif relleno1 and relleno1 not in ["-1", "cwf"] and abertura <= 0:
                     reg_err_est("relleno1", relleno1, "ADVERTENCIA", f"El tipo de relleno está definido pero la abertura de junta es 0mm. Datos evaluados -> Tipo Relleno: '{relleno1}', Abertura de Junta: {abertura}mm, Espesor: {espesor}mm.")
 
             if matching_run:
                 if raw_dureza is not None and not dureza_can:
-                    reg_err_est("dureza_pared", raw_dureza, "ALERTA", f"Código de Resistencia ISRM no válido.")
+                    reg_err_est("dureza_pared", raw_dureza, "ALERTA", f"Código de Resistencia ISRM no válido. Permitidos: {', '.join(VALID_STRENGTHS)}")
                 
-                res_matriz = matching_run["resistencia"]
-                r_levels = {"R0":0, "R1":1, "R2":2, "R3":3, "R4":4, "R5":5, "R6":6}
-                if dureza_pared in r_levels and res_matriz in r_levels:
-                    if r_levels[dureza_pared] > r_levels[res_matriz]:
-                        reg_err_est("dureza_pared", raw_dureza, "ADVERTENCIA", f"Incompatibilidad geológica (Dureza de pared de junta supera la resistencia maxima estimada de la corrida). Datos evaluados -> Dureza de Pared de Junta en Estructural: {dureza_pared}, Resistencia Maxima Estimada en LGG: {res_matriz}.")
+                # Solo comparar compatibilidad si ambas durezas son válidas y distintas de "-1"
+                if dureza_pared and dureza_pared != "-1":
+                    res_matriz = matching_run["resistencia"]
+                    r_levels = {"R0": 0, "R1": 1, "R2": 2, "R3": 3, "R4": 4, "R5": 5, "R6": 6}
+                    if res_matriz and res_matriz != "-1" and dureza_pared in r_levels and res_matriz in r_levels:
+                        if r_levels[dureza_pared] > r_levels[res_matriz]:
+                            reg_err_est(
+                                "dureza_pared", 
+                                raw_dureza, 
+                                "ADVERTENCIA", 
+                                f"Incompatibilidad geológica (Dureza de pared de junta supera la resistencia maxima estimada de la corrida). Datos evaluados -> Dureza de Pared de Junta en Estructural: {dureza_pared}, Resistencia Maxima Estimada en LGG: {res_matriz}."
+                            )
 
             if not row_has_errors: total_ok += 1
 

@@ -316,7 +316,7 @@ MASTER_ERROR_RULES = [
     },
     {
         "code": "R212",
-        "msg": "Se declaró espesor de relleno pero el tipo de relleno está sin definir.",
+        "msg": "Se declaró espesor de relleno pero el tipo de relleno está sin definir o es CWF.",
         "severity": "ADVERTENCIA",
         "group": "Estructural"
     },

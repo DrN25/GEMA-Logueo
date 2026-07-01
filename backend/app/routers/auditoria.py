@@ -96,8 +96,8 @@ def simplify_message(msg):
         if "EXCEPTO" in msg_up or "ESTRUCTURAS" in msg_up:
             return "El espesor de relleno no puede ser mayor que la abertura de junta excepto en estructuras F, RF, VN, SZ, F+10 o BED."
         return "El espesor de relleno no puede ser mayor que la abertura de junta."
-    if "SIN DEFINIR" in msg_up:
-        return "Se declaró espesor de relleno pero el tipo de relleno está sin definir."
+    if "SIN DEFINIR" in msg_up or "O ES CWF" in msg_up:
+        return "Se declaró espesor de relleno pero el tipo de relleno está sin definir o es CWF."
     if "TIPO DE RELLENO" in msg_up and ("ABERTURA DE JUNTA ES 0" in msg_up or "ABERTURA ES 0" in msg_up or "ABERTURA DE JUNTA ES 0" in msg_up):
         return "El tipo de relleno está definido pero la abertura de junta es 0mm."
     if "DUREZA DE PARED" in msg_up and ("SUPERA" in msg_up or "INCOMPATIBILIDAD GEOLÓGICA" in msg_up or "INCOMPATIBILIDAD GEOLOGICA" in msg_up):
