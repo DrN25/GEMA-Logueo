@@ -25,7 +25,7 @@ export default function AuditHistory({
     <div className="rounded-xl border border-cyan-500/10 bg-[#090f1d]/50 p-4 shadow-xl select-none">
       <h3 className="text-xs font-black uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
         <Folder size={14} className="text-cyan-400" />
-        <span>Historial de Importaciones Logueadas Auditadas</span>
+        <span>Historial de Importaciones Logueadas Revisadas</span>
       </h3>
       <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
         {history.length === 0 ? (
@@ -37,11 +37,10 @@ export default function AuditHistory({
               <button
                 key={audit.audit_id}
                 onClick={() => onSelectAudit(audit.audit_id)}
-                className={`flex-shrink-0 p-3 rounded-lg border text-left transition-all ${
-                  isActive
+                className={`flex-shrink-0 p-3 rounded-lg border text-left transition-all ${isActive
                     ? 'bg-cyan-500/10 border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.15)] ring-1 ring-cyan-500/30'
                     : 'bg-[#0f172a]/40 border-navy-800 hover:border-slate-700 hover:bg-slate-900/40'
-                }`}
+                  }`}
               >
                 <div className="flex items-center justify-between gap-4">
                   <span className="text-xs font-black text-slate-100 truncate max-w-[180px]" title={audit.archivo}>

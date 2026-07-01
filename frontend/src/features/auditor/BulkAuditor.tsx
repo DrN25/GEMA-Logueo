@@ -513,7 +513,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
           <div className="space-y-2">
             <p className="text-xs font-black uppercase tracking-widest text-cyan-400 flex items-center justify-center gap-1.5">
               <RefreshCw size={14} className="animate-spin" />
-              <span>{status === 'uploading' ? 'Cargando Base de Datos...' : 'Auditoría Geotécnica en Ejecución'}</span>
+              <span>{status === 'uploading' ? 'Cargando Base de Datos...' : 'Revisión Geotécnica en Ejecución'}</span>
             </p>
             <p className="text-xs text-slate-350 leading-relaxed font-semibold">
               {status === 'uploading'

@@ -391,16 +391,23 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
             if v_san is None:
                 registrar_lgg_error(key, None, "VACIO", f"El campo obligatorio '{key}' se encuentra vacío o es -1.")
 
-        de = safe_float(sanitize_val(row_dict.get("de"), float))
-        a = safe_float(sanitize_val(row_dict.get("a"), float))
-        perf = round(a - de, 2)
-        
-        rec_m = safe_float(sanitize_val(row_dict.get("rec_m"), float))
-        rqd_m = safe_float(sanitize_val(row_dict.get("rqd_m"), float))
-        lrf_m = safe_float(sanitize_val(row_dict.get("lrf_m"), float))
-        small_frag_m = safe_float(sanitize_val(row_dict.get("small_frag_m"), float))
+        de = sanitize_val(row_dict.get("de"), float)
+        a = sanitize_val(row_dict.get("a"), float)
 
-        # Validaciones de valores negativos
+        rec_m = sanitize_val(row_dict.get("rec_m"), float)
+        rqd_m = sanitize_val(row_dict.get("rqd_m"), float)
+        lrf_m = sanitize_val(row_dict.get("lrf_m"), float)
+        small_frag_m = sanitize_val(row_dict.get("small_frag_m"), float)
+
+        frac_nat = sanitize_val(row_dict.get("frac_nat"), int)
+        b30 = sanitize_val(row_dict.get("frac_buz30"), int)
+        b60 = sanitize_val(row_dict.get("frac_buz60"), int)
+        b90 = sanitize_val(row_dict.get("frac_buz90"), int)
+
+        abertura = sanitize_val(row_dict.get("abertura"), float)
+        espesor = sanitize_val(row_dict.get("espesor"), float)
+
+        # Validaciones de valores negativos (se ejecutan solo si el valor existe)
         raw_de = row_dict.get("de")
         if de is not None and de < 0:
             registrar_lgg_error("de", raw_de, "ALERTA", f"El valor de 'de:' ({de}m) no puede ser negativo.")
@@ -420,10 +427,89 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
         if small_frag_m is not None and small_frag_m < 0:
             registrar_lgg_error("small_frag_m", raw_small, "ALERTA", f"El metraje de fragmentos <10cm ({small_frag_m}m) no puede ser negativo.")
 
-        frac_nat = safe_int(sanitize_val(row_dict.get("frac_nat"), int))
-        b30 = safe_int(sanitize_val(row_dict.get("frac_buz30"), int))
-        b60 = safe_int(sanitize_val(row_dict.get("frac_buz60"), int))
-        b90 = safe_int(sanitize_val(row_dict.get("frac_buz90"), int))
+        raw_frac_nat = row_dict.get("frac_nat")
+        if frac_nat is not None and frac_nat < 0:
+            registrar_lgg_error("frac_nat", raw_frac_nat, "ALERTA", f"El número de fracturas naturales ({frac_nat}) no puede ser negativo.")
+        raw_b30 = row_dict.get("frac_buz30")
+        if b30 is not None and b30 < 0:
+            registrar_lgg_error("frac_buz30", raw_b30, "ALERTA", f"El número de fracturas en Buz<30° ({b30}) no puede ser negativo.")
+        raw_b60 = row_dict.get("frac_buz60")
+        if b60 is not None and b60 < 0:
+            registrar_lgg_error("frac_buz60", raw_b60, "ALERTA", f"El número de fracturas en 30°-60° ({b60}) no puede ser negativo.")
+        raw_b90 = row_dict.get("frac_buz90")
+        if b90 is not None and b90 < 0:
+            registrar_lgg_error("frac_buz90", raw_b90, "ALERTA", f"El número de fracturas en Buz>60° ({b90}) no puede ser negativo.")
+
+        raw_abertura = row_dict.get("abertura")
+        if abertura is not None and abertura < 0:
+            registrar_lgg_error("abertura", raw_abertura, "ALERTA", f"La abertura de junta ({abertura}mm) no puede ser negativa.")
+        raw_espesor = row_dict.get("espesor")
+        if espesor is not None and espesor < 0:
+            registrar_lgg_error("espesor", raw_espesor, "ALERTA", f"El espesor de relleno ({espesor}mm) no puede ser negativo.")
+        raw_camp = row_dict.get("campana")
+        if camp is not None and camp < 0:
+            registrar_lgg_error("campana", raw_camp, "ALERTA", f"El año de campaña ({camp}) no puede ser negativo.")
+
+        for key, val_raw in [("frac_nat", raw_frac_nat), ("frac_buz30", raw_b30), ("frac_buz60", raw_b60), ("frac_buz90", raw_b90)]:
+            if val_raw is not None and val_raw != -1:
+                try:
+                    f_val = float(val_raw)
+                    if not f_val.is_integer():
+                        registrar_lgg_error(key, val_raw, "ALERTA", f"El campo '{key}' ({val_raw}) debe ser un número entero.")
+                except ValueError:
+                    pass
+
+        if "frf" in lgg_map:
+            frf_raw = row_dict.get("frf")
+            frf_val = sanitize_val(frf_raw, int)
+            if frf_val is not None and frf_val != -1:
+                if frf_val < 0:
+                    registrar_lgg_error("frf", frf_raw, "ALERTA", f"El valor de FRF ({frf_val}) no puede ser negativo.")
+                try:
+                    f_frf = float(frf_raw)
+                    if not f_frf.is_integer():
+                        registrar_lgg_error("frf", frf_raw, "ALERTA", f"El valor de FRF ({frf_raw}) debe ser un número entero.")
+                except ValueError:
+                    pass
+                if lrf_m is not None:
+                    calc_frf = math.floor(round(lrf_m * 100) / 5) if lrf_m > 0 else 0
+                    if frf_val != calc_frf:
+                        registrar_lgg_error("frf", frf_raw, "ALERTA", f"El valor de FRF ({frf_val}) no coincide con el calculado por la fórmula ({calc_frf}) basado en LRF ({lrf_m}m).")
+
+        if a is not None:
+            resumen_celdas[celda_padre]["dist_celda"] = max(resumen_celdas[celda_padre]["dist_celda"], a)
+
+        if de is not None and celda_padre in last_a_by_taladro:
+            prev_a = last_a_by_taladro[celda_padre]
+            if abs(de - prev_a) > 0.001:
+                gap = round(abs(de - prev_a), 4)
+                registrar_lgg_error("de", de, "ALERTA", f"Ruptura de continuidad espacial detectada. Datos evaluados -> Profundidad de inicio 'De': {de}m, Profundidad final anterior 'A': {prev_a}m (Brecha calculada: {gap}m).")
+        if a is not None:
+            last_a_by_taladro[celda_padre] = a
+
+        if de is not None and a is not None:
+            perf = round(a - de, 2)
+            if perf <= 0:
+                registrar_lgg_error("a", a, "ALERTA", f"Longitud de corrida perforada debe ser positiva. Datos evaluados -> De: {de}m, A: {a}m, Avance calculado: {perf}m.")
+            
+            if rec_m is not None and round(rec_m, 4) > round(perf, 4):
+                registrar_lgg_error("rec_m", rec_m, "ALERTA", f"La longitud recuperada es mayor que el avance perforado. Datos evaluados -> Recuperada: {rec_m}m, Avance de corrida: {perf}m (De: {de}m, A: {a}m).")
+                
+            if rqd_m is not None and rec_m is not None and round(rqd_m, 4) > round(rec_m, 4):
+                registrar_lgg_error("rqd_m", rqd_m, "ALERTA", f"Metraje RQD es mayor que la longitud recuperada. Datos evaluados -> RQD: {rqd_m}m, Recuperada: {rec_m}m, Avance de corrida: {perf}m (De: {de}m, A: {a}m).")
+
+            if lrf_m is not None and rec_m is not None and round(lrf_m, 4) > round(rec_m, 4):
+                registrar_lgg_error("lrf_m", lrf_m, "ALERTA", f"La longitud de roca fracturada LRF es mayor que la longitud recuperada. Datos evaluados -> LRF: {lrf_m}m, Recuperada: {rec_m}m, Avance de corrida: {perf}m (De: {de}m, A: {a}m).")
+
+            if rqd_m is not None and lrf_m is not None and small_frag_m is not None:
+                sum_frags = round(rqd_m + lrf_m + small_frag_m, 2)
+                if round(sum_frags, 4) > round(perf, 4):
+                    registrar_lgg_error("rqd_m", rqd_m, "ALERTA", f"La suma de fragmentos físicos supera el avance perforado. Datos evaluados -> Suma de fragmentos: {sum_frags}m (RQD: {rqd_m}m + LRF: {lrf_m}m + <10cm: {small_frag_m}m), Avance de corrida: {perf}m (De: {de}m, A: {a}m), Longitud Recuperada: {rec_m}m.")
+
+        if b30 is not None and b60 is not None and b90 is not None and frac_nat is not None:
+            sum_bins = b30 + b60 + b90
+            if sum_bins != frac_nat:
+                registrar_lgg_error("frac_nat", frac_nat, "ADVERTENCIA", f"La sumatoria de fracturas por buzamiento no coincide con el conteo general. Datos evaluados -> Conteo General (Frac_Nat): {frac_nat}, Suma por buzamiento: {sum_bins} (Buz <30°: {b30} + 30°-60°: {b60} + >60°: {b90}).")
 
         raw_frac_nat = row_dict.get("frac_nat")
         if frac_nat is not None and frac_nat < 0:
@@ -472,7 +558,7 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
                         registrar_lgg_error("frf", frf_raw, "ALERTA", f"El valor de FRF ({frf_raw}) debe ser un número entero.")
                 except ValueError:
                     pass
-                calc_frf = math.floor(round(lrf_m * 100) / 5) + 1 if lrf_m > 0 else 0
+                calc_frf = math.floor(round(lrf_m * 100) / 5) if lrf_m > 0 else 0
                 if frf_val != calc_frf:
                     registrar_lgg_error("frf", frf_raw, "ALERTA", f"El valor de FRF ({frf_val}) no coincide con el calculado por la fórmula ({calc_frf}) basado en LRF ({lrf_m}m).")
 
@@ -530,9 +616,9 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
         relleno1_can = get_canonical_value(raw_relleno1, VALID_RELLENO)
         if raw_relleno1 is not None and not relleno1_can:
             registrar_lgg_error("relleno1", raw_relleno1, "ALERTA", f"Código de Tipo de Relleno no válido. Permitidos: {', '.join(VALID_RELLENO)}")
-            relleno1 = "cwf"
+            relleno1 = None
         else:
-            relleno1 = relleno1_can or "cwf"
+            relleno1 = relleno1_can
 
         raw_agua_obs = row_dict.get("agua_obs")
         agua_obs_can = get_canonical_value(raw_agua_obs, VALID_AGUA)
@@ -572,13 +658,8 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
 
         if espesor > 0 and abertura <= 0:
             registrar_lgg_error("abertura", abertura, "ADVERTENCIA", f"Se declaró espesor de relleno de junta pero la abertura es 0mm. Datos evaluados -> Espesor: {espesor}mm (Tipo Relleno: '{relleno1}'), Abertura de Junta: {abertura}mm.")
-        elif espesor == 0 and abertura > 0:
+        elif espesor == 0 and abertura > 0 and relleno1 not in [None, "-1"]:
             registrar_lgg_error("espesor", espesor, "ADVERTENCIA", f"La abertura de junta es mayor a 0mm pero no se ha registrado espesor de relleno. Datos evaluados -> Abertura de Junta: {abertura}mm, Espesor: {espesor}mm (Tipo Relleno: '{relleno1}').")
-
-        if resistencia in WEATHERING_COMPATIBILITY:
-            valid_w = WEATHERING_COMPATIBILITY[resistencia]
-            if weathering and weathering not in valid_w:
-                registrar_lgg_error("intemperismo", weathering, "ADVERTENCIA", f"Incompatibilidad geológica (Resistencia vs Intemperismo de corrida). Datos evaluados -> Resistencia ISRM: {resistencia}, Intemperismo: {weathering}. Grados permitidos: {', '.join(valid_w)}.")
 
         lgg_runs.append({
             "taladro": taladro, "de": de, "a": a, "corrida": corrida_num,
@@ -619,9 +700,24 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
         empty_streak_est = 0
         total_est_filas += 1
         taladro = current_taladro_est
-        depth = safe_float(sanitize_val(row_dict.get("profundidad"), float))
+        
+        # --- PARSEO Y SANITIZACIÓN INMEDIATA (ESTRUCTURAL) ---
+        depth = sanitize_val(row_dict.get("profundidad"), float)
         camp = sanitize_val(row_dict.get("campana"), int)
         geo = sanitize_val(row_dict.get("geotecnico"), str)
+        
+        abertura = sanitize_val(row_dict.get("abertura"), float)
+        espesor = sanitize_val(row_dict.get("espesor"), float)
+        
+        dip = sanitize_val(row_dict.get("dip"), float)
+        azimuth = sanitize_val(row_dict.get("azimuth"), float)
+        
+        est_de = sanitize_val(row_dict.get("de"), float)
+        est_a = sanitize_val(row_dict.get("a"), float)
+        
+        alfa = sanitize_val(row_dict.get("alfa"), float)
+        beta = sanitize_val(row_dict.get("beta"), float)
+        jrc10 = sanitize_val(row_dict.get("jrc10"), int)
         sector = "N/A"
 
         celda_padre = taladro
@@ -667,9 +763,6 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
             if v_san is None:
                 registrar_est_error(key, None, "VACIO", f"El campo obligatorio '{key}' se encuentra vacío o es -1.")
 
-        abertura = safe_float(sanitize_val(row_dict.get("abertura"), float))
-        espesor = safe_float(sanitize_val(row_dict.get("espesor"), float))
-
         raw_depth = row_dict.get("profundidad")
         if depth is not None and depth < 0:
             registrar_est_error("profundidad", raw_depth, "ALERTA", f"Profundidad ({depth}m) no puede ser negativa.")
@@ -683,31 +776,26 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
         if camp is not None and camp < 0:
             registrar_est_error("campana", raw_camp, "ALERTA", f"El año de campaña ({camp}) no puede ser negativo.")
 
-        dip = safe_float(sanitize_val(row_dict.get("dip"), float))
         raw_dip = row_dict.get("dip")
         if dip is not None:
             if dip < 0.0 or dip > 90.0:
                 registrar_est_error("dip", raw_dip, "ALERTA", f"El ángulo Dip es inválido. Datos evaluados -> Dip: {dip}°. Debe estar entre 0° y 90°.")
 
-        azimuth = safe_float(sanitize_val(row_dict.get("azimuth"), float))
         raw_azimuth = row_dict.get("azimuth")
         if azimuth is not None:
             if azimuth < 0.0 or azimuth > 360.0:
                 registrar_est_error("azimuth", raw_azimuth, "ALERTA", f"El ángulo Azimut es inválido. Datos evaluados -> Azimut: {azimuth}°. Debe estar entre 0° y 360°.")
 
         matching_run = None
-        for run in lgg_runs:
-            if run["taladro"] == taladro and run["de"] <= depth <= run["a"]:
-                matching_run = run
-                break
+        if depth is not None:
+            for run in lgg_runs:
+                if run["taladro"] == taladro and run["de"] <= depth <= run["a"]:
+                    matching_run = run
+                    break
 
-        if matching_run is None:
-            registrar_est_error("profundidad", depth, "ALERTA", f"Profundidad huérfana de junta no corresponde a ningún tramo de corrida en LGG. Datos evaluados -> Profundidad de Junta: {depth}m, Taladro: '{taladro}'.")
+            if matching_run is None:
+                registrar_est_error("profundidad", depth, "ALERTA", f"Profundidad huérfana de junta no corresponde a ningún tramo de corrida en LGG. Datos evaluados -> Profundidad de Junta: {depth}m, Taladro: '{taladro}'.")
 
-        est_de = safe_float(sanitize_val(row_dict.get("de"), float))
-        est_a = safe_float(sanitize_val(row_dict.get("a"), float))
-        raw_de = row_dict.get("de")
-        raw_a = row_dict.get("a")
         if est_de is not None and est_a is not None:
             has_exact_match = False
             for run in lgg_runs:
@@ -719,68 +807,65 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
             if depth is not None and (depth < est_de or depth > est_a):
                 registrar_est_error("profundidad", depth, "ALERTA", f"La profundidad se encuentra fuera del tramo de corrida especificado. Datos evaluados -> Profundidad de Junta: {depth}m, Tramo especificado: {est_de}m - {est_a}m.")
 
-        alfa = safe_float(sanitize_val(row_dict.get("alfa"), float), -1.0)
-        if alfa != -1.0:
+        if alfa is not None:
             if alfa < 0.0 or alfa > 90.0:
                 registrar_est_error("alfa", alfa, "ALERTA", f"El ángulo Alfa es inválido. Datos evaluados -> Alfa: {alfa}°. Debe estar entre 0° y 90° o ser -1.")
             elif not float(alfa).is_integer():
                 registrar_est_error("alfa", alfa, "ADVERTENCIA", f"El ángulo Alfa debería ser un número entero. Datos evaluados -> Alfa: {alfa}°.")
 
-        beta = safe_float(sanitize_val(row_dict.get("beta"), float), -1.0)
-        if beta != -1.0:
+        if beta is not None:
             if beta < 0.0 or beta > 360.0:
                 registrar_est_error("beta", beta, "ALERTA", f"El ángulo Beta es inválido. Datos evaluados -> Beta: {beta}°. Debe estar entre 0° y 360° o ser -1.")
             elif not float(beta).is_integer():
                 registrar_est_error("beta", beta, "ADVERTENCIA", f"El ángulo Beta debería ser un número entero. Datos evaluados -> Beta: {beta}°.")
 
-        jrc10 = safe_int(sanitize_val(row_dict.get("jrc10"), int), -1)
-        if jrc10 != -1:
+        if jrc10 is not None:
             if jrc10 > 20:
                 registrar_est_error("jrc10", jrc10, "ALERTA", f"El valor de JRC10 es inválido. No se permiten valores mayores a 20. Datos evaluados -> JRC10: {jrc10}.")
             elif jrc10 < 0:
                 registrar_est_error("jrc10", jrc10, "ALERTA", f"El valor de JRC10 no puede ser negativo. Datos evaluados -> JRC10: {jrc10}.")
 
-        raw_forma = row_dict.get("forma")
-        forma_can = get_canonical_value(raw_forma, VALID_FORMA)
-        if raw_forma is not None and not forma_can:
-            registrar_est_error("forma", raw_forma, "ALERTA", f"Forma de junta no válida. Permitidos: Plano (1) a Irregular (6). Datos evaluados -> Forma: '{raw_forma}'.")
+        raw_forma = sanitize_val(row_dict.get("forma"), str)
+        if raw_forma is not None:
+            forma_can = get_canonical_value(raw_forma, VALID_FORMA)
+            if not forma_can:
+                registrar_est_error("forma", raw_forma, "ALERTA", f"Forma de junta no válida. Permitidos: Plano (1) a Irregular (6). Datos evaluados -> Forma: '{raw_forma}'.")
 
         tipo_est = safe_str(sanitize_val(row_dict.get("tipo_estructura"), str))
-        if espesor > abertura and tipo_est not in exceptions:
-            registrar_est_error("espesor", espesor, "ALERTA", f"El espesor de relleno no puede ser mayor que la abertura de junta excepto en estructuras F, RF, VN, SZ, F+10 o BED. Datos evaluados -> Espesor: {espesor}mm (Tipo Relleno: '{relleno1}'), Abertura de Junta: {abertura}mm, Estructura: '{tipo_est}'.")
+        if espesor is not None and abertura is not None:
+            if espesor > abertura and tipo_est not in exceptions:
+                registrar_est_error("espesor", espesor, "ALERTA", f"El espesor de relleno no puede ser mayor que la abertura de junta excepto en estructuras F, RF, VN, SZ, F+10 o BED. Datos evaluados -> Espesor: {espesor}mm (Tipo Relleno: '{relleno1}'), Abertura de Junta: {abertura}mm, Estructura: '{tipo_est}'.")
 
-        raw_relleno1 = row_dict.get("relleno1")
-        relleno1_can = get_canonical_value(raw_relleno1, VALID_RELLENO)
-        if raw_relleno1 is not None and not relleno1_can:
-            registrar_est_error("relleno1", raw_relleno1, "ALERTA", f"Código de Tipo de Relleno no válido. Permitidos: {', '.join(VALID_RELLENO)}")
-            relleno1 = "cwf"
-        else:
-            relleno1 = relleno1_can or "cwf"
+            raw_relleno1 = row_dict.get("relleno1")
+            relleno1_can = get_canonical_value(raw_relleno1, VALID_RELLENO)
+            if raw_relleno1 is not None and not relleno1_can:
+                registrar_est_error("relleno1", raw_relleno1, "ALERTA", f"Código de Tipo de Relleno no válido. Permitidos: {', '.join(VALID_RELLENO)}")
+                relleno1 = None
+            else:
+                relleno1 = relleno1_can
 
-        if espesor > 0 and (not relleno1 or relleno1 in ["cwf", "-1"]):
-            registrar_est_error("relleno1", relleno1, "ADVERTENCIA", f"Se declaró espesor de relleno pero el tipo de relleno está sin definir. Datos evaluados -> Espesor: {espesor}mm, Tipo Relleno: '{relleno1}'.")
-        elif relleno1 and relleno1 not in ["cwf", "-1"] and abertura <= 0:
-            registrar_est_error("relleno1", relleno1, "ADVERTENCIA", f"El tipo de relleno está definido pero la abertura de junta es 0mm. Datos evaluados -> Tipo Relleno: '{relleno1}', Abertura de Junta: {abertura}mm, Espesor: {espesor}mm.")
+            if espesor > 0 and (not relleno1 or relleno1 in ["-1"]):
+                registrar_est_error("relleno1", relleno1, "ADVERTENCIA", f"Se declaró espesor de relleno pero el tipo de relleno está sin definir. Datos evaluados -> Espesor: {espesor}mm, Tipo Relleno: '{relleno1}'.")
+            elif relleno1 and relleno1 not in ["-1"] and abertura <= 0:
+                registrar_est_error("relleno1", relleno1, "ADVERTENCIA", f"El tipo de relleno está definido pero la abertura de junta es 0mm. Datos evaluados -> Tipo Relleno: '{relleno1}', Abertura de Junta: {abertura}mm, Espesor: {espesor}mm.")
 
         if matching_run:
-            raw_dureza = row_dict.get("dureza_pared")
-            dureza_can = get_canonical_value(raw_dureza, VALID_STRENGTHS)
-            if raw_dureza is not None and not dureza_can:
-                registrar_est_error("dureza_pared", raw_dureza, "ALERTA", f"Código de Resistencia ISRM no válido. Permitidos: {', '.join(VALID_STRENGTHS)}")
-                dureza_pared = "R4"
+            raw_dureza = sanitize_val(row_dict.get("dureza_pared"), str)
+            if raw_dureza is not None:
+                dureza_can = get_canonical_value(raw_dureza, VALID_STRENGTHS)
+                if not dureza_can:
+                    registrar_est_error("dureza_pared", raw_dureza, "ALERTA", f"Código de Resistencia ISRM no válido. Permitidos: {', '.join(VALID_STRENGTHS)}")
+                    dureza_pared = "R4"
+                else:
+                    dureza_pared = dureza_can
             else:
-                dureza_pared = dureza_can or "R4"
+                dureza_pared = "R4"
 
             res_matriz = matching_run["resistencia"]
             r_levels = {"R0":0, "R1":1, "R2":2, "R3":3, "R4":4, "R5":5, "R6":6}
             if dureza_pared in r_levels and res_matriz in r_levels:
                 if r_levels[dureza_pared] > r_levels[res_matriz]:
                     registrar_est_error("dureza_pared", raw_dureza, "ADVERTENCIA", f"Incompatibilidad geológica (Dureza de pared de junta supera la resistencia maxima estimada de la corrida). Datos evaluados -> Dureza de Pared de Junta en Estructural: {dureza_pared}, Resistencia Maxima Estimada en LGG: {res_matriz}.")
-
-            lito_junta = safe_str(sanitize_val(row_dict.get("lito1"), str))
-            run_litos = [matching_run["lito1"], matching_run.get("lito2"), matching_run.get("lito3")]
-            if lito_junta and lito_junta not in run_litos:
-                registrar_est_error("lito1", lito_junta, "ADVERTENCIA", f"Incompatibilidad de litología entre la corrida y la junta. Datos evaluados -> Litología de Junta: '{lito_junta}', Litologías en Corrida Matriz: {run_litos}.")
 
         if not row_has_errors:
             total_ok += 1
@@ -947,7 +1032,7 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
 
             raw_relleno1 = row_dict.get("relleno1")
             relleno1_can = get_canonical_value(raw_relleno1, VALID_RELLENO)
-            relleno1 = relleno1_can or "cwf"
+            relleno1 = relleno1_can
 
             raw_agua_obs = row_dict.get("agua_obs")
             agua_obs_can = get_canonical_value(raw_agua_obs, VALID_AGUA)
@@ -987,8 +1072,9 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
                 tipo_est2 = tipo_est2_can or ""
 
             # --- 4. REGLAS DE CONSISTENCIA GEOMECÁNICA ---
-            max_lgg[taladro] = max(max_lgg.get(taladro, 0.0), a)
-            resumen_celdas[celda_padre]["dist_celda"] = max(resumen_celdas[celda_padre]["dist_celda"], a)
+            if a is not None:
+                max_lgg[taladro] = max(max_lgg.get(taladro, 0.0), a)
+                resumen_celdas[celda_padre]["dist_celda"] = max(resumen_celdas[celda_padre]["dist_celda"], a)
 
             raw_de = row_dict.get("de")
             if de is not None and de < 0:
@@ -1053,44 +1139,45 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
                             reg_err("frf", frf_raw, "ALERTA", f"El valor de FRF debe ser un número entero. Datos evaluados -> FRF: {frf_raw}.")
                     except ValueError:
                         pass
-                    calc_frf = math.floor(round(lrf_m * 100) / 5) + 1 if lrf_m > 0 else 0
-                    if frf_val != calc_frf:
-                        reg_err("frf", frf_raw, "ALERTA", f"El valor de FRF no coincide con el calculado por la fórmula. Datos evaluados -> FRF: {frf_val}, Calculado: {calc_frf} basado en LRF ({lrf_m}m).")
+                    if lrf_m is not None:
+                        calc_frf = math.floor(round(lrf_m * 100) / 5) if lrf_m > 0 else 0
+                        if frf_val != calc_frf:
+                            reg_err("frf", frf_raw, "ALERTA", f"El valor de FRF no coincide con el calculado por la fórmula. Datos evaluados -> FRF: {frf_val}, Calculado: {calc_frf} basado en LRF ({lrf_m}m).")
 
-            if perf <= 0: reg_err("a", a, "ALERTA", f"Longitud de corrida perforada debe ser positiva. Datos evaluados -> De: {de}m, A: {a}m, Avance calculado: {perf}m.")
-            elif perf > 1.6: reg_err("a", a, "ALERTA", f"Longitud de corrida perforada excede el límite crítico de 1.6m. Datos evaluados -> De: {de}m, A: {a}m, Avance calculado: {perf}m.")
-            
-            if rec_m > perf: reg_err("rec_m", rec_m, "ALERTA", f"La longitud recuperada es mayor que el avance perforado. Datos evaluados -> Recuperada: {rec_m}m, Avance de corrida: {perf}m (De: {de}m, A: {a}m).")
-            if rqd_m > rec_m: reg_err("rqd_m", rqd_m, "ALERTA", f"Metraje RQD es mayor que la longitud recuperada. Datos evaluados -> RQD: {rqd_m}m, Recuperada: {rec_m}m, Avance de corrida: {perf}m (De: {de}m, A: {a}m).")
-            if lrf_m > rec_m: reg_err("lrf_m", lrf_m, "ALERTA", f"La longitud de roca fracturada LRF es mayor que la longitud recuperada. Datos evaluados -> LRF: {lrf_m}m, Recuperada: {rec_m}m, Avance de corrida: {perf}m (De: {de}m, A: {a}m).")
-
-            sum_frags = round(rqd_m + lrf_m + small_frag_m, 2)
-            if sum_frags > perf: reg_err("rqd_m", rqd_m, "ALERTA", f"La suma de fragmentos físicos supera el avance perforado. Datos evaluados -> Suma de fragmentos: {sum_frags}m (RQD: {rqd_m}m + LRF: {lrf_m}m + <10cm: {small_frag_m}m), Avance de corrida: {perf}m (De: {de}m, A: {a}m), Longitud Recuperada: {rec_m}m.")
-
-            sum_bins = b30 + b60 + b90
-            if sum_bins != frac_nat:
-                reg_err("frac_nat", frac_nat, "ADVERTENCIA", f"La sumatoria de fracturas por buzamiento no coincide con el conteo general. Datos evaluados -> Conteo General (Frac_Nat): {frac_nat}, Suma por buzamiento: {sum_bins} (Buz <30°: {b30} + 30°-60°: {b60} + >60°: {b90}).")
-
-            if celda_padre in last_a_by_taladro:
+            if de is not None and celda_padre in last_a_by_taladro:
                 prev_a = last_a_by_taladro[celda_padre]
                 if abs(de - prev_a) > 0.001:
                     gap = round(abs(de - prev_a), 4)
                     reg_err("de", de, "ALERTA", f"Ruptura de continuidad espacial detectada. Datos evaluados -> Profundidad de inicio 'De': {de}m, Profundidad final anterior 'A': {prev_a}m (Brecha calculada: {gap}m).")
-            last_a_by_taladro[celda_padre] = a
+            if a is not None:
+                last_a_by_taladro[celda_padre] = a
+
+            if de is not None and a is not None:
+                perf = round(a - de, 2)
+                if perf <= 0: reg_err("a", a, "ALERTA", f"Longitud de corrida perforada debe ser positiva. Datos evaluados -> De: {de}m, A: {a}m, Avance calculado: {perf}m.")
+                
+                if rec_m is not None and round(rec_m, 4) > round(perf, 4): reg_err("rec_m", rec_m, "ALERTA", f"La longitud recuperada es mayor que el avance perforado. Datos evaluados -> Recuperada: {rec_m}m, Avance de corrida: {perf}m (De: {de}m, A: {a}m).")
+                if rqd_m is not None and rec_m is not None and round(rqd_m, 4) > round(rec_m, 4): reg_err("rqd_m", rqd_m, "ALERTA", f"Metraje RQD es mayor que la longitud recuperada. Datos evaluados -> RQD: {rqd_m}m, Recuperada: {rec_m}m, Avance de corrida: {perf}m (De: {de}m, A: {a}m).")
+                if lrf_m is not None and rec_m is not None and round(lrf_m, 4) > round(rec_m, 4): reg_err("lrf_m", lrf_m, "ALERTA", f"La longitud de roca fracturada LRF es mayor que la longitud recuperada. Datos evaluados -> LRF: {lrf_m}m, Recuperada: {rec_m}m, Avance de corrida: {perf}m (De: {de}m, A: {a}m).")
+
+                if rqd_m is not None and lrf_m is not None and small_frag_m is not None:
+                    sum_frags = round(rqd_m + lrf_m + small_frag_m, 2)
+                    if round(sum_frags, 4) > round(perf, 4): reg_err("rqd_m", rqd_m, "ALERTA", f"La suma de fragmentos físicos supera el avance perforado. Datos evaluados -> Suma de fragmentos: {sum_frags}m (RQD: {rqd_m}m + LRF: {lrf_m}m + <10cm: {small_frag_m}m), Avance de corrida: {perf}m (De: {de}m, A: {a}m), Longitud Recuperada: {rec_m}m.")
+
+            if b30 is not None and b60 is not None and b90 is not None and frac_nat is not None:
+                sum_bins = b30 + b60 + b90
+                if sum_bins != frac_nat:
+                    reg_err("frac_nat", frac_nat, "ADVERTENCIA", f"La sumatoria de fracturas por buzamiento no coincide con el conteo general. Datos evaluados -> Conteo General (Frac_Nat): {frac_nat}, Suma por buzamiento: {sum_bins} (Buz <30°: {b30} + 30°-60°: {b60} + >60°: {b90}).")
 
             exceptions = {"F", "RF", "VN", "SZ", "F+10", "BED"}
-            if espesor > abertura and (tipo_est1 not in exceptions and tipo_est2 not in exceptions):
-                reg_err("espesor", espesor, "ALERTA", f"El espesor de relleno no puede ser mayor que la abertura de junta excepto en estructuras F, RF, VN, SZ, F+10 o BED. Datos evaluados -> Espesor: {espesor}mm (Tipo Relleno: '{relleno1}'), Abertura de Junta: {abertura}mm, Estructuras: '{tipo_est1}' / '{tipo_est2}'.")
+            if espesor is not None and abertura is not None:
+                if espesor > abertura and (tipo_est1 not in exceptions and tipo_est2 not in exceptions):
+                    reg_err("espesor", espesor, "ALERTA", f"El espesor de relleno no puede ser mayor que la abertura de junta. Datos evaluados -> Espesor: {espesor}mm (Tipo Relleno: '{relleno1}'), Abertura de Junta: {abertura}mm, Estructuras: '{tipo_est1}' / '{tipo_est2}'.")
 
-            if espesor > 0 and abertura <= 0:
-                reg_err("abertura", abertura, "ADVERTENCIA", f"Se declaró espesor de relleno de junta pero la abertura es 0mm. Datos evaluados -> Espesor: {espesor}mm (Tipo Relleno: '{relleno1}'), Abertura de Junta: {abertura}mm.")
-            elif espesor == 0 and abertura > 0:
-                reg_err("espesor", espesor, "ADVERTENCIA", f"La abertura de junta es mayor a 0mm pero no se ha registrado espesor de relleno. Datos evaluados -> Abertura de Junta: {abertura}mm, Espesor: {espesor}mm (Tipo Relleno: '{relleno1}').")
-
-            if resistencia in WEATHERING_COMPATIBILITY:
-                valid_w = WEATHERING_COMPATIBILITY[resistencia]
-                if weathering and weathering not in valid_w:
-                    reg_err("intemperismo", weathering, "ADVERTENCIA", f"Incompatibilidad geológica (Resistencia vs Intemperismo de corrida). Datos evaluados -> Resistencia ISRM: {resistencia}, Intemperismo: {weathering}. Grados permitidos: {', '.join(valid_w)}.")
+                if espesor > 0 and abertura <= 0:
+                    reg_err("abertura", abertura, "ADVERTENCIA", f"Se declaró espesor de relleno de junta pero la abertura es 0mm. Datos evaluados -> Espesor: {espesor}mm (Tipo Relleno: '{relleno1}'), Abertura de Junta: {abertura}mm.")
+                elif espesor == 0 and abertura > 0 and relleno1 not in [None, "-1"]: 
+                    reg_err("espesor", espesor, "ADVERTENCIA", f"La abertura de junta es mayor a 0mm pero no se ha registrado espesor de relleno. Datos evaluados -> Abertura de Junta: {abertura}mm, Espesor: {espesor}mm (Tipo Relleno: '{relleno1}').")
 
             if raw_resistencia is not None and not resistencia_can:
                 pass
@@ -1186,28 +1273,29 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
             beta = sanitize_val(row_dict.get("beta"), float)
             jrc10 = sanitize_val(row_dict.get("jrc10"), int)
             
-            raw_forma = row_dict.get("forma")
-            forma_can = get_canonical_value(raw_forma, VALID_FORMA)
+            raw_forma = sanitize_val(row_dict.get("forma"), str)
+            forma_can = get_canonical_value(raw_forma, VALID_FORMA) if raw_forma is not None else None
             
             tipo_est = safe_str(sanitize_val(row_dict.get("tipo_estructura"), str))
             
             raw_relleno1 = row_dict.get("relleno1")
             relleno1_can = get_canonical_value(raw_relleno1, VALID_RELLENO)
-            relleno1 = relleno1_can or "cwf"
+            relleno1 = relleno1_can
 
-            raw_dureza = row_dict.get("dureza_pared")
-            dureza_can = get_canonical_value(raw_dureza, VALID_STRENGTHS)
+            raw_dureza = sanitize_val(row_dict.get("dureza_pared"), str)
+            dureza_can = get_canonical_value(raw_dureza, VALID_STRENGTHS) if raw_dureza is not None else None
             dureza_pared = dureza_can or "R4"
 
             # --- 2. VALIDACIONES MAESTRAS (EST) ---
-            max_est[taladro] = max(max_est.get(taladro, 0.0), depth)
-            
+            if depth is not None:
+                max_est[taladro] = max(max_est.get(taladro, 0.0), depth)
+                
+                lgg_max_for_t = max_lgg.get(taladro, 0.0)
+                if lgg_max_for_t > 0 and depth > lgg_max_for_t:
+                    reg_err_est("profundidad", depth, "ALERTA", f"La profundidad en logueo estructural excede el límite final registrado en LGG. Datos evaluados -> Profundidad Estructural: {depth}m, Profundidad Máxima LGG: {lgg_max_for_t}m.")
+
             if camp:
                 resumen_celdas[celda_padre]["campania"] = str(camp)
-            
-            lgg_max_for_t = max_lgg.get(taladro, 0.0)
-            if lgg_max_for_t > 0 and depth > lgg_max_for_t:
-                reg_err_est("profundidad", depth, "ALERTA", f"La profundidad en logueo estructural excede el límite final registrado en LGG. Datos evaluados -> Profundidad Estructural: {depth}m, Profundidad Máxima LGG: {lgg_max_for_t}m.")
 
             mandatory_est = ["profundidad", "alfa", "beta", "forma", "rugosidad", "jrc10", "abertura", "weathering", "espesor", "relleno1", "dureza_pared", "agua", "geotecnico", "campana"]
             for key in mandatory_est:
@@ -1239,13 +1327,14 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
                     reg_err_est("azimuth", raw_azimuth, "ALERTA", f"El ángulo Azimut es inválido. Datos evaluados -> Azimut: {azimuth}°. Debe estar entre 0° y 360°.")
 
             matching_run = None
-            for run in lgg_runs:
-                if run["taladro"] == taladro and run["de"] <= depth <= run["a"]:
-                    matching_run = run
-                    break
+            if depth is not None:
+                for run in lgg_runs:
+                    if run["taladro"] == taladro and run["de"] <= depth <= run["a"]:
+                        matching_run = run
+                        break
 
-            if matching_run is None:
-                reg_err_est("profundidad", depth, "ALERTA", f"Profundidad huérfana de junta no corresponde a ningún tramo de corrida en LGG. Datos evaluados -> Profundidad de Junta: {depth}m, Taladro: '{taladro}'.")
+                if matching_run is None:
+                    reg_err_est("profundidad", depth, "ALERTA", f"Profundidad huérfana de junta no corresponde a ningún tramo de corrida en LGG. Datos evaluados -> Profundidad de Junta: {depth}m, Taladro: '{taladro}'.")
 
             raw_de = row_dict.get("de")
             raw_a = row_dict.get("a")
@@ -1260,19 +1349,19 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
                 if depth is not None and (depth < est_de or depth > est_a):
                     reg_err_est("profundidad", depth, "ALERTA", f"La profundidad se encuentra fuera del tramo de corrida especificado. Datos evaluados -> Profundidad de Junta: {depth}m, Tramo especificado: {est_de}m - {est_a}m.")
 
-            if alfa != -1.0:
+            if alfa is not None:
                 if alfa < 0.0 or alfa > 90.0:
                     reg_err_est("alfa", alfa, "ALERTA", f"El ángulo Alfa es inválido. Datos evaluados -> Alfa: {alfa}°. Debe estar entre 0° y 90° o ser -1.")
                 elif not float(alfa).is_integer():
                     reg_err_est("alfa", alfa, "ADVERTENCIA", f"El ángulo Alfa debería ser un número entero. Datos evaluados -> Alfa: {alfa}°.")
 
-            if beta != -1.0:
+            if beta is not None:
                 if beta < 0.0 or beta > 360.0:
                     reg_err_est("beta", beta, "ALERTA", f"El ángulo Beta es inválido. Datos evaluados -> Beta: {beta}°. Debe estar entre 0° y 360° o ser -1.")
                 elif not float(beta).is_integer():
                     reg_err_est("beta", beta, "ADVERTENCIA", f"El ángulo Beta debería ser un número entero. Datos evaluados -> Beta: {beta}°.")
 
-            if jrc10 != -1:
+            if jrc10 is not None:
                 if jrc10 > 20:
                     reg_err_est("jrc10", jrc10, "ALERTA", f"El valor de JRC10 es inválido. No se permiten valores mayores a 20. Datos evaluados -> JRC10: {jrc10}.")
                 elif jrc10 < 0:
@@ -1282,13 +1371,14 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
                 reg_err_est("forma", raw_forma, "ALERTA", f"Forma de junta no válida. Permitidos: Plano (1) a Irregular (6). Datos evaluados -> Forma: '{raw_forma}'.")
 
             exceptions = {"F", "RF", "VN", "SZ", "F+10", "BED"}
-            if espesor > abertura and tipo_est not in exceptions:
-                reg_err_est("espesor", espesor, "ALERTA", f"El espesor de relleno no puede ser mayor que la abertura de junta excepto en estructuras F, RF, VN, SZ, F+10 o BED. Datos evaluados -> Espesor: {espesor}mm (Tipo Relleno: '{relleno1}'), Abertura de Junta: {abertura}mm, Estructura: '{tipo_est}'.")
+            if espesor is not None and abertura is not None:
+                if espesor > abertura and tipo_est not in exceptions:
+                    reg_err_est("espesor", espesor, "ALERTA", f"El espesor de relleno no puede ser mayor que la abertura de junta excepto en estructuras F, RF, VN, SZ, F+10 o BED. Datos evaluados -> Espesor: {espesor}mm (Tipo Relleno: '{relleno1}'), Abertura de Junta: {abertura}mm, Estructura: '{tipo_est}'.")
 
-            if espesor > 0 and (not relleno1 or relleno1 in ["cwf", "-1"]):
-                reg_err_est("relleno1", relleno1, "ADVERTENCIA", f"Se declaró espesor de relleno pero el tipo de relleno está sin definir. Datos evaluados -> Espesor: {espesor}mm, Tipo Relleno: '{relleno1}'.")
-            elif relleno1 and relleno1 not in ["cwf", "-1"] and abertura <= 0:
-                reg_err_est("relleno1", relleno1, "ADVERTENCIA", f"El tipo de relleno está definido pero la abertura de junta es 0mm. Datos evaluados -> Tipo Relleno: '{relleno1}', Abertura de Junta: {abertura}mm, Espesor: {espesor}mm.")
+                if espesor > 0 and (not relleno1 or relleno1 in ["-1"]):
+                    reg_err_est("relleno1", relleno1, "ADVERTENCIA", f"Se declaró espesor de relleno pero el tipo de relleno está sin definir. Datos evaluados -> Espesor: {espesor}mm, Tipo Relleno: '{relleno1}'.")
+                elif relleno1 and relleno1 not in ["-1"] and abertura <= 0:
+                    reg_err_est("relleno1", relleno1, "ADVERTENCIA", f"El tipo de relleno está definido pero la abertura de junta es 0mm. Datos evaluados -> Tipo Relleno: '{relleno1}', Abertura de Junta: {abertura}mm, Espesor: {espesor}mm.")
 
             if matching_run:
                 if raw_dureza is not None and not dureza_can:
@@ -1299,11 +1389,6 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
                 if dureza_pared in r_levels and res_matriz in r_levels:
                     if r_levels[dureza_pared] > r_levels[res_matriz]:
                         reg_err_est("dureza_pared", raw_dureza, "ADVERTENCIA", f"Incompatibilidad geológica (Dureza de pared de junta supera la resistencia maxima estimada de la corrida). Datos evaluados -> Dureza de Pared de Junta en Estructural: {dureza_pared}, Resistencia Maxima Estimada en LGG: {res_matriz}.")
-
-                lito_junta = safe_str(sanitize_val(row_dict.get("lito1"), str))
-                run_litos = [matching_run["lito1"], matching_run.get("lito2"), matching_run.get("lito3")]
-                if lito_junta and lito_junta not in run_litos:
-                    reg_err_est("lito1", lito_junta, "ADVERTENCIA", f"Incompatibilidad de litología entre la corrida y la junta. Datos evaluados -> Litología de Junta: '{lito_junta}', Litologías en Corrida Matriz: {run_litos}.")
 
             if not row_has_errors: total_ok += 1
 

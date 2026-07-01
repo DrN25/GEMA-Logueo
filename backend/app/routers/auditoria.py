@@ -31,18 +31,36 @@ os.makedirs(temp_dir, exist_ok=True)
 def simplify_message(msg):
     msg_clean = str(msg or "").strip()
     msg_up = msg_clean.upper()
+    
+    # 1. Campos obligatorios vacíos (Máxima prioridad para evitar secuestros)
+    if "VACIO" in msg_up or "VACÍO" in msg_up or "OBLIGATORIO" in msg_up:
+        return "Campo obligatorio se encuentra vacío."
+        
+    # 2. Negativos generales (Captura todos los negativos, incluyendo FRF negativo)
+    if "NEGATIV" in msg_up:
+        return "El valor no puede ser negativo."
+        
+    # 3. Reglas de FRF restantes (Fórmula y formato entero)
+    if "FRF" in msg_up:
+        if "ENTERO" in msg_up:
+            return "El valor de FRF debe ser un número entero."
+        return "El valor de FRF no coincide con el calculado por la fórmula."
+
+    # 4. Inconsistencias físicas de metraje (RQD, LRF y Recuperada)
+    if "RQD" in msg_up and "RECUPERADA" in msg_up:
+        return "Metraje RQD es mayor que la longitud recuperada."
+    if "LRF" in msg_up and "RECUPERADA" in msg_up:
+        return "La longitud de roca fracturada LRF es mayor que la longitud recuperada."
+    if "RECUPERADA" in msg_up and "AVANCE" in msg_up:
+        return "La longitud recuperada es mayor que el avance perforado."
+
+    # 5. Resto de reglas específicas
     if "RUPTURA DE CONTINUIDAD" in msg_up:
         return "Ruptura de continuidad espacial detectada."
     if "LÍMITE CRÍTICO DE 1.6M" in msg_up or "LIMITE CRITICO DE 1.6M" in msg_up:
         return "Longitud de corrida perforada excede el límite crítico de 1.6m."
     if "POSITIVA" in msg_up or "DEBE SER MAYOR A 0" in msg_up:
         return "Longitud de corrida perforada debe ser positiva."
-    if "RECUPERADA" in msg_up and "AVANCE" in msg_up:
-        return "La longitud recuperada es mayor que el avance perforado."
-    if "RQD" in msg_up and "RECUPERADA" in msg_up:
-        return "Metraje RQD es mayor que la longitud recuperada."
-    if "LRF" in msg_up and "RECUPERADA" in msg_up:
-        return "La longitud de roca fracturada LRF es mayor que la longitud recuperada."
     if "SUMA DE FRAGMENTOS" in msg_up:
         return "La suma de fragmentos físicos supera el avance perforado."
     if "BUZAMIENTO" in msg_up and "COINCIDE" in msg_up:
@@ -71,7 +89,10 @@ def simplify_message(msg):
         return "El valor de JRC10 no puede ser negativo."
     if "FORMA DE JUNTA NO VÁLIDA" in msg_up or "FORMA DE JUNTA NO VALIDA" in msg_up or "FORMA DE JUNTA" in msg_up and "INVALIDO" in msg_up:
         return "Forma de junta no válida. Permitidos: Plano (1) a Irregular (6)."
-    if "ESPESOR DE RELLENO" in msg_up and ("MAYOR" in msg_up or "SUPERA" in msg_up):
+    if "NO SE HA REGISTRADO ESPESOR DE RELLENO" in msg_up or "LA ABERTURA DE JUNTA ES MAYOR A 0MM" in msg_up:
+        return "La abertura de junta es mayor a 0mm pero no se ha registrado espesor de relleno."
+
+    if "ESPESOR DE RELLENO NO PUEDE SER MAYOR" in msg_up or "ESPESOR DE RELLENO" in msg_up and "SUPERA A LA ABERTURA" in msg_up:
         if "EXCEPTO" in msg_up or "ESTRUCTURAS" in msg_up:
             return "El espesor de relleno no puede ser mayor que la abertura de junta excepto en estructuras F, RF, VN, SZ, F+10 o BED."
         return "El espesor de relleno no puede ser mayor que la abertura de junta."
@@ -81,12 +102,8 @@ def simplify_message(msg):
         return "El tipo de relleno está definido pero la abertura de junta es 0mm."
     if "DUREZA DE PARED" in msg_up and ("SUPERA" in msg_up or "INCOMPATIBILIDAD GEOLÓGICA" in msg_up or "INCOMPATIBILIDAD GEOLOGICA" in msg_up):
         return "Dureza de pared de junta en Estructural supera la resistencia maxima estimada de la corrida en LGG."
-    if "LITOLOGÍA" in msg_up or "LITOLOGIA" in msg_up:
-        return "Incompatibilidad de litología entre la corrida y la junta."
-    if "VACÍO" in msg_up or "VACIO" in msg_up:
-        return "Campo obligatorio se encuentra vacío."
     if "HUÉRFANA" in msg_up or "HUERFANA" in msg_up:
-        return "Profundidad huérfana de junta no corresponde a ningún tramo de corrida en LGG."
+        return "Profundidad huérfana de estructura en Logueo Estructural no corresponde a ningún tramo de corrida en LGG."
     if "NO EXISTE DE FORMA EXACTA" in msg_up or "PAR DE CORRIDA" in msg_up or "COINCIDE EXACTAMENTE" in msg_up or "CORRIDA ASOCIADA" in msg_up:
         return "La corrida asociada (de/a) no existe de forma exacta en las corridas de LGG para el taladro."
     if "FUERA DEL TRAMO" in msg_up or "TRAMO DE CORRIDA ESPECIFICADO" in msg_up:
@@ -103,46 +120,13 @@ def simplify_message(msg):
         return "El ángulo Dip es inválido. Debe estar entre 0° y 90°."
     if "AZIMUT" in msg_up or "AZIMUTH" in msg_up:
         return "El ángulo Azimut es inválido. Debe estar entre 0° y 360°."
-    if "FRF" in msg_up and ("NEGATIVO" in msg_up or "ENTERO" in msg_up or "FÓRMULA" in msg_up or "FORMULA" in msg_up):
-        if "NEGATIVO" in msg_up:
-            return "El valor de FRF no puede ser negativo."
-        if "ENTERO" in msg_up:
-            return "El valor de FRF debe ser un número entero."
-        return "El valor de FRF no coincide con el calculado por la fórmula."
     if "PROFUNDIDADES FINALES" in msg_up or "COINCIDEN ENTRE MÓDULOS" in msg_up:
         return "Las profundidades finales del taladro no coinciden entre módulos (LGG, Estructural, Collar, Survey)."
     if "EXCEDE EL LÍMITE FINAL REGISTRADO EN LGG" in msg_up:
         return "La profundidad en logueo estructural excede el límite final registrado en LGG."
     if "ENTERO" in msg_up:
         return "El valor del campo debe ser un número entero."
-    if "NEGATIV" in msg_up:
-        if "DE:" in msg_up or "DE " in msg_up:
-            return "El valor de 'de:' no puede ser negativo."
-        if "A:" in msg_up or "A " in msg_up:
-            return "El valor de 'a:' no puede ser negativo."
-        if "RECUPERADA" in msg_up:
-            return "La longitud recuperada no puede ser negativa."
-        if "RQD" in msg_up:
-            return "El metraje RQD no puede ser negativo."
-        if "LRF" in msg_up or "ROCA FRACTURADA" in msg_up:
-            return "La longitud de roca fracturada LRF no puede ser negativa."
-        if "FRAGMENTOS <10CM" in msg_up or "<10CM" in msg_up:
-            return "El metraje de fragmentos <10cm no puede ser negativo."
-        if "FRACTURAS NATURALES" in msg_up:
-            return "El número de fracturas naturales no puede ser negativo."
-        if "BUZ<30" in msg_up or "BUZ <30" in msg_up:
-            return "El número de fracturas en Buz<30° no puede ser negativo."
-        if "30°-60°" in msg_up or "30-60" in msg_up:
-            return "El número de fracturas en 30°-60° no puede ser negativo."
-        if "BUZ>60" in msg_up or "BUZ >60" in msg_up:
-            return "El número de fracturas en Buz>60° no puede ser negativo."
-        if "ABERTURA" in msg_up:
-            return "La abertura no puede ser negativa."
-        if "ESPESOR" in msg_up:
-            return "El espesor de relleno no puede ser negativo."
-        if "CAMPAÑA" in msg_up or "CAMPANA" in msg_up:
-            return "El año de campaña no puede ser negativo."
-        return "El valor no puede ser negativo."
+        
     return msg_clean
 
 def get_safe_sheet_name(title, index):
