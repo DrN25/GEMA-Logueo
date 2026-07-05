@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useDeferredValue } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ComposedChart, Scatter, Line, XAxis, YAxis, ZAxis, CartesianGrid,
   ResponsiveContainer, Label, Cell, BarChart, Bar, Tooltip, Legend, LabelList
@@ -6,7 +7,7 @@ import {
 import { BarChart2, ChevronLeft, ChevronRight, ListFilter } from 'lucide-react';
 import { calculateRowRmr } from '../../utils/formulaEngine';
 import { LITHOLOGY_CATALOG } from '../../utils/catalogData';
-import RqdPorLitologiaTab from './RqdPorLitologiaTab';
+import RqdPorLitologiaTab, { getLithologyClass } from './RqdPorLitologiaTab';
 
 // ─── Control Points & Envelopes (Bieniawski Chart D) ───
 const BIENIAWSKI_CTRL_MIN = [
@@ -68,6 +69,7 @@ interface DashPoint {
   ff_per_m: number;
   ph_teorico: number;
   lito1?: string;
+  lito2?: string;
   lito3?: string;
   rmr89?: number;
   elev_m?: number;
@@ -177,6 +179,247 @@ function spacingClass(s: number): { label: string; color: string } {
   return { label: 'Muy Cerrado', color: '#ef4444' };
 }
 
+const getRqdColorClass = (pct: number): string => {
+  if (pct <= 40) return 'text-red-500';
+  if (pct <= 70) return 'text-amber-400';
+  return 'text-emerald-400';
+};
+
+const BienTooltip = ({ hoveredPoint }: any) => {
+  if (!hoveredPoint) return null;
+  const d = hoveredPoint;
+
+  const minRqd = interpolateY(BIENIAWSKI_CTRL_MIN, d.spacing_mm, true);
+  const maxRqd = interpolateY(BIENIAWSKI_CTRL_MAX, d.spacing_mm, true);
+
+  const l1 = d.lito1 && d.lito1 !== '-1' && d.lito1 !== '-' ? d.lito1.trim().toUpperCase() : '';
+  const l2 = d.lito2 && d.lito2 !== '-1' && d.lito2 !== '-' ? d.lito2.trim().toUpperCase() : '';
+  const l3 = d.lito3 && d.lito3 !== '-1' && d.lito3 !== '-' ? d.lito3.trim().toUpperCase() : '';
+  const mainLito = l3 || l1 || 'S/D';
+  const clase = getLithologyClass(mainLito);
+  const litoCombo = [l1, l2, l3].filter(Boolean).join('\t');
+
+  return (
+    <div className="bg-navy-950/95 border border-navy-700 rounded-xl p-3 text-xs shadow-2xl backdrop-blur-sm space-y-1.5 w-[340px] text-left pointer-events-none whitespace-pre-line">
+      <p className="font-extrabold border-b border-navy-800 pb-1.5 mb-1 text-[11px] tracking-wide flex flex-wrap gap-x-1 items-center">
+        <span className="text-cyan-400">📍 {d.taladro}</span>
+        <span className="text-slate-500">-</span>
+        <span className="text-orange-400">Corrida de {d.corrida}</span>
+        <span className="text-slate-500">-</span>
+        <span className="text-fuchsia-400">{litoCombo} ({clase})</span>
+      </p>
+      <p className="text-slate-100 font-extrabold text-xs">
+        Espaciamiento: <span className="text-cyan-300 font-black">{d.spacing_mm} mm</span>
+      </p>
+      <p className="text-blue-400 text-xs">
+        Curva RQD mínimo: <span className="font-bold">{minRqd > 0 ? `${minRqd.toFixed(1)}%` : '0.0%'}</span>
+      </p>
+      <p className="text-orange-400 text-xs">
+        Curva RQD máximo: <span className="font-bold">{maxRqd > 0 ? `${maxRqd.toFixed(1)}%` : '100.0%'}</span>
+      </p>
+      <p className="text-slate-300 text-xs">
+        RQD Medido: <span className={`${getRqdColorClass(d.rqd_pct)} font-bold`}>{d.rqd_pct}%</span>
+      </p>
+      <p className="text-slate-300 text-xs">
+        Estado de Banda: <span className={`font-semibold ${bandStatus(d.rqd_pct, d.spacing_mm) === 'dentro' ? 'text-emerald-400' : 'text-red-500'}`}>
+          {bandStatus(d.rqd_pct, d.spacing_mm) === 'dentro' ? '✓ Dentro de Banda' : '▲ Fuera de Banda'}
+        </span>
+      </p>
+    </div>
+  );
+};
+
+const PhTooltip = ({ hoveredPoint }: any) => {
+  if (!hoveredPoint) return null;
+  const d = hoveredPoint;
+
+  const ff = d.ff_per_m;
+  const minRqd = interpolateY(LAMBDA_CTRL_MIN, ff, false);
+  const maxRqd = interpolateY(LAMBDA_CTRL_MAX, ff, false);
+
+  const l1 = d.lito1 && d.lito1 !== '-1' && d.lito1 !== '-' ? d.lito1.trim().toUpperCase() : '';
+  const l2 = d.lito2 && d.lito2 !== '-1' && d.lito2 !== '-' ? d.lito2.trim().toUpperCase() : '';
+  const l3 = d.lito3 && d.lito3 !== '-1' && d.lito3 !== '-' ? d.lito3.trim().toUpperCase() : '';
+  const mainLito = l3 || l1 || 'S/D';
+  const clase = getLithologyClass(mainLito);
+  const litoCombo = [l1, l2, l3].filter(Boolean).join('\t');
+
+  return (
+    <div className="bg-navy-950/95 border border-navy-700 rounded-xl p-3 text-xs shadow-2xl backdrop-blur-sm space-y-1 w-[340px] text-left pointer-events-none whitespace-pre-line">
+      <p className="font-extrabold border-b border-navy-800 pb-1.5 mb-1 text-[11px] tracking-wide flex flex-wrap gap-x-1 items-center">
+        <span className="text-cyan-400">📍 {d.taladro}</span>
+        <span className="text-slate-500">-</span>
+        <span className="text-orange-400">Corrida de {d.corrida}</span>
+        <span className="text-slate-500">-</span>
+        <span className="text-fuchsia-400">{litoCombo} ({clase})</span>
+      </p>
+      <p className="text-slate-100 font-extrabold text-xs mb-1">
+        FF = <span className="text-cyan-300 font-black">{ff.toFixed(2)} fract/m</span>
+      </p>
+      <p className="text-red-400 text-xs">
+        Curva RQD mínimo: <span className="font-bold">{minRqd > 0 ? `${minRqd.toFixed(1)}%` : '0.0%'}</span>
+      </p>
+      <p className="text-blue-400 text-xs">
+        Curva RQD máximo: <span className="font-bold">{maxRqd > 0 ? `${maxRqd.toFixed(1)}%` : '100.0%'}</span>
+      </p>
+      <p className="text-slate-300 text-xs">
+        Priest &amp; Hudson teórico: <span className="text-slate-100 font-bold">{d.ph_teorico}%</span>
+      </p>
+      <p className="text-slate-300 text-xs">
+        RQD Medido: <span className={`${getRqdColorClass(d.rqd_pct)} font-bold`}>{d.rqd_pct}%</span>
+      </p>
+      <p className="text-slate-300 text-xs">
+        Delta (Med - Teórico): <span className={`font-semibold ${Math.abs(d.rqd_pct - d.ph_teorico) > 15 ? 'text-red-500' : 'text-emerald-400'}`}>
+          {(d.rqd_pct - d.ph_teorico).toFixed(1)}%
+        </span>
+      </p>
+    </div>
+  );
+};
+
+interface BieniawskiChartSectionProps {
+  scatterBien: DashPoint[];
+}
+
+const BieniawskiChartSection = React.memo(({ scatterBien }: BieniawskiChartSectionProps) => {
+  const [hoveredPointBien, setHoveredPointBien] = useState<any | null>(null);
+
+  return (
+    <div className="w-full overflow-auto scrollbar-thin rounded-lg border border-navy-900/60 p-2 bg-navy-950/40 mt-2 relative" onMouseLeave={() => setHoveredPointBien(null)}>
+      <div style={{ minWidth: 600, height: 380 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart margin={{ top: 10, right: 10, bottom: 20, left: -20 }} onMouseLeave={() => setHoveredPointBien(null)}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b/30" />
+            <XAxis
+              dataKey="x"
+              type="number"
+              scale="log"
+              domain={[0.8, 2200]}
+              ticks={[1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000]}
+              tick={{ fill: '#64748b', fontSize: 10 }}
+              tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`}
+            >
+              <Label value="Espaciamiento (mm)" position="insideBottom" offset={-15} fill="#64748b" fontSize={11} fontWeight="bold" />
+            </XAxis>
+            <YAxis dataKey="y" domain={[-2, 102]} ticks={[0, 20, 40, 60, 80, 100]} tick={{ fill: '#64748b', fontSize: 10 }}>
+              <Label value="RQD (%)" angle={-90} position="insideLeft" offset={15} fill="#64748b" fontSize={11} fontWeight="bold" />
+            </YAxis>
+            <ZAxis type="number" range={[16, 16]} />
+
+            <Line data={BIENIAWSKI_CTRL_MIN} dataKey="y" type="monotone" dot={false} stroke="#ef4444" strokeWidth={2} strokeDasharray="6 3" name="Banda Mínima" />
+            <Line data={BIENIAWSKI_CTRL_MAX} dataKey="y" type="monotone" dot={false} stroke="#10b981" strokeWidth={2} strokeDasharray="6 3" name="Banda Máxima" />
+            <Line data={BIENIAWSKI_CTRL_MID} dataKey="y" type="monotone" dot={false} stroke="#3b82f6" strokeWidth={2} strokeDasharray="4 3" name="Media" />
+
+            <Scatter data={scatterBien} onMouseLeave={() => setHoveredPointBien(null)}>
+              {scatterBien.map((entry, index) => (
+                <Cell
+                  key={`cell-bien-${index}`}
+                  fill={getDrillColor(entry.taladro)}
+                  onMouseEnter={(e: any) => {
+                    setHoveredPointBien({ data: entry, x: e.clientX, y: e.clientY });
+                  }}
+                  onMouseMove={(e: any) => {
+                    setHoveredPointBien({ data: entry, x: e.clientX, y: e.clientY });
+                  }}
+                  onMouseLeave={() => {
+                    setHoveredPointBien((prev: any) => (prev && prev.data === entry ? null : prev));
+                  }}
+                  style={{ cursor: 'pointer' }}
+                />
+              ))}
+            </Scatter>
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+
+      {hoveredPointBien && createPortal(
+        <div
+          className="fixed z-[9999] pointer-events-none animate-fade-in"
+          style={{
+            left: hoveredPointBien.x,
+            top: hoveredPointBien.y,
+            transform: 'translate(-50%, -100%)',
+            marginTop: '-12px',
+          }}
+        >
+          <BienTooltip hoveredPoint={hoveredPointBien.data} />
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+});
+
+BieniawskiChartSection.displayName = 'BieniawskiChartSection';
+
+interface PriestHudsonChartSectionProps {
+  scatterPh: DashPoint[];
+  phSuaveLine: { x: number; y: number }[];
+}
+
+const PriestHudsonChartSection = React.memo(({ scatterPh, phSuaveLine }: PriestHudsonChartSectionProps) => {
+  const [hoveredPointPh, setHoveredPointPh] = useState<any | null>(null);
+
+  return (
+    <div className="w-full overflow-auto scrollbar-thin rounded-lg border border-navy-900/60 p-2 bg-navy-950/40 mt-2 relative" onMouseLeave={() => setHoveredPointPh(null)}>
+      <div style={{ minWidth: 600, height: 380 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart margin={{ top: 10, right: 10, bottom: 20, left: -20 }} onMouseLeave={() => setHoveredPointPh(null)}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b/30" />
+            <XAxis type="number" dataKey="x" domain={[-0.5, 40.5]} ticks={[0, 5, 10, 15, 20, 25, 30, 35, 40]} tick={{ fill: '#64748b', fontSize: 10 }}>
+              <Label value="Frecuencia de Fracturas (fract/m)" position="insideBottom" offset={-15} fill="#64748b" fontSize={11} fontWeight="bold" />
+            </XAxis>
+            <YAxis dataKey="y" domain={[-2, 102]} ticks={[0, 20, 40, 60, 80, 100]} tick={{ fill: '#64748b', fontSize: 10 }}>
+              <Label value="RQD (%)" angle={-90} position="insideLeft" offset={15} fill="#64748b" fontSize={11} fontWeight="bold" />
+            </YAxis>
+            <ZAxis type="number" range={[16, 16]} />
+
+            <Line data={phSuaveLine} dataKey="y" type="monotone" dot={false} stroke="#64748b" strokeWidth={2} name="P&H Teórico" />
+            <Line data={LAMBDA_CTRL_MIN} dataKey="y" type="monotone" dot={false} stroke="#ef4444" strokeWidth={2} strokeDasharray="5 3" name="Banda Mínima" />
+            <Line data={LAMBDA_CTRL_MAX} dataKey="y" type="monotone" dot={false} stroke="#10b981" strokeWidth={2} strokeDasharray="5 3" name="Banda Máxima" />
+
+            <Scatter data={scatterPh} onMouseLeave={() => setHoveredPointPh(null)}>
+              {scatterPh.map((entry, index) => (
+                <Cell
+                  key={`cell-ph-${index}`}
+                  fill={getDrillColor(entry.taladro)}
+                  onMouseEnter={(e: any) => {
+                    setHoveredPointPh({ data: entry, x: e.clientX, y: e.clientY });
+                  }}
+                  onMouseMove={(e: any) => {
+                    setHoveredPointPh({ data: entry, x: e.clientX, y: e.clientY });
+                  }}
+                  onMouseLeave={() => {
+                    setHoveredPointPh((prev: any) => (prev && prev.data === entry ? null : prev));
+                  }}
+                  style={{ cursor: 'pointer' }}
+                />
+              ))}
+            </Scatter>
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+
+      {hoveredPointPh && createPortal(
+        <div
+          className="fixed z-[9999] pointer-events-none animate-fade-in"
+          style={{
+            left: hoveredPointPh.x,
+            top: hoveredPointPh.y,
+            transform: 'translate(-50%, -100%)',
+            marginTop: '-12px',
+          }}
+        >
+          <PhTooltip hoveredPoint={hoveredPointPh.data} />
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+});
+
+PriestHudsonChartSection.displayName = 'PriestHudsonChartSection';
+
 function computePointsFromCorridas(corridas: Corrida[], taladroName: string): DashPoint[] {
   const points: DashPoint[] = [];
   for (const row of corridas) {
@@ -195,6 +438,7 @@ function computePointsFromCorridas(corridas: Corrida[], taladroName: string): Da
         ff_per_m: parseFloat(ff.toFixed(4)),
         ph_teorico: parseFloat(phTeoricoFn(ff).toFixed(2)),
         lito1: row.lito1 || 'S/D',
+        lito2: row.lito2 || '',
         lito3: row.lito3 || 'S/D',
         rmr89: res.rmr_89,
         elev_m: 4000.0 - parseFloat(((row.de + row.a) / 2).toFixed(2))
@@ -770,42 +1014,7 @@ export default function RqdDashboard({ activeTaladro, taladros }: Props) {
                   <p className="text-xs text-slate-500 mt-1 font-semibold">Diagrama logarítmico para comprobar la correspondencia empírica de calidad.</p>
                 </div>
 
-                {/* WRAPPER FIJO PARA RECHARTS (Soluciona tooltips, hover y escalas) */}
-                <div className="w-full overflow-auto scrollbar-thin rounded-lg border border-navy-900/60 p-2 bg-navy-950/40 mt-2">
-                  <div style={{ minWidth: 600, height: 380 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <ComposedChart margin={{ top: 10, right: 10, bottom: 20, left: -20 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#1e293b/30" />
-                        <XAxis
-                          dataKey="x"
-                          type="number"
-                          scale="log"
-                          domain={[0.8, 2200]}
-                          ticks={[1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000]}
-                          tick={{ fill: '#64748b', fontSize: 10 }}
-                          tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`}
-                        >
-                          <Label value="Espaciamiento (mm)" position="insideBottom" offset={-15} fill="#64748b" fontSize={11} fontWeight="bold" />
-                        </XAxis>
-                        <YAxis dataKey="y" domain={[-2, 102]} ticks={[0, 20, 40, 60, 80, 100]} tick={{ fill: '#64748b', fontSize: 10 }}>
-                          <Label value="RQD (%)" angle={-90} position="insideLeft" offset={15} fill="#64748b" fontSize={11} fontWeight="bold" />
-                        </YAxis>
-                        <ZAxis type="number" range={[16, 16]} />
-                        <Tooltip contentStyle={{ background: '#090f1d', borderColor: '#1e293b', fontSize: 11 }} />
-
-                        <Line data={bienMinLine} dataKey="y" type="monotone" dot={false} stroke="#ef4444" strokeWidth={2} strokeDasharray="6 3" name="Banda Mínima" />
-                        <Line data={bienMaxLine} dataKey="y" type="monotone" dot={false} stroke="#10b981" strokeWidth={2} strokeDasharray="6 3" name="Banda Máxima" />
-                        <Line data={bienMidLine} dataKey="y" type="monotone" dot={false} stroke="#3b82f6" strokeWidth={2} strokeDasharray="4 3" name="Media" />
-
-                        <Scatter data={scatterBien}>
-                          {scatterBien.map((entry, index) => (
-                            <Cell key={`cell-bien-${index}`} fill={getDrillColor(entry.taladro)} />
-                          ))}
-                        </Scatter>
-                      </ComposedChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
+                <BieniawskiChartSection scatterBien={scatterBien} />
               </section>
 
               {/* Priest & Hudson */}
@@ -815,33 +1024,7 @@ export default function RqdDashboard({ activeTaladro, taladros }: Props) {
                   <p className="text-xs text-slate-500 mt-1 font-semibold">Densidad lineal de fracturación empírica en matriz geomecánica.</p>
                 </div>
 
-                <div className="w-full overflow-auto scrollbar-thin rounded-lg border border-navy-900/60 p-2 bg-navy-950/40 mt-2">
-                  <div style={{ minWidth: 600, height: 380 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <ComposedChart margin={{ top: 10, right: 10, bottom: 20, left: -20 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#1e293b/30" />
-                        <XAxis type="number" dataKey="x" domain={[-0.5, 40.5]} ticks={[0, 5, 10, 15, 20, 25, 30, 35, 40]} tick={{ fill: '#64748b', fontSize: 10 }}>
-                          <Label value="Frecuencia de Fracturas (fract/m)" position="insideBottom" offset={-15} fill="#64748b" fontSize={11} fontWeight="bold" />
-                        </XAxis>
-                        <YAxis dataKey="y" domain={[-2, 102]} ticks={[0, 20, 40, 60, 80, 100]} tick={{ fill: '#64748b', fontSize: 10 }}>
-                          <Label value="RQD (%)" angle={-90} position="insideLeft" offset={15} fill="#64748b" fontSize={11} fontWeight="bold" />
-                        </YAxis>
-                        <ZAxis type="number" range={[16, 16]} />
-                        <Tooltip contentStyle={{ background: '#090f1d', borderColor: '#1e293b', fontSize: 11 }} />
-
-                        <Line data={phSuaveLine} dataKey="y" type="monotone" dot={false} stroke="#64748b" strokeWidth={2} name="P&H Teórico" />
-                        <Line data={lambdaMinLine} dataKey="y" type="monotone" dot={false} stroke="#ef4444" strokeWidth={2} strokeDasharray="5 3" name="Banda Mínima" />
-                        <Line data={lambdaMaxLine} dataKey="y" type="monotone" dot={false} stroke="#10b981" strokeWidth={2} strokeDasharray="5 3" name="Banda Máxima" />
-
-                        <Scatter data={scatterPh}>
-                          {scatterPh.map((entry, index) => (
-                            <Cell key={`cell-ph-${index}`} fill={getDrillColor(entry.taladro)} />
-                          ))}
-                        </Scatter>
-                      </ComposedChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
+                <PriestHudsonChartSection scatterPh={scatterPh} phSuaveLine={phSuaveLine} />
               </section>
             </div>
 

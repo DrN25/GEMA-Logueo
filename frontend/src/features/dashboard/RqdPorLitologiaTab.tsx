@@ -11,6 +11,7 @@ interface DashPoint {
     ff_per_m: number;
     ph_teorico: number;
     lito1?: string;
+    lito2?: string;
     lito3?: string;
     rmr89?: number;
     elev_m?: number;
@@ -33,7 +34,7 @@ interface BoxplotStats {
     color: string;
 }
 
-function getLithologyClass(code: string): string {
+export function getLithologyClass(code: string): string {
     const upper = code.trim().toUpperCase();
     if (["MZB", "MBF", "MBF1", "MBF2", "MBF_P", "MZM", "MZM_F", "MZM_M", "MZH", "MZH_1", "MZH_2", "MZD", "MZQ", "AN", "GD"].includes(upper)) return "INTRUSIVOS";
     if (["LMT", "LMT_C", "LMT_M", "LMT_MG", "LMT_S", "LMT_U", "SHL", "HFL", "SHL_MA", "MARA", "MARA_BX"].includes(upper)) return "SEDIMENTARIOS";

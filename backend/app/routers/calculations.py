@@ -49,6 +49,7 @@ def get_dashboard_rqd_summary(db: Session = Depends(get_db)):
                 lgg.NumFracturasNaturales AS frac_nat,
                 lgg.FRF                   AS frf,
                 lit1.CodigoLitologia      AS lito1,
+                lit2.CodigoLitologia      AS lito2,
                 lit3.CodigoLitologia      AS lito3,
                 vrmr.RMR89_Total          AS rmr89,
                 col.Elevacion             AS collar_elev,
@@ -57,6 +58,7 @@ def get_dashboard_rqd_summary(db: Session = Depends(get_db)):
             LEFT JOIN dbo.Campañas c                 ON s.CampañaID = c.CampañaID
             JOIN dbo.LogueoGeotecnicoGeneral lgg     ON lgg.SondajeID = s.SondajeID
             LEFT JOIN dbo.Litologias lit1            ON lgg.Litologia1ID = lit1.LitologiaID
+            LEFT JOIN dbo.Litologias lit2            ON lgg.Litologia2ID = lit2.LitologiaID
             LEFT JOIN dbo.Litologias lit3            ON lgg.Litologia3ID = lit3.LitologiaID
             LEFT JOIN dbo.ValidacionRMR vrmr         ON vrmr.SondajeID = s.SondajeID 
                                                     AND vrmr.NumeroCorrida = lgg.NumeroRegistro
@@ -84,10 +86,11 @@ def get_dashboard_rqd_summary(db: Session = Depends(get_db)):
         
         # Mapeos geológicos adicionales
         lito1 = row[9].strip() if row[9] else "S/D"
-        lito3 = row[10].strip() if row[10] else "S/D"
-        rmr89 = int(row[11]) if row[11] is not None else None
-        collar_elev = float(row[12]) if row[12] is not None else 4000.0
-        inclinacion = float(row[13]) if row[13] is not None else -90.0
+        lito2 = row[10].strip() if row[10] else ""
+        lito3 = row[11].strip() if row[11] else "S/D"
+        rmr89 = int(row[12]) if row[12] is not None else None
+        collar_elev = float(row[13]) if row[13] is not None else 4000.0
+        inclinacion = float(row[14]) if row[14] is not None else -90.0
 
         perf = round(a_m - de_m, 4)
         if perf <= 0 or perf > 5.0:
@@ -123,6 +126,7 @@ def get_dashboard_rqd_summary(db: Session = Depends(get_db)):
             "ff_per_m": ff_per_m,
             "ph_teorico": ph_teorico,
             "lito1": lito1,
+            "lito2": lito2,
             "lito3": lito3,
             "rmr89": rmr89,
             "elev_m": elev_run
