@@ -167,6 +167,7 @@ export default function LggQaqcPanel({
 
     const criticalCount = safeAlerts.filter(a => a && a.type === 'CRITICAL').length;
     const warningCount = safeAlerts.filter(a => a && a.type === 'WARNING').length;
+    const vacioCount = safeAlerts.filter(a => a && a.type === 'VACIO').length;
 
     // Jump to grid handler
     const handleAlertFix = (fieldId: string) => {

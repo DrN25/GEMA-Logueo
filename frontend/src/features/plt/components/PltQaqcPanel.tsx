@@ -121,6 +121,7 @@ export default function PltQaqcPanel({
 
         const criticalCount = pltAlerts.filter(a => a && a.type === 'CRITICAL').length;
         const warningCount = pltAlerts.filter(a => a && a.type === 'WARNING').length;
+        const vacioCount = pltAlerts.filter(a => a && a.type === 'VACIO').length;
 
         const handleAlertFix = (fieldId: string) => {
             if (onSwitchTab) onSwitchTab('plt');

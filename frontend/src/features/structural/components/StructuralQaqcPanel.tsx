@@ -113,6 +113,7 @@ export default function StructuralQaqcPanel({
 
     const criticalCount = structuralAlerts.filter(a => a.type === 'CRITICAL').length;
     const warningCount = structuralAlerts.filter(a => a.type === 'WARNING').length;
+    const vacioCount = structuralAlerts.filter(a => a.type === 'VACIO').length;
 
     const handleAlertFix = (fieldId: string) => {
       if (onSwitchTab) {

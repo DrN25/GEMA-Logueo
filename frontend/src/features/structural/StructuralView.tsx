@@ -64,8 +64,6 @@ export default function StructuralView({
     setFilterTipoEst,
     filterWeathering,
     setFilterWeathering,
-    handleApplyFilters,
-    handleClearFilters,
     handleCellChange,
     addDiscontinuidadRow,
     insertDiscontinuidadRow,
@@ -76,7 +74,6 @@ export default function StructuralView({
     corridas,
     onDiscontinuidadesChange,
     geologo,
-    selectedRowIndex,
     onSelectRow
   });
 

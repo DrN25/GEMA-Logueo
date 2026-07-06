@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useRef } from 'react';
-import { Database, Filter } from 'lucide-react';
+import { Database } from 'lucide-react';
 import type { ValidationAlert } from '../../utils/qaqcValidator';
-import { LITHOLOGY_CATALOG, RESISTENCIA_OPTIONS, INTEMPERISMO_OPTIONS } from '../../utils/catalogData';
+import { LITHOLOGY_CATALOG } from '../../utils/catalogData';
 import ExcelImportModal from '../../components/common/ExcelImportModal';
 import LggQaqcPanel from './components/LggQaqcPanel';
 import BaseEditableGrid, { type GridColumn } from '../../components/common/BaseEditableGrid';
@@ -81,8 +81,7 @@ export default function LggView({
     setFilterRmrClass,
     filterGeotecnico,
     setFilterGeotecnico,
-    handleApplyFilters,
-    handleClearFilters,
+
     addCorridaRow,
     deleteCorridaRow,
     insertCorridaRow,

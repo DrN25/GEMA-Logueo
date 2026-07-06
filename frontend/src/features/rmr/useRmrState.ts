@@ -121,13 +121,11 @@ export function getDrillColor(name: string): string {
 interface UseRmrStateProps {
   corridas: any[];
   waterTableM: number;
-  activeTaladroName: string;
 }
 
 export function useRmrState({
   corridas = [],
-  waterTableM,
-  activeTaladroName
+  waterTableM
 }: UseRmrStateProps) {
   // Filtros locales
   const [filterLito, setFilterLito] = useState<string>('');

@@ -1,4 +1,3 @@
-import React from 'react';
 import { Trash2, Check, X } from 'lucide-react';
 import type { GridColumn } from '../../components/common/BaseEditableGrid';
 import type { EnsayoPlt } from '../../App';

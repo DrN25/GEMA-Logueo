@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Construction,
   Database
@@ -939,185 +939,7 @@ export default function App() {
     setSyncStatus('unsaved');
   };
 
-  // Render proper sub-views
-  const renderActiveView = () => {
-    if (currentView === 'revision') {
-      return <BulkAuditor apiBase={API_BASE} />;
-    }
 
-    if (!activeTaladro || currentView === 'dashboard' || currentView === 'list') {
-      return (
-        <MainDashboard
-          taladros={taladros}
-          onSelectTaladro={handleSelectTaladro}
-          onCreateTaladro={handleCreateTaladro}
-          onDeleteTaladro={handleDeleteTaladro}
-        />
-      );
-    }
-
-    switch (currentView) {
-      case 'collar':
-        return (
-          <CollarView
-            collar={activeTaladro}
-            surveys={activeTaladro.surveys}
-            alerts={activeAlerts}
-            onCollarChange={handleCollarChange}
-            onSurveysChange={handleSurveysChange}
-          />
-        );
-      case 'lgg':
-        return (
-          <LggView
-            corridas={activeTaladro.corridas}
-            alerts={activeAlerts}
-            onCorridasChange={handleCorridasChange}
-            selectedRowIndex={selectedRowIndex}
-            onSelectRow={setSelectedRowIndex}
-            waterTableM={97.0}
-            darkMode={darkMode}
-            activeTaladroName={activeTaladro.name}
-            activeTaladroGeologo={activeTaladro.geologo}
-            activeTaladroFecha={activeTaladro.fecha_registro}
-            sidebarCollapsed={sidebarCollapsed}
-            onFocusField={handleFocusField}
-            onCreateTaladro={(newTal) => handleCreateTaladro(newTal, 'lgg')}
-            onRenameTaladro={handleRenameTaladro}
-            onImportExcel={handleImportExcel}
-            syncStatus={syncStatus}
-            defaultTurno={activeTaladro.turno}
-          />
-        );
-      case 'lgest':
-        return (
-          <StructuralView
-            discontinuidades={activeTaladro.discontinuidades}
-            corridas={activeTaladro.corridas}
-            onDiscontinuidadesChange={handleDiscontinuidadesChange}
-            geologo={activeTaladro.geologo}
-            activeTaladroName={activeTaladro.name}
-            alerts={activeAlerts}
-            onImportExcel={handleImportStructExcelData}
-            darkMode={darkMode}
-            sidebarCollapsed={sidebarCollapsed}
-            onFocusField={handleFocusField}
-          />
-        );
-      case 'rmr':
-        return (
-          <RmrAnalysis
-            corridas={activeTaladro.corridas}
-            waterTableM={97.0}
-            activeTaladroName={activeTaladro.name}
-            geologo={activeTaladro.geologo}
-            fecha={activeTaladro.fecha_registro}
-            taladros={taladros}
-          />
-        );
-      case 'import':
-        return (
-          <div className="glass-panel p-8 rounded-xl border border-navy-800 space-y-6 max-w-2xl mx-auto text-center text-slate-300 shadow-2xl relative overflow-hidden backdrop-blur-md">
-            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-500 via-cyan-400 to-emerald-500" />
-            <div className="w-16 h-16 rounded-full bg-blue-500/10 text-blue-500 dark:text-cyan-400 flex items-center justify-center mx-auto ring-4 ring-blue-500/5 animate-pulse">
-              <Database size={32} />
-            </div>
-            <div className="space-y-2">
-              <h2 className="text-xl font-bold text-slate-100 uppercase tracking-wider">
-                Importación y Exportación de Datos
-              </h2>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-500 dark:text-cyan-400 text-xs font-bold uppercase tracking-wider">
-                <Construction size={12} className="animate-spin" />
-                Módulo En Progreso / In Progress
-              </div>
-            </div>
-            <p className="text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
-              Este módulo facilitará la importación directa de datos históricos en formato BCP y la exportación unificada de registros a plantillas estructuradas de geotecnia minera para software especializado como <span className="text-slate-200 font-semibold">Leapfrog</span>, <span className="text-slate-200 font-semibold">gINT</span> y <span className="text-slate-200 font-semibold">Vulcan</span>.
-            </p>
-            <div className="pt-4 border-t border-navy-800/60 max-w-md mx-auto">
-              <p className="text-xs text-slate-500">
-                La conexión duplicada con SQL Server local se encuentra activa. Las rutinas de persistencia normalizadas ya están preparadas en el backend API.
-              </p>
-            </div>
-          </div>
-        );
-      case 'reports_plt':
-        return (
-          <PltView
-            ensayos_plt={activeTaladro.ensayos_plt || []}
-            onEnsayosPltChange={handleEnsayosPltChange}
-            corridas={activeTaladro.corridas}
-            collar={activeTaladro}
-            alerts={activeAlerts}
-            onImportExcel={handleImportPltExcelData}
-          />
-        );
-      case 'dashboard_rqd':
-        return (
-          <RqdDashboard
-            activeTaladro={activeTaladro}
-            taladros={taladros}
-            onSelectTaladro={(name) => handleSelectTaladro(name, false)}
-          />
-        );
-      case 'reports_pdf':
-        return (
-          <ReportsPdf
-            activeTaladro={activeTaladro}
-            taladros={taladros}
-            onSelectTaladro={(name) => handleSelectTaladro(name, false)}
-          />
-        );
-      case 'config':
-        return (
-          <div className="glass-panel p-6 rounded-xl border border-navy-800 space-y-4 max-w-xl mx-auto text-slate-300">
-            <h2 className="text-lg font-bold text-slate-100 uppercase tracking-wide border-b border-navy-800 pb-2">
-              Configuración de Parámetros
-            </h2>
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between items-center py-2 border-b border-navy-900/60">
-                <span>Campaña</span>
-                <input
-                  type="text"
-                  value={activeTaladro.campana}
-                  onChange={(e) => handleCollarChange({ ...activeTaladro, campana: e.target.value })}
-                  className="bg-navy-900 border border-navy-700 rounded px-2.5 py-1 text-center w-32 text-slate-100 focus:outline-none"
-                />
-              </div>
-              <div className="flex justify-between items-center py-2 border-b border-navy-900/60">
-                <span>Turno Predeterminado</span>
-                <select
-                  value={activeTaladro.turno}
-                  onChange={(e) => handleCollarChange({ ...activeTaladro, turno: e.target.value })}
-                  className="bg-navy-900 border border-navy-700 rounded px-2 py-1 text-slate-200 focus:outline-none"
-                >
-                  <option value="D">Día</option>
-                  <option value="N">Noche</option>
-                </select>
-              </div>
-              <div className="flex justify-between items-center py-2">
-                <span>Diámetro Predeterminado</span>
-                <select
-                  value={activeTaladro.diametro}
-                  onChange={(e) => handleCollarChange({ ...activeTaladro, diametro: e.target.value })}
-                  className="bg-navy-900 border border-navy-700 rounded px-2 py-1 text-slate-200 focus:outline-none"
-                >
-                  <option value="HQ3">HQ3</option>
-                  <option value="NQ3">NQ3</option>
-                  <option value="PQ3">PQ3</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        );
-      default:
-        return (
-          <div className="p-8 text-center text-slate-500 font-medium">
-            Módulo en desarrollo y validación.
-          </div>
-        );
-    }
-  };
 
   return (
     <div className="flex h-screen overflow-hidden text-slate-200 bg-navy-950 font-sans">
@@ -1203,6 +1025,7 @@ export default function App() {
                   onFocusField={handleFocusField}
                   onCreateTaladro={(newTal) => handleCreateTaladro(newTal, 'lgg')}
                   onRenameTaladro={handleRenameTaladro}
+                  onImportExcel={handleImportExcel}
                   syncStatus={syncStatus}
                   defaultTurno={activeTaladro.turno}
                 />
@@ -1254,7 +1077,6 @@ export default function App() {
                 activeTaladroName={activeTaladro.name}
                 geologo={activeTaladro.geologo}
                 fecha={activeTaladro.fecha_registro}
-                taladros={taladros}
               />
             </div>
           )}

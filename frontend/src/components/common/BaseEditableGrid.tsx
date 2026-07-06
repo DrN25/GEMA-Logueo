@@ -16,7 +16,7 @@ export interface GridColumn<T> {
   stickyRight?: number;
   headerBgClass?: string;
   cellClassName?: string;
-  renderCell?: (row: T, index: number, isSelected: boolean) => React.RefNode | React.ReactNode;
+  renderCell?: (row: T, index: number, isSelected: boolean) => React.ReactNode;
 }
 
 interface BaseEditableGridProps<T> {

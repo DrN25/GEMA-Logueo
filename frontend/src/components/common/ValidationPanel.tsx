@@ -224,7 +224,6 @@ export default function ValidationPanel({ alerts, onFocusField }: ValidationPane
             .map((alert, idx) => {
               const isCritical = alert.type === 'CRITICAL';
               const isWarning = alert.type === 'WARNING';
-              const isVacio = alert.type === 'VACIO';
               const context = getAlertContext(alert.field);
 
               return (

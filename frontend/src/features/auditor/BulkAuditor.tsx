@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   FileSpreadsheet, AlertTriangle, Database, ShieldCheck, Download,
   Loader2, Info, RefreshCw, Trash2, X
@@ -18,7 +18,7 @@ interface BulkAuditorProps {
 }
 
 export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
-  const [file, setFile] = useState<File | null>(null);
+
 
   // Lifted state initialized from localStorage for persistence
   const [status, setStatus] = useState<'idle' | 'uploading' | 'processing' | 'loaded' | 'error'>(() => {
@@ -40,9 +40,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
 
   const [excelReady, setExcelReady] = useState<boolean>(false);
 
-  // Sheet selection modal states
-  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-  const [sheetList, setSheetList] = useState<string[]>([]);
+
 
   // History and KPIs
   const [history, setHistory] = useState<AuditHistoryItem[]>([]);
@@ -324,7 +322,6 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
 
     // Reset local frontend state immediately
     setStatus('idle');
-    setFile(null);
     setSelectedAuditId('');
     setProcessingAuditId('');
     setUploadedFilename('');

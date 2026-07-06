@@ -6,7 +6,6 @@ interface UseStructuralStateProps {
   corridas: Corrida[];
   onDiscontinuidadesChange: (discontinuidades: Discontinuidad[]) => void;
   geologo: string;
-  selectedRowIndex: number | null;
   onSelectRow: (index: number | null) => void;
 }
 
@@ -21,8 +20,7 @@ export function useStructuralState({
   corridas,
   onDiscontinuidadesChange,
   geologo,
-  selectedRowIndex,
-  onSelectRow
+  onSelectRow,
 }: UseStructuralStateProps) {
   // --- Filtros ---
   const [filterTipoEst, setFilterTipoEst] = useState<string>('');

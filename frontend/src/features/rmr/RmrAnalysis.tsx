@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { TrendingUp, Search, RotateCcw, Database, Settings } from 'lucide-react';
 import { LITHOLOGY_CATALOG } from '../../utils/catalogData';
 import RmrGrid from './components/RmrGrid';
@@ -74,8 +73,7 @@ export default function RmrAnalysis({
     scatterPh = []
   } = useRmrState({
     corridas,
-    waterTableM,
-    activeTaladroName
+    waterTableM
   });
 
   return (
