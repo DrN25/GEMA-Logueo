@@ -5,7 +5,7 @@ interface SheetSelectModalProps {
   isOpen: boolean;
   onClose: () => void;
   sheets: string[];
-  onConfirm: (lggSheet: string, estSheet: string) => void;
+  onConfirm: (lggSheet: string, estSheet: string, rmrSheet?: string) => void;
 }
 
 export default function SheetSelectModal({
@@ -16,6 +16,7 @@ export default function SheetSelectModal({
 }: SheetSelectModalProps) {
   const [lggSheet, setLggSheet] = useState<string>('');
   const [estSheet, setEstSheet] = useState<string>('');
+  const [rmrSheet, setRmrSheet] = useState<string>('');
   const [error, setError] = useState<string>('');
 
   useEffect(() => {
@@ -33,6 +34,13 @@ export default function SheetSelectModal({
         return lower === 'bd lg est. (2)' || lower === 'bd lg est' || lower === 'lg est' || lower.includes('estruc') || lower.includes('est. (2)');
       });
       if (estMatch) setEstSheet(estMatch);
+
+      // Buscar coincidencia inteligente para Validación RMR
+      const rmrMatch = sheets.find(s => {
+        const lower = s.toLowerCase();
+        return lower === 'validación_rmr' || lower === 'validacion_rmr' || lower === 'rmr' || lower.includes('rmr') || lower.includes('hoja1');
+      });
+      if (rmrMatch) setRmrSheet(rmrMatch);
     }
   }, [sheets]);
 
@@ -40,15 +48,15 @@ export default function SheetSelectModal({
 
   const handleConfirm = () => {
     if (!lggSheet || !estSheet) {
-      setError('Por favor, selecciona las hojas para ambos módulos.');
+      setError('Por favor, selecciona al menos las hojas para LGG y Estructural.');
       return;
     }
     if (lggSheet === estSheet) {
-      setError('No puedes seleccionar la misma hoja para ambos módulos geotécnicos.');
+      setError('No puedes seleccionar la misma hoja para LGG y Estructural.');
       return;
     }
     setError('');
-    onConfirm(lggSheet, estSheet);
+    onConfirm(lggSheet, estSheet, rmrSheet || undefined);
   };
 
   return (
@@ -70,7 +78,7 @@ export default function SheetSelectModal({
               Mapear Hojas del Libro Excel
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              Identifica la hoja correspondiente a cada módulo
+              Identifica la hoja correspondiente a cada módulo (LGG, Estructural, RMR)
             </p>
           </div>
         </div>
@@ -119,6 +127,28 @@ export default function SheetSelectModal({
               className="w-full bg-slate-950 border border-slate-800 text-xs text-slate-200 font-bold px-3 py-2 rounded-lg focus:outline-none focus:border-cyan-500 transition-colors"
             >
               <option value="">-- Seleccionar Hoja --</option>
+              {sheets.map((sheet) => (
+                <option key={sheet} value={sheet}>
+                  {sheet}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* RMR Selection */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-black uppercase tracking-wider text-slate-400 block">
+              Hoja de Validación RMR (Opcional / Auto)
+            </label>
+            <select
+              value={rmrSheet}
+              onChange={(e) => {
+                setRmrSheet(e.target.value);
+                setError('');
+              }}
+              className="w-full bg-slate-950 border border-slate-800 text-xs text-slate-200 font-bold px-3 py-2 rounded-lg focus:outline-none focus:border-cyan-500 transition-colors"
+            >
+              <option value="">-- Ninguna / Auto-detectar --</option>
               {sheets.map((sheet) => (
                 <option key={sheet} value={sheet}>
                   {sheet}

@@ -116,6 +116,9 @@ def restore_env():
         print("--> Archivo .env del frontend restaurado a su configuración original (localhost).")
 
 def main():
+    # 0. Restablecer env si hubo un cierre abrupto anterior
+    restore_env()
+
     # 1. Limpieza inicial de puertos por seguridad
     print("--> Liberando puertos 5173 y 8000 de cualquier proceso previo...")
     os.system("for /f \"tokens=5\" %a in ('netstat -aon ^| findstr :5173 ^| findstr LISTENING') do taskkill /f /pid %a >nul 2>&1")

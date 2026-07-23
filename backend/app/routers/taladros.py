@@ -86,29 +86,33 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
 @router.get("")
 def list_taladros(db: Session = Depends(get_db)):
     """Retorna un listado resumido de todos los sondajes cargados en GEMA."""
-    sondajes = db.query(models.Sondaje).all()
-    results = []
-    
-    for s in sondajes:
-        collar = s.collar
+    try:
+        sondajes = db.query(models.Sondaje).all()
+        results = []
         
-        # Metraje perforado total acumulado por este sondaje en LGG
-        perf_total = db.query(
-            func.sum(models.LogueoGeotecnicoGeneral.IntervaloA - models.LogueoGeotecnicoGeneral.IntervaloDe)
-        ).filter_by(SondajeID=s.SondajeID).scalar() or 0.0
+        for s in sondajes:
+            collar = s.collar
+            
+            # Metraje perforado total acumulado por este sondaje en LGG
+            perf_total = db.query(
+                func.sum(models.LogueoGeotecnicoGeneral.IntervaloA - models.LogueoGeotecnicoGeneral.IntervaloDe)
+            ).filter_by(SondajeID=s.SondajeID).scalar() or 0.0
 
-        results.append({
-            "name": s.CodigoSondaje,
-            "proyecto": s.Spacer if hasattr(s, 'Spacer') else (s.Spacer if hasattr(s, 'Spacer') else (s.Proyecto if s.Proyecto else "Proyecto A")),
-            "geologo": s.Geotecnico if s.Geotecnico else "RD/RB",
-            "diametro": s.DiametroPerfora if s.DiametroPerfora else "HQ3",
-            "inclinacion": s.InclinacionTaladro if s.InclinacionTaladro else -60.0,
-            "fecha_registro": s.FechaRegistro.strftime("%Y-%m-%d") if s.FechaRegistro else "2026-06-29",
-            "corridas_count": db.query(models.LogueoGeotecnicoGeneral).filter_by(SondajeID=s.SondajeID).count(),
-            "surveys_count": db.query(models.Survey).filter_by(SondajeID=s.SondajeID).count(),
-            "perf_total": round(float(perf_total), 2)
-        })
-    return results
+            results.append({
+                "name": s.CodigoSondaje,
+                "proyecto": s.Spacer if hasattr(s, 'Spacer') else (s.Spacer if hasattr(s, 'Spacer') else (s.Proyecto if s.Proyecto else "Proyecto A")),
+                "geologo": s.Geotecnico if s.Geotecnico else "RD/RB",
+                "diametro": s.DiametroPerfora if s.DiametroPerfora else "HQ3",
+                "inclinacion": s.InclinacionTaladro if s.InclinacionTaladro else -60.0,
+                "fecha_registro": s.FechaRegistro.strftime("%Y-%m-%d") if s.FechaRegistro else "2026-06-29",
+                "corridas_count": db.query(models.LogueoGeotecnicoGeneral).filter_by(SondajeID=s.SondajeID).count(),
+                "surveys_count": db.query(models.Survey).filter_by(SondajeID=s.SondajeID).count(),
+                "perf_total": round(float(perf_total), 2)
+            })
+        return results
+    except Exception as e:
+        print("[!] Backend SQL Server no disponible en GET /api/taladros:", e)
+        return []
 
 @router.get("/{name}", response_model=TaladroSchema)
 def get_taladro(name: str, db: Session = Depends(get_db)):

@@ -258,6 +258,39 @@ export const EXPECTED_STRUCT_FIELDS: MappingField[] = [
   { key: 'tipo', label: 'Tipo (Nat/Mec)', required: false, synonyms: ['tipo', 'type', 'tipodejunta', 'juntatipo'] }
 ];
 
+export const EXPECTED_RMR_FIELDS: MappingField[] = [
+  { key: 'sondaje', label: 'Taladro / Sondaje', required: true, synonyms: ['sondaje', 'taladro', 'drillhole', 'holeid', 'taladroid'] },
+  { key: 'corrida', label: 'N° Corrida', required: true, synonyms: ['corrida', 'run', 'nrocorrida', 'numcorrida'] },
+  { key: 'lito1', label: 'Litho 1', required: true, synonyms: ['litho1', 'lito1', 'litologia1'] },
+  { key: 'lito2', label: 'Litho 2', required: false, synonyms: ['litho2', 'lito2', 'litologia2'] },
+  { key: 'lito3', label: 'Litho 3', required: false, synonyms: ['litho3', 'lito3', 'litologia3'] },
+  { key: 'de', label: 'Desde (m)', required: true, synonyms: ['desde', 'desdem', 'de', 'from'] },
+  { key: 'a', label: 'Hasta (m)', required: true, synonyms: ['hasta', 'hastam', 'a', 'to'] },
+  { key: 'long_corrida', label: 'Long. Corrida (m)', required: true, synonyms: ['longcorrida', 'longcorridam', 'longitudcorrida', 'longitudcorridam'] },
+  { key: 'rec_m', label: 'Rec (m)', required: true, synonyms: ['recm', 'rec', 'recuperada', 'recuperacionm'] },
+  { key: 'rec_pct', label: 'Rec (%)', required: true, synonyms: ['recpct', 'rec%', 'recuperacion%'] },
+  { key: 'rqd_m', label: 'RQD (m)', required: true, synonyms: ['rqdm', 'rqd'] },
+  { key: 'rqd_pct', label: 'RQD (%)', required: true, synonyms: ['rqdpct', 'rqd%'] },
+  { key: 'lrf_m', label: 'Long. Tramo fracturado (m)', required: true, synonyms: ['longtramofracturadom', 'lrfm', 'lrf'] },
+  { key: 'frf', label: 'FRF (zonas trituradas)', required: true, synonyms: ['frf', 'frfzonastrituradas'] },
+  { key: 'frac_nat', label: 'Fracturas naturales', required: true, synonyms: ['fracturasnaturales', 'fracnat', 'fn'] },
+  { key: 'total_frac', label: 'Total de Fracturas', required: true, synonyms: ['totaldefracturas', 'totalfracturas'] },
+  { key: 'ff_1m', label: 'FF/1m', required: true, synonyms: ['ff1m', 'ff/1m'] },
+  { key: 'espaciamiento_mm', label: 'Espaciamiento (mm)', required: true, synonyms: ['espaciamientomm', 'espaciamiento'] },
+  { key: 'resistencia', label: 'Resistencia', required: true, synonyms: ['resistencia', 'resistisrm'] },
+  { key: 'tipo_estructura', label: 'Tipo de Estructura', required: true, synonyms: ['tipodeestructura', 'tipoestructura'] },
+  { key: 'abertura_mm', label: 'Abertura (mm)', required: true, synonyms: ['aberturamm', 'abertura'] },
+  { key: 'rugosidad', label: 'Rugosidad', required: true, synonyms: ['rugosidad', 'rugosidadisrm'] },
+  { key: 'relleno', label: 'Relleno', required: true, synonyms: ['relleno', 'tiporelleno'] },
+  { key: 'clasificacion_relleno', label: 'Clasificación Relleno', required: true, synonyms: ['clasificacionrelleno', 'clasifrelleno'] },
+  { key: 'intemperismo', label: 'Intemperismo', required: true, synonyms: ['intemperismo', 'alteracion', 'weathering'] },
+  { key: 'jrc10', label: 'JRC10', required: true, synonyms: ['jrc10', 'jrc'] },
+  { key: 'espesor_relleno', label: 'Espesor de relleno', required: true, synonyms: ['espesorderelleno', 'espesorrellenomm', 'espesorrelleno'] },
+  { key: 'presencia_agua', label: 'Presencia de Agua', required: false, synonyms: ['presenciadeagua', 'presenciaagua', 'agua'] },
+  { key: 'rmr76', label: "RMR'76 Total", required: false, synonyms: ['rmr76', 'rmr76total', "rmr'76"] },
+  { key: 'rmr89', label: "RMR'89 Total", required: false, synonyms: ['rmr89', 'rmr89total', "rmr'89"] }
+];
+
 export const EXPECTED_PLT_FIELDS: MappingField[] = [
   { key: 'taladro', label: 'Taladro / Sondaje', required: true, synonyms: ['taladro', 'sondaje', 'drillhole', 'holeid', 'taladroid'] },
   { key: 'campana', label: 'Campaña / Año', required: false, synonyms: ['campana', 'campaña', 'campaign', 'year', 'anio'] },

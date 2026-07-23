@@ -762,9 +762,10 @@ def run_logueo_audit_pipeline(file_path: str, lgg_sheet: str, est_sheet: str, au
     
     total_fields = total_filas * 20
     total_vacios = sum(1 for i in incidencias if i.get("tipo_incidencia") == "VACIO")
+    total_sin_informacion = sum(1 for i in incidencias if i.get("tipo_incidencia") == "SIN_INFORMACION")
     total_advertencias = sum(1 for i in incidencias if i.get("tipo_incidencia") == "ADVERTENCIA")
     total_alertas = sum(1 for i in incidencias if i.get("tipo_incidencia") == "ALERTA")
-    total_correctos = total_fields - (total_vacios + total_advertencias + total_alertas)
+    total_correctos = max(0, total_fields - (total_vacios + total_sin_informacion + total_advertencias + total_alertas))
     
     row_errors = defaultdict(set)
     for i in incidencias:
@@ -772,12 +773,12 @@ def run_logueo_audit_pipeline(file_path: str, lgg_sheet: str, est_sheet: str, au
         
     discs_con_alerta = sum(1 for row, errs in row_errors.items() if "ALERTA" in errs)
     discs_con_advertencia = sum(1 for row, errs in row_errors.items() if "ADVERTENCIA" in errs and "ALERTA" not in errs)
-    discs_con_vacio = sum(1 for row, errs in row_errors.items() if "VACIO" in errs)
-    discs_correctas = total_filas - len(row_errors)
+    discs_con_vacio = sum(1 for row, errs in row_errors.items() if "VACIO" in errs or "SIN_INFORMACION" in errs)
+    discs_correctas = max(0, total_filas - len(row_errors))
     
-    camp_stats = defaultdict(lambda: {"vacios": 0, "advertencias": 0, "alertas": 0, "filas": set()})
-    geo_stats = defaultdict(lambda: {"vacios": 0, "advertencias": 0, "alertas": 0, "filas": set()})
-    sector_stats = defaultdict(lambda: {"vacios": 0, "advertencias": 0, "alertas": 0, "filas": set()})
+    camp_stats = defaultdict(lambda: {"vacios": 0, "sin_informacion": 0, "advertencias": 0, "alertas": 0, "filas": set()})
+    geo_stats = defaultdict(lambda: {"vacios": 0, "sin_informacion": 0, "advertencias": 0, "alertas": 0, "filas": set()})
+    sector_stats = defaultdict(lambda: {"vacios": 0, "sin_informacion": 0, "advertencias": 0, "alertas": 0, "filas": set()})
     
     observaciones_por_año = defaultdict(lambda: defaultdict(lambda: {"incidents": 0, "stations": set()}))
     top_stations_por_año = defaultdict(lambda: defaultdict(lambda: Counter()))
@@ -801,6 +802,10 @@ def run_logueo_audit_pipeline(file_path: str, lgg_sheet: str, est_sheet: str, au
             camp_stats[c]["vacios"] += 1
             geo_stats[g]["vacios"] += 1
             sector_stats[s]["vacios"] += 1
+        elif tipo == "SIN_INFORMACION":
+            camp_stats[c]["sin_informacion"] += 1
+            geo_stats[g]["sin_informacion"] += 1
+            sector_stats[s]["sin_informacion"] += 1
         elif tipo == "ADVERTENCIA":
             camp_stats[c]["advertencias"] += 1
             geo_stats[g]["advertencias"] += 1
@@ -860,11 +865,11 @@ def run_logueo_audit_pipeline(file_path: str, lgg_sheet: str, est_sheet: str, au
         })
         
     msg_alertas = Counter(simplify_message(i.get("mensaje")) for i in incidencias if i.get("tipo_incidencia") == "ALERTA")
-    msg_advertencias = Counter(simplify_message(i.get("mensaje")) for i in incidencias if i.get("tipo_incidencia") == "ADVERTENCIA")
+    msg_advertencias = Counter(simplify_message(i.get("mensaje")) for i in incidencias if i.get("tipo_incidencia") in ["ADVERTENCIA", "VACIO", "SIN_INFORMACION"])
     
     top_5_alertas = [{"mensaje": k, "cantidad": v, "pct": (v / max(1, total_alertas)) * 100} for k, v in msg_alertas.most_common(5)]
     lista_alertas = [{"mensaje": k, "cantidad": v, "pct": (v / max(1, total_alertas)) * 100} for k, v in msg_alertas.most_common()]
-    lista_advertencias = [{"mensaje": k, "cantidad": v, "pct": (v / max(1, total_advertencias)) * 100} for k, v in msg_advertencias.most_common()]
+    lista_advertencias = [{"mensaje": k, "cantidad": v, "pct": (v / max(1, total_advertencias + total_vacios + total_sin_informacion)) * 100} for k, v in msg_advertencias.most_common()]
     
     compact["audit_id"] = audit_id
     compact["fecha_auditoria"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -877,7 +882,7 @@ def run_logueo_audit_pipeline(file_path: str, lgg_sheet: str, est_sheet: str, au
         "total_discontinuidades": total_filas,
         "total_metros": round(total_metros, 2)
     }
-    compact["familia2"] = {"total_fields": total_fields, "total_vacios": total_vacios, "total_advertencias": total_advertencias, "total_alertas": total_alertas, "total_correctos": total_correctos}
+    compact["familia2"] = {"total_fields": total_fields, "total_vacios": total_vacios, "total_sin_informacion": total_sin_informacion, "total_advertencias": total_advertencias, "total_alertas": total_alertas, "total_correctos": total_correctos}
     compact["familia3"] = {"total_discontinuidades": total_filas, "discontinuidades_alertas": discs_con_alerta, "discontinuidades_advertencias": discs_con_advertencia, "discontinuidades_vacios": discs_con_vacio, "discontinuidades_correctas": discs_correctas}
     compact["distribucion_campania"] = distribucion_campania
     compact["distribucion_sector"] = distribucion_sector

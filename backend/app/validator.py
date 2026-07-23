@@ -4,8 +4,16 @@ import math
 import unicodedata
 import re
 import openpyxl
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from app.core.rules import WEATHERING_COMPATIBILITY, MASTER_ERROR_RULES
+from app.calculator import (
+    STRENGTH_RATINGS, WEATHERING_RATINGS_76, WEATHERING_RATINGS_89,
+    ROUGHNESS_RATINGS_76, ROUGHNESS_RATINGS_89, FILLING_CLASSES,
+    calculate_rqd_rating, calculate_spacing_rating_76, calculate_spacing_rating_89,
+    calculate_aperture_rating_76, calculate_aperture_rating_89,
+    calculate_filling_rating_76, calculate_filling_rating_89,
+    calculate_water_rating, get_rock_class
+)
 
 # Normalización robusta para mapeo de cabeceras (remueve acentos, espacios y especiales)
 def normalize_text(text: str) -> str:
@@ -88,6 +96,40 @@ EST_PATTERNS = {
     "campana": ["campana", "anio", "campan", "campaign", "year"]
 }
 
+RMR_PATTERNS = {
+    "sondaje": ["sondaje", "taladro", "drillhole", "holeid"],
+    "corrida": ["corrida", "id", "numcorrida"],
+    "lito1": ["litho1", "lito1", "litologia1"],
+    "lito2": ["litho2", "lito2", "litologia2"],
+    "lito3": ["litho3", "lito3", "litologia3"],
+    "de": ["desde", "desdem", "de", "from"],
+    "a": ["hasta", "hastam", "a", "to"],
+    "long_corrida": ["longcorrida", "longcorridam", "longitudcorrida"],
+    "rec_m": ["recm", "recupm", "recuperacionm", "longitudrecuperada"],
+    "rec_pct": ["recpct", "recporcentaje"],
+    "rqd_m": ["rqdm", "rqd"],
+    "rqd_pct": ["rqdpct", "rqdporcentaje"],
+    "lrf_m": ["longtramofracturadom", "lrfm", "lrf", "longitudrocafracturada"],
+    "frf": ["frfzonastrituradas", "frf"],
+    "frac_nat": ["fracturasnaturales", "nfracnaturales", "fracnat"],
+    "total_frac": ["toraldefracturas", "totaldefracturas", "totalfracturas"],
+    "ff_1m": ["ff1m", "ffm"],
+    "espaciamiento_mm": ["espaciamientomm", "espaciamiento"],
+    "resistencia": ["resistencia", "resistenciainput"],
+    "tipo_estructura": ["tipodeestructura", "tipoest"],
+    "abertura_mm": ["aberturamm", "abertura"],
+    "rugosidad": ["rugosidad"],
+    "relleno": ["relleno"],
+    "clasificacion_relleno": ["clasificacionrelleno"],
+    "intemperismo": ["intemperismo"],
+    "jrc10": ["jrc10"],
+    "espesor_relleno": ["espesorderelleno", "espesorrelleno"],
+    "presencia_agua": ["presenciadeagua", "presenciaagua"],
+    "rmr76": ["rmr76", "rmr76total"],
+    "rmr89": ["rmr89", "rmr89total"],
+    "campana": ["campana", "anio"]
+}
+
 COLLAR_PATTERNS = {
     "taladro": ["taladro", "sondaje", "drillhole", "holeid", "taladroid", "hole_id", "hole"],
     "eoh": ["eoh", "profundidad_final", "prof_final", "max_depth", "total_depth"]
@@ -111,6 +153,20 @@ FALLBACK_EST_MAP = {
     "alfa": 10, "beta": 11, "dip": 12, "azimuth": 13, "forma": 14, "rugosidad": 15, "jrc10": 16, "abertura": 17,
     "weathering": 18, "espesor": 19, "relleno1": 20, "relleno2": 21, "dureza_pared": 22, "agua": 23,
     "geotecnico": 24, "comentario": 25, "campana": 26
+}
+
+FALLBACK_RMR_MAP = {
+    "sondaje": 1, "fecha": 2, "logueador": 3, "corrida": 4, "lito1": 5, "lito2": 6, "lito3": 7,
+    "de": 8, "a": 9, "long_corrida": 10, "rec_m": 11, "rec_pct": 12, "rqd_m": 13, "rqd_pct": 14,
+    "lrf_m": 15, "frf": 16, "frac_nat": 17, "total_frac": 18, "ff_1m": 19, "espaciamiento_mm": 20,
+    "resistencia": 21, "tipo_estructura": 22, "abertura_mm": 23, "rugosidad": 24, "relleno": 25,
+    "clasificacion_relleno": 26, "intemperismo": 27, "jrc10": 28, "espesor_relleno": 29, "presencia_agua": 30,
+    "r76_resistencia": 32, "r76_rqd": 33, "r76_espaciamiento": 34, "r76_abertura": 35,
+    "r76_rugosidad": 36, "r76_relleno": 37, "r76_intemperismo": 38, "r76_persistencia": 39,
+    "r76_juntas": 40, "r76_agua": 41, "rmr76": 42, "r76_calidad_roca": 43, "r76_litologia": 44,
+    "r89_resistencia": 46, "r89_rqd": 47, "r89_espaciamiento": 48, "r89_abertura": 49,
+    "r89_rugosidad": 50, "r89_relleno": 51, "r89_intemperismo": 52, "r89_persistencia": 53,
+    "r89_juntas": 54, "r89_agua": 55, "rmr89": 56, "r89_calidad_roca": 57, "campana": 58
 }
 
 def find_header_row_and_mapping(sheet, keyword_maps) -> tuple:
@@ -267,6 +323,357 @@ def validate_row_qaqc(data: Dict[str, Any]) -> List[Dict[str, str]]:
     except Exception as e:
         alerts.append({"type": "CRITICAL", "field": "global", "message": f"Error al procesar reglas de consistencia: {str(e)}"})
     return alerts
+
+from collections import defaultdict
+
+def find_rmr_sheet_name(sheetnames: list) -> Optional[str]:
+    for s in sheetnames:
+        norm = normalize_text(s)
+        if norm in ['validacionrmr', 'validacion_rmr', 'rmr', 'bdrmr', 'logueormr', 'hoja1']:
+            return s
+    for s in sheetnames:
+        norm = normalize_text(s)
+        if 'rmr' in norm:
+            return s
+    return None
+
+def validate_rmr_sheet_data(
+    ws_rmr,
+    lgg_runs: list,
+    resumen_celdas: dict,
+    incidencias: list,
+    r_counters: dict,
+    custom_map: dict = None
+) -> int:
+    """
+    Realiza el escaneo y auditoría geomecánica masiva de la hoja 'Validación_RMR' (o similar)
+    verificando la congruencia de los 48 campos contra LGG y las reglas de Reglas.md.
+    Clasifica datos ausentes en:
+    - 'VACIO': Celda sin contenido (None o '').
+    - 'SIN_INFORMACION': Celda con valor '-1' (Sin dato registrado).
+    """
+    h_idx, rmr_map = find_header_row_and_mapping(ws_rmr, RMR_PATTERNS)
+    for k, v in FALLBACK_RMR_MAP.items():
+        if k not in rmr_map:
+            rmr_map[k] = v
+    if custom_map:
+        for k, v in custom_map.items():
+            if v is not None and v > 0:
+                rmr_map[k] = v
+
+    print(f"[*] Iniciando escaneo de Validación_RMR. Fila inicial: {h_idx + 1}, Fila máxima: {ws_rmr.max_row}", flush=True)
+
+    lgg_by_taladro = defaultdict(list)
+    for run in lgg_runs:
+        t_name = run.get("taladro")
+        if t_name:
+            lgg_by_taladro[t_name].append(run)
+
+    rmr_by_taladro = defaultdict(list)
+    empty_streak = 0
+    current_taladro = None
+    total_rmr_filas = 0
+
+    for r in range(h_idx + 1, ws_rmr.max_row + 1):
+        if r % 500 == 0:
+            print(f"  ... [RMR] Fila {r} / {ws_rmr.max_row}", flush=True)
+            
+        row_dict, is_empty = get_row_dict(ws_rmr, r, rmr_map)
+
+        t_val = row_dict.get("sondaje") or row_dict.get("taladro")
+        if t_val is not None and str(t_val).strip() != "":
+            current_taladro = safe_str(t_val)
+        else:
+            row_dict["sondaje"] = current_taladro
+
+        if is_empty:
+            empty_streak += 1
+            if empty_streak >= 20:
+                print(f"[*] [RMR] Freno de emergencia en fila {r}.", flush=True)
+                break
+            continue
+
+        if not current_taladro:
+            continue
+
+        empty_streak = 0
+        total_rmr_filas += 1
+        taladro = current_taladro
+        corrida_num = safe_int(row_dict.get("corrida", 0))
+        celda_padre = taladro
+        celda_hija = f"{taladro}-RMR{corrida_num if corrida_num > 0 else r}"
+
+        if celda_padre not in resumen_celdas:
+            resumen_celdas[celda_padre] = {
+                "total_hijas": 0, "vacios": 0, "sin_informacion": 0,
+                "advertencias": 0, "alertas": 0, "estado_celda": "OK",
+                "dist_celda": 0.0, "campania": "N/A"
+            }
+        resumen_celdas[celda_padre]["total_hijas"] += 1
+        row_has_errors = False
+
+        def reg_err_rmr(col, val, tipo, msg):
+            nonlocal row_has_errors
+            incidencias.append({
+                "fila_excel": r, "celda_padre": celda_padre, "celda_hija": celda_hija,
+                "columna": col, "valor_actual": val, "tipo_incidencia": tipo, "mensaje": msg,
+                "campania": safe_str(row_dict.get("campana")) or "N/A", "geotecnico": "N/A", "sector_geotecnico": "N/A",
+                "modulo": "Validación RMR"
+            })
+            if tipo == "VACIO":
+                r_counters["total_vacios"] += 1
+                resumen_celdas[celda_padre]["vacios"] += 1
+            elif tipo == "SIN_INFORMACION":
+                r_counters["total_sin_informacion"] += 1
+                if "sin_informacion" not in resumen_celdas[celda_padre]:
+                    resumen_celdas[celda_padre]["sin_informacion"] = 0
+                resumen_celdas[celda_padre]["sin_informacion"] += 1
+            elif tipo == "ADVERTENCIA":
+                r_counters["total_advertencias"] += 1
+                resumen_celdas[celda_padre]["advertencias"] += 1
+            elif tipo == "ALERTA":
+                r_counters["total_alertas"] += 1
+                resumen_celdas[celda_padre]["alertas"] += 1
+                row_has_errors = True
+
+        # 1. CLASIFICACIÓN DE CAMPOS VACÍOS VS SIN INFORMACIÓN (-1)
+        mandatory_rmr_fields = [
+            ("sondaje", "Sondaje"), ("corrida", "Corrida"), ("de", "Desde (m)"), ("a", "Hasta (m)"),
+            ("long_corrida", "Long. Corrida (m)"), ("lito1", "Litho 1"), ("rec_m", "Rec (m)"),
+            ("rec_pct", "Rec (%)"), ("rqd_m", "RQD (m)"), ("rqd_pct", "RQD (%)"),
+            ("lrf_m", "Long. Tramo fracturado (m)"), ("frf", "FRF (zonas trituradas)"),
+            ("frac_nat", "Fracturas naturales"), ("total_frac", "Total de Fracturas"),
+            ("ff_1m", "FF/1m"), ("espaciamiento_mm", "Espaciamiento (mm)"), ("resistencia", "Resistencia"),
+            ("tipo_estructura", "Tipo de Estructura"), ("abertura_mm", "Abertura (mm)"),
+            ("rugosidad", "Rugosidad"), ("relleno", "Relleno"), ("clasificacion_relleno", "Clasificación Relleno"),
+            ("intemperismo", "Intemperismo"), ("jrc10", "JRC10"), ("espesor_relleno", "Espesor de relleno")
+        ]
+
+        for field_key, field_lbl in mandatory_rmr_fields:
+            val_raw = row_dict.get(field_key)
+            if val_raw is None or str(val_raw).strip() == "":
+                reg_err_rmr(field_key, None, "VACIO", f"El campo obligatorio '{field_lbl}' se encuentra vacío.")
+            elif str(val_raw).strip() in ["-1", "-1.0", "-1,0"]:
+                reg_err_rmr(field_key, val_raw, "SIN_INFORMACION", f"El campo obligatorio '{field_lbl}' no contiene información (-1).")
+
+        # 2. MATCHING CON CORRIDA LGG
+        rmr_by_taladro[taladro].append(row_dict)
+        lgg_runs_for_t = lgg_by_taladro.get(taladro, [])
+
+        matching_lgg_run = None
+        if corrida_num > 0:
+            for l_run in lgg_runs_for_t:
+                if l_run.get("corrida") == corrida_num:
+                    matching_lgg_run = l_run
+                    break
+
+        de = sanitize_val(row_dict.get("de"), float)
+        a = sanitize_val(row_dict.get("a"), float)
+
+        if matching_lgg_run is None and de is not None and a is not None:
+            for l_run in lgg_runs_for_t:
+                if abs(l_run.get("de", 0.0) - de) < 0.05 and abs(l_run.get("a", 0.0) - a) < 0.05:
+                    matching_lgg_run = l_run
+                    break
+
+        if matching_lgg_run is None:
+            reg_err_rmr("corrida", corrida_num, "ALERTA", f"Corrida en Validación RMR (Fila {r}, Corrida #{corrida_num}) no coincide con ninguna corrida registrada en LGG para el taladro '{taladro}'.")
+        else:
+            # 3. REGLAS CRÍTICAS DE COINCIDENCIA E INSUMOS
+            lgg_de = matching_lgg_run.get("de", 0.0)
+            lgg_a = matching_lgg_run.get("a", 0.0)
+            if de is not None and a is not None:
+                if abs(de - lgg_de) > 0.001 or abs(a - lgg_a) > 0.001:
+                    reg_err_rmr("de", f"{de}-{a}", "ALERTA", f"Intervalo Desde/Hasta ({de}m - {a}m) en RMR no coincide exactamente con el intervalo de LGG ({lgg_de}m - {lgg_a}m).")
+
+            long_corrida = sanitize_val(row_dict.get("long_corrida"), float)
+            if de is not None and a is not None and long_corrida is not None:
+                expected_long = round(a - de, 2)
+                if long_corrida <= 0:
+                    reg_err_rmr("long_corrida", long_corrida, "ALERTA", f"La Longitud de Corrida ({long_corrida}m) debe ser mayor a 0.")
+                if abs(long_corrida - expected_long) > 0.1:
+                    reg_err_rmr("long_corrida", long_corrida, "ALERTA", f"La Longitud de Corrida ({long_corrida}m) no coincide con (Hasta - Desde = {expected_long}m) dentro de la tolerancia de 0.1m.")
+
+            rmr_l1 = safe_str(row_dict.get("lito1"))
+            rmr_l2 = safe_str(row_dict.get("lito2"))
+            rmr_l3 = safe_str(row_dict.get("lito3"))
+            lgg_l1 = safe_str(matching_lgg_run.get("lito1"))
+            lgg_l2 = safe_str(matching_lgg_run.get("lito2"))
+            lgg_l3 = safe_str(matching_lgg_run.get("lito3"))
+            if rmr_l1 != lgg_l1 or rmr_l2 != lgg_l2 or rmr_l3 != lgg_l3:
+                reg_err_rmr("lito1", f"{rmr_l1}/{rmr_l2}/{rmr_l3}", "ALERTA", f"Combinación litológica en RMR ({rmr_l1}, {rmr_l2}, {rmr_l3}) no coincide con LGG ({lgg_l1}, {lgg_l2}, {lgg_l3}).")
+
+            rec_m = sanitize_val(row_dict.get("rec_m"), float)
+            lgg_rec = matching_lgg_run.get("rec_m", 0.0)
+            if rec_m is not None and abs(rec_m - lgg_rec) > 0.001:
+                reg_err_rmr("rec_m", rec_m, "ALERTA", f"Rec (m) en RMR ({rec_m}m) no coincide con la Recuperación de LGG ({lgg_rec}m).")
+            rec_pct = sanitize_val(row_dict.get("rec_pct"), float)
+            if rec_m is not None and long_corrida is not None and long_corrida > 0 and rec_pct is not None:
+                expected_rec_pct = round((rec_m / long_corrida) * 100)
+                if abs(rec_pct - expected_rec_pct) > 1.0:
+                    reg_err_rmr("rec_pct", rec_pct, "ALERTA", f"Rec (%) en RMR ({rec_pct}%) no coincide con la fórmula Rec(m)/Long.Corrida(m) = {expected_rec_pct}%.")
+
+            rqd_m = sanitize_val(row_dict.get("rqd_m"), float)
+            lgg_rqd = matching_lgg_run.get("rqd_m", 0.0)
+            if rqd_m is not None and abs(rqd_m - lgg_rqd) > 0.001:
+                reg_err_rmr("rqd_m", rqd_m, "ALERTA", f"RQD (m) en RMR ({rqd_m}m) no coincide con el RQD de LGG ({lgg_rqd}m).")
+            rqd_pct = sanitize_val(row_dict.get("rqd_pct"), float)
+            if rqd_m is not None and long_corrida is not None and long_corrida > 0 and rqd_pct is not None:
+                expected_rqd_pct = round((rqd_m / long_corrida) * 100)
+                if abs(rqd_pct - expected_rqd_pct) > 1.0:
+                    reg_err_rmr("rqd_pct", rqd_pct, "ALERTA", f"RQD (%) en RMR ({rqd_pct}%) no coincide con la fórmula RQD(m)/Long.Corrida(m) = {expected_rqd_pct}%.")
+
+            lrf_m = sanitize_val(row_dict.get("lrf_m"), float)
+            lgg_lrf = matching_lgg_run.get("lrf_m", 0.0)
+            if lrf_m is not None and abs(lrf_m - lgg_lrf) > 0.001:
+                reg_err_rmr("lrf_m", lrf_m, "ALERTA", f"Longitud de Tramo Fracturado ({lrf_m}m) no coincide con LRF de LGG ({lgg_lrf}m).")
+
+            frf = sanitize_val(row_dict.get("frf"), int)
+            lgg_frf = matching_lgg_run.get("frf", 0)
+            if frf is not None and frf != lgg_frf:
+                reg_err_rmr("frf", frf, "ALERTA", f"FRF en RMR ({frf}) no coincide con FRF de LGG ({lgg_frf}).")
+
+            frac_nat = sanitize_val(row_dict.get("frac_nat"), int)
+            lgg_fn = matching_lgg_run.get("frac_nat", 0)
+            if frac_nat is not None and frac_nat != lgg_fn:
+                reg_err_rmr("frac_nat", frac_nat, "ALERTA", f"Fracturas Naturales en RMR ({frac_nat}) no coincide con Frac Nat de LGG ({lgg_fn}).")
+
+            total_frac = sanitize_val(row_dict.get("total_frac"), float)
+            if frf is not None and frac_nat is not None and total_frac is not None:
+                expected_total_frac = round(frf + frac_nat)
+                if abs(total_frac - expected_total_frac) > 0.01:
+                    reg_err_rmr("total_frac", total_frac, "ALERTA", f"Total de Fracturas en RMR ({total_frac}) no coincide con FRF + FracNat ({expected_total_frac}).")
+
+            ff_1m = sanitize_val(row_dict.get("ff_1m"), float)
+            if total_frac is not None and long_corrida is not None and long_corrida > 0 and ff_1m is not None:
+                expected_ff_1m = round(total_frac / long_corrida)
+                if abs(ff_1m - expected_ff_1m) > 1.0:
+                    reg_err_rmr("ff_1m", ff_1m, "ALERTA", f"FF/1m en RMR ({ff_1m}) no coincide con TotalFracturas / Long.Corrida = {expected_ff_1m}.")
+
+            espaciamiento = sanitize_val(row_dict.get("espaciamiento_mm"), float)
+            if total_frac is not None and long_corrida is not None and long_corrida > 0 and espaciamiento is not None:
+                if round(total_frac) == 0:
+                    expected_esp = round(long_corrida * 1000)
+                else:
+                    expected_esp = round(long_corrida * 1000 / total_frac)
+                if abs(espaciamiento - expected_esp) > 2.0:
+                    reg_err_rmr("espaciamiento_mm", espaciamiento, "ALERTA", f"Espaciamiento ({espaciamiento}mm) no coincide con la fórmula calculada ({expected_esp}mm).")
+
+            resistencia = safe_str(row_dict.get("resistencia"))
+            lgg_res = safe_str(matching_lgg_run.get("resistencia"))
+            if resistencia and lgg_res and resistencia.upper() != lgg_res.upper():
+                reg_err_rmr("resistencia", resistencia, "ALERTA", f"Resistencia en RMR ({resistencia}) no coincide con LGG ({lgg_res}).")
+
+            tipo_est = safe_str(row_dict.get("tipo_estructura"))
+            lgg_tipo_est = safe_str(matching_lgg_run.get("tipo_est1"))
+            if tipo_est and lgg_tipo_est and tipo_est.upper() != lgg_tipo_est.upper():
+                reg_err_rmr("tipo_estructura", tipo_est, "ALERTA", f"Tipo de Estructura en RMR ({tipo_est}) no coincide con LGG ({lgg_tipo_est}).")
+
+            abertura = sanitize_val(row_dict.get("abertura_mm"), float)
+            lgg_ab = matching_lgg_run.get("abertura", 0.0)
+            if abertura is not None and abs(abertura - lgg_ab) > 0.001:
+                reg_err_rmr("abertura_mm", abertura, "ALERTA", f"Abertura en RMR ({abertura}mm) no coincide con LGG ({lgg_ab}mm).")
+
+            rugosidad = safe_str(row_dict.get("rugosidad"))
+            lgg_rug = safe_str(matching_lgg_run.get("rugosidad"))
+            if rugosidad and lgg_rug and rugosidad != lgg_rug:
+                reg_err_rmr("rugosidad", rugosidad, "ALERTA", f"Rugosidad en RMR ({rugosidad}) no coincide con LGG ({lgg_rug}).")
+
+            relleno = safe_str(row_dict.get("relleno"))
+            lgg_rel = safe_str(matching_lgg_run.get("relleno1"))
+            if relleno and lgg_rel and relleno.lower() != lgg_rel.lower():
+                reg_err_rmr("relleno", relleno, "ALERTA", f"Relleno en RMR ({relleno}) no coincide con LGG ({lgg_rel}).")
+
+            clasif_relleno = sanitize_val(row_dict.get("clasificacion_relleno"), int)
+            if relleno:
+                expected_class = FILLING_CLASSES.get(relleno.lower(), 1)
+                if clasif_relleno is not None and clasif_relleno != expected_class:
+                    reg_err_rmr("clasificacion_relleno", clasif_relleno, "ALERTA", f"Clasificación de Relleno ({clasif_relleno}) no coincide con el código '{relleno}' (Clase esperada: {expected_class}).")
+
+            intemperismo = safe_str(row_dict.get("intemperismo"))
+            lgg_int = safe_str(matching_lgg_run.get("intemperismo"))
+            if intemperismo and lgg_int and intemperismo.upper() != lgg_int.upper():
+                reg_err_rmr("intemperismo", intemperismo, "ALERTA", f"Intemperismo en RMR ({intemperismo}) no coincide con LGG ({lgg_int}).")
+
+            jrc10 = sanitize_val(row_dict.get("jrc10"), int)
+            lgg_jrc = matching_lgg_run.get("jrc10")
+            if jrc10 is not None and lgg_jrc is not None and jrc10 != lgg_jrc:
+                reg_err_rmr("jrc10", jrc10, "ALERTA", f"JRC10 en RMR ({jrc10}) no coincide con LGG ({lgg_jrc}).")
+
+            espesor_rel = sanitize_val(row_dict.get("espesor_relleno"), float)
+            lgg_esp = matching_lgg_run.get("espesor", 0.0)
+            if espesor_rel is not None and abs(espesor_rel - lgg_esp) > 0.001:
+                reg_err_rmr("espesor_relleno", espesor_rel, "ALERTA", f"Espesor de relleno en RMR ({espesor_rel}mm) no coincide con LGG ({lgg_esp}mm).")
+
+            pres_agua = row_dict.get("presencia_agua")
+            if pres_agua is not None and str(pres_agua).strip() != "":
+                reg_err_rmr("presencia_agua", pres_agua, "ADVERTENCIA", f"Presencia de Agua en RMR ('{pres_agua}'): Validación de reglas avanzadas de hidrogeología pendiente.")
+
+            # 4. REGLAS RATINGS RMR'76
+            rmr76_excel = sanitize_val(row_dict.get("rmr76"), int)
+            r76_res = STRENGTH_RATINGS.get(resistencia, 0)
+            r76_rqd = calculate_rqd_rating(rqd_pct) if rqd_pct is not None else 0
+            r76_esp = calculate_spacing_rating_76(espaciamiento) if espaciamiento is not None else 0
+            r76_ab = calculate_aperture_rating_76(abertura) if abertura is not None else 0
+            r76_rug = ROUGHNESS_RATINGS_76.get(safe_int(rugosidad), 0)
+            r76_rel = calculate_filling_rating_76(relleno, espesor_rel if espesor_rel is not None else 0.0)
+            r76_int = WEATHERING_RATINGS_76.get(intemperismo.upper(), 0)
+            r76_pers = round((r76_ab + r76_rug + r76_rel + r76_int) / 4)
+            r76_juntas = r76_ab + r76_rug + r76_rel + r76_int + r76_pers
+            water_res = calculate_water_rating(a if a is not None else 0.0)
+            r76_agua = water_res["score_76"]
+
+            expected_rmr76 = r76_res + r76_rqd + r76_esp + r76_juntas + r76_agua
+            if rmr76_excel is not None:
+                if rmr76_excel < 0 or rmr76_excel > 100:
+                    reg_err_rmr("rmr76", rmr76_excel, "ALERTA", f"Puntaje RMR'76 ({rmr76_excel}) fuera del rango permitido de 0 a 100.")
+                if abs(rmr76_excel - expected_rmr76) > 1:
+                    reg_err_rmr("rmr76", rmr76_excel, "ALERTA", f"Descuadre en RMR'76: Excel registra {rmr76_excel}, pero los sub-ratings geomecánicos suman {expected_rmr76}.")
+
+            r76_lito_excel = safe_str(row_dict.get("r76_litologia"))
+            if r76_lito_excel and rmr_l1 and r76_lito_excel.upper() != rmr_l1.upper():
+                reg_err_rmr("r76_litologia", r76_lito_excel, "ADVERTENCIA", f"Litología en columna RMR'76 ('{r76_lito_excel}') difiere de Litho 1 ('{rmr_l1}').")
+
+            # 5. REGLAS RATINGS RMR'89
+            rmr89_excel = sanitize_val(row_dict.get("rmr89"), int)
+            r89_res = STRENGTH_RATINGS.get(resistencia, 0)
+            r89_rqd = calculate_rqd_rating(rqd_pct) if rqd_pct is not None else 0
+            r89_esp = calculate_spacing_rating_89(espaciamiento) if espaciamiento is not None else 0
+            r89_ab = calculate_aperture_rating_89(abertura) if abertura is not None else 0
+            r89_rug = ROUGHNESS_RATINGS_89.get(safe_int(rugosidad), 0)
+            r89_rel = calculate_filling_rating_89(relleno, espesor_rel if espesor_rel is not None else 0.0)
+            r89_int = WEATHERING_RATINGS_89.get(intemperismo.upper(), 0)
+            r89_pers = round((r89_ab + r89_rug + r89_rel + r89_int) / 4)
+            r89_juntas = r89_ab + r89_rug + r89_rel + r89_int + r89_pers
+            r89_agua = water_res["score_89"]
+
+            expected_rmr89 = r89_res + r89_rqd + r89_esp + r89_juntas + r89_agua
+            if rmr89_excel is not None:
+                if rmr89_excel < 0 or rmr89_excel > 100:
+                    reg_err_rmr("rmr89", rmr89_excel, "ALERTA", f"Puntaje RMR'89 ({rmr89_excel}) fuera del rango permitido de 0 a 100.")
+                if abs(rmr89_excel - expected_rmr89) > 1:
+                    reg_err_rmr("rmr89", rmr89_excel, "ALERTA", f"Descuadre en RMR'89: Excel registra {rmr89_excel}, pero los sub-ratings geomecánicos suman {expected_rmr89}.")
+
+        if not row_has_errors:
+            r_counters["total_ok"] += 1
+
+    # REGLA CRÍTICA: CANTIDAD TOTAL DE CORRIDAS RMR VS LGG
+    for t_name, lgg_runs_for_t in lgg_by_taladro.items():
+        rmr_runs_for_t = rmr_by_taladro.get(t_name, [])
+        if len(lgg_runs_for_t) > 0 and len(rmr_runs_for_t) != len(lgg_runs_for_t):
+            msg = f"Inconsistencia total de corridas: El taladro '{t_name}' registra {len(rmr_runs_for_t)} corridas en Validación RMR vs {len(lgg_runs_for_t)} corridas en LGG."
+            incidencias.append({
+                "fila_excel": 0, "celda_padre": t_name, "celda_hija": t_name,
+                "columna": "Total Corridas", "valor_actual": len(rmr_runs_for_t),
+                "tipo_incidencia": "ALERTA", "mensaje": msg,
+                "campania": "N/A", "geotecnico": "N/A", "sector_geotecnico": "N/A",
+                "modulo": "Validación RMR"
+            })
+            if t_name in resumen_celdas:
+                resumen_celdas[t_name]["alertas"] += 1
+                r_counters["total_alertas"] += 1
+
+    return total_rmr_filas
 
 def validate_logueo_bulk_sheets(file_path: str, lgg_sheet: str, est_sheet: str, output_json_path: str):
     wb = openpyxl.load_workbook(file_path, data_only=True)
@@ -581,22 +988,24 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
         elif perf > 1.6:
             registrar_lgg_error("a", a, "ALERTA", f"Longitud de corrida perforada excede el límite crítico de 1.6m. Datos evaluados -> De: {de}m, A: {a}m, Avance calculado: {perf}m.")
         
-        if rec_m > perf:
+        if rec_m is not None and rec_m > perf:
             registrar_lgg_error("rec_m", rec_m, "ALERTA", f"La longitud recuperada es mayor que el avance perforado. Datos evaluados -> Recuperada: {rec_m}m, Avance de corrida: {perf}m (De: {de}m, A: {a}m).")
             
-        if rqd_m > rec_m:
+        if rqd_m is not None and rec_m is not None and rqd_m > rec_m:
             registrar_lgg_error("rqd_m", rqd_m, "ALERTA", f"Metraje RQD es mayor que la longitud recuperada. Datos evaluados -> RQD: {rqd_m}m, Recuperada: {rec_m}m, Avance de corrida: {perf}m (De: {de}m, A: {a}m).")
 
-        if lrf_m > rec_m:
+        if lrf_m is not None and rec_m is not None and lrf_m > rec_m:
             registrar_lgg_error("lrf_m", lrf_m, "ALERTA", f"La longitud de roca fracturada LRF es mayor que la longitud recuperada. Datos evaluados -> LRF: {lrf_m}m, Recuperada: {rec_m}m, Avance de corrida: {perf}m (De: {de}m, A: {a}m).")
 
-        sum_frags = round(rqd_m + lrf_m + small_frag_m, 2)
-        if sum_frags > perf:
-            registrar_lgg_error("rqd_m", rqd_m, "ALERTA", f"La suma de fragmentos físicos supera el avance perforado. Datos evaluados -> Suma de fragmentos: {sum_frags}m (RQD: {rqd_m}m + LRF: {lrf_m}m + <10cm: {small_frag_m}m), Avance de corrida: {perf}m (De: {de}m, A: {a}m), Longitud Recuperada: {rec_m}m.")
+        if rqd_m is not None and lrf_m is not None and small_frag_m is not None:
+            sum_frags = round(rqd_m + lrf_m + small_frag_m, 2)
+            if sum_frags > perf:
+                registrar_lgg_error("rqd_m", rqd_m, "ALERTA", f"La suma de fragmentos físicos supera el avance perforado. Datos evaluados -> Suma de fragmentos: {sum_frags}m (RQD: {rqd_m}m + LRF: {lrf_m}m + <10cm: {small_frag_m}m), Avance de corrida: {perf}m (De: {de}m, A: {a}m), Longitud Recuperada: {rec_m}m.")
 
-        sum_bins = b30 + b60 + b90
-        if sum_bins != frac_nat:
-            registrar_lgg_error("frac_nat", frac_nat, "ADVERTENCIA", f"La sumatoria de fracturas por buzamiento no coincide con el conteo general. Datos evaluados -> Conteo General (Frac_Nat): {frac_nat}, Suma por buzamiento: {sum_bins} (Buz <30°: {b30} + 30°-60°: {b60} + >60°: {b90}).")
+        if b30 is not None and b60 is not None and b90 is not None and frac_nat is not None:
+            sum_bins = b30 + b60 + b90
+            if sum_bins != frac_nat:
+                registrar_lgg_error("frac_nat", frac_nat, "ADVERTENCIA", f"La sumatoria de fracturas por buzamiento no coincide con el conteo general. Datos evaluados -> Conteo General (Frac_Nat): {frac_nat}, Suma por buzamiento: {sum_bins} (Buz <30°: {b30} + 30°-60°: {b60} + >60°: {b90}).")
 
         tipo_est1 = safe_str(sanitize_val(row_dict.get("tipo_est1"), str))
         tipo_est2 = safe_str(sanitize_val(row_dict.get("tipo_est2"), str))
@@ -877,17 +1286,31 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
         if not row_has_errors:
             total_ok += 1
 
+    # --- 3. PROCESAR HOJA RMR (SI EXISTE) ---
+    rmr_sheet_name = find_rmr_sheet_name(wb.sheetnames)
+    total_rmr_filas = 0
+    total_sin_informacion = 0
+    if rmr_sheet_name:
+        ws_rmr = wb[rmr_sheet_name]
+        r_counters = {"total_ok": 0, "total_vacios": 0, "total_sin_informacion": 0, "total_advertencias": 0, "total_alertas": 0}
+        total_rmr_filas = validate_rmr_sheet_data(ws_rmr, lgg_runs, resumen_celdas, incidencias, r_counters)
+        total_vacios += r_counters["total_vacios"]
+        total_sin_informacion += r_counters["total_sin_informacion"]
+        total_advertencias += r_counters["total_advertencias"]
+        total_alertas += r_counters["total_alertas"]
+        total_ok += r_counters["total_ok"]
+
     total_celdas_ok = 0
     for celda, data in resumen_celdas.items():
         if data["alertas"] > 0:
             data["estado_celda"] = "ALERTA"
-        elif data["vacios"] > 0 or data["advertencias"] > 0:
+        elif data["vacios"] > 0 or data.get("sin_informacion", 0) > 0 or data["advertencias"] > 0:
             data["estado_celda"] = "ADVERTENCIA"
         else:
             data["estado_celda"] = "OK"
             total_celdas_ok += 1
 
-    total_filas = total_lgg_filas + total_est_filas
+    total_filas = total_lgg_filas + total_est_filas + total_rmr_filas
     total_campos = total_filas * 20
 
     output_json = {
@@ -898,6 +1321,7 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
             "total_celdas_hija_procesadas": total_filas,
             "total_ok": total_ok,
             "total_vacios": total_vacios,
+            "total_sin_informacion": total_sin_informacion,
             "total_advertencias": total_advertencias,
             "total_alertas": total_alertas,
             "total_celdas_ok": total_celdas_ok
@@ -1411,6 +1835,22 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
 
             if not row_has_errors: total_ok += 1
 
+    # --- 2.5. PROCESAR HOJA RMR (SI EXISTE) ---
+    conf_rmr = config.get("rmr")
+    rmr_sheet_name = conf_rmr["sheet"] if conf_rmr else find_rmr_sheet_name(wb_main.sheetnames)
+    total_rmr_filas = 0
+    total_sin_informacion = 0
+    if rmr_sheet_name and rmr_sheet_name in wb_main.sheetnames:
+        ws_rmr = wb_main[rmr_sheet_name]
+        custom_rmr_map = conf_rmr.get("mappings") if conf_rmr else None
+        r_counters = {"total_ok": 0, "total_vacios": 0, "total_sin_informacion": 0, "total_advertencias": 0, "total_alertas": 0}
+        total_rmr_filas = validate_rmr_sheet_data(ws_rmr, lgg_runs, resumen_celdas, incidencias, r_counters, custom_map=custom_rmr_map)
+        total_vacios += r_counters["total_vacios"]
+        total_sin_informacion += r_counters["total_sin_informacion"]
+        total_advertencias += r_counters["total_advertencias"]
+        total_alertas += r_counters["total_alertas"]
+        total_ok += r_counters["total_ok"]
+
     # --- 3. PROCESAR COLLAR PARA EOH ---
     conf_col = config.get("collar")
     if wb_col and conf_col:
@@ -1488,12 +1928,12 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
     total_celdas_ok = 0
     for celda, data in resumen_celdas.items():
         if data["alertas"] > 0: data["estado_celda"] = "ALERTA"
-        elif data["vacios"] > 0 or data["advertencias"] > 0: data["estado_celda"] = "ADVERTENCIA"
+        elif data["vacios"] > 0 or data.get("sin_informacion", 0) > 0 or data["advertencias"] > 0: data["estado_celda"] = "ADVERTENCIA"
         else:
             data["estado_celda"] = "OK"
             total_celdas_ok += 1
 
-    total_filas = total_lgg_filas + total_est_filas
+    total_filas = total_lgg_filas + total_est_filas + total_rmr_filas
     total_campos = total_filas * 20
 
     output_json = {
@@ -1504,6 +1944,7 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
             "total_celdas_hija_procesadas": total_filas,
             "total_ok": total_ok,
             "total_vacios": total_vacios,
+            "total_sin_informacion": total_sin_informacion,
             "total_advertencias": total_advertencias,
             "total_alertas": total_alertas,
             "total_celdas_ok": total_celdas_ok

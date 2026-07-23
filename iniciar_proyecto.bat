@@ -16,6 +16,35 @@ echo Al cerrar esta ventana o presionar ENTER, se detendran los servidores
 echo de manera limpia.
 echo =======================================================================
 echo.
+:: 0. Restauración de Emergencia de Entorno Local (.env)
+echo [0/3] Verificando estado del archivo de configuracion .env...
+
+:: Restaurar respaldo si compartir_proyecto.bat fue cerrado de forma imprevista
+if exist frontend\.env.backup (
+    echo [RESTORE] Restableciendo frontend\.env desde la copia de seguridad...
+    copy /y frontend\.env.backup frontend\.env >nul
+    del /f /q frontend\.env.backup >nul
+    echo OK: Configuracion .env restaurada correctamente desde backup.
+)
+
+:: Verificar si el .env actual contiene URLs de Cloudflare no deseadas
+findstr /i "trycloudflare.com" frontend\.env >nul 2>&1
+if %errorlevel% equ 0 (
+    echo [CLEANUP] Limpiando enlace residual de Cloudflare en frontend\.env...
+    (
+        echo # URL base para la API en el frontend
+        echo VITE_API_BASE=
+        echo.
+        echo # Target del proxy local de Vite ^(adonde se redirigen las peticiones locales a /api^)
+        echo VITE_PROXY_TARGET=http://127.0.0.1:8000
+    ) > frontend\.env
+    echo OK: frontend\.env limpiado para trabajo en localhost.
+)
+
+:: Detener cualquier proceso residual de cloudflared
+taskkill /f /im cloudflared.exe >nul 2>&1
+echo OK: Entorno local verificado.
+echo.
 
 :: 1. Verificar dependencias
 echo [1/3] Verificando instalacion de herramientas en el sistema...
