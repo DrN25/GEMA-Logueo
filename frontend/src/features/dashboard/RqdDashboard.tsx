@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useDeferredValue } from 'react';
 import { BarChart2, ChevronLeft, ChevronRight, ListFilter } from 'lucide-react';
 import RqdPorLitologiaTab, { getLithologyClass } from './RqdPorLitologiaTab';
+import RqdPorNivelTab from './RqdPorNivelTab';
 import {
   type Corrida, type DashPoint, type TaladroSummary, LITHOLOGY_COLORS, getDrillColor,
   rqdClass, spacingClass, computePointsFromCorridas, bandStatus,
@@ -18,7 +19,7 @@ interface Props {
 
 export default function RqdDashboard({ activeTaladro, taladros }: Props) {
   // Pestaña activa por defecto: correlaciones (Priest & Bieniawski)
-  const [activeTab, setActiveTab] = useState<'correlaciones' | 'propuesta' | 'lito_rqd'>('correlaciones');
+  const [activeTab, setActiveTab] = useState<'correlaciones' | 'propuesta' | 'lito_rqd' | 'nivel_rqd'>('correlaciones');
 
   const [selectedDrills, setSelectedDrills] = useState<Set<string>>(new Set());
   const deferredSelected = useDeferredValue(selectedDrills);
@@ -435,6 +436,12 @@ export default function RqdDashboard({ activeTaladro, taladros }: Props) {
           >
             RQD por Litología
           </button>
+          <button
+            onClick={() => setActiveTab('nivel_rqd')}
+            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${activeTab === 'nivel_rqd' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
+          >
+            RQD por Nivel / Sector
+          </button>
         </div>
       </div>
 
@@ -752,6 +759,11 @@ export default function RqdDashboard({ activeTaladro, taladros }: Props) {
         {/* ── PESTAÑA C: NUEVO DASHBOARD INDEPENDIENTE "RQD POR LITOLOGÍA" ── */}
         {activeTab === 'lito_rqd' && (
           <RqdPorLitologiaTab visiblePoints={visiblePoints} />
+        )}
+
+        {/* ── PESTAÑA D: NUEVO DASHBOARD INDEPENDIENTE "RQD POR NIVEL / SECTOR" ── */}
+        {activeTab === 'nivel_rqd' && (
+          <RqdPorNivelTab visiblePoints={visiblePoints} />
         )}
 
       </div>
