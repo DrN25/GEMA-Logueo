@@ -186,11 +186,13 @@ export default function AnomaliesViewer({
                     ? 'bg-red-500/10 text-red-400 border-red-500/20'
                     : item.tipo_incidencia === 'ADVERTENCIA'
                       ? 'bg-orange-500/10 text-orange-400 border-orange-500/20'
-                      : 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20';
+                      : item.tipo_incidencia === 'SIN_INFORMACION'
+                        ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                        : 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20';
 
                   const rawVal = item.valor_actual;
                   const displayVal = (rawVal === null || rawVal === undefined || String(rawVal).trim() === "" || String(rawVal) === "-1")
-                    ? '—'
+                    ? (item.tipo_incidencia === 'SIN_INFORMACION' ? '-1' : '—')
                     : String(rawVal);
 
                   return (
@@ -212,7 +214,7 @@ export default function AnomaliesViewer({
                       {/* Gravedad (Negrita) */}
                       <td className="py-2.5 px-3">
                         <span className={`px-2 py-0.5 rounded text-xs font-black uppercase border ${severityBadge}`}>
-                          {item.tipo_incidencia}
+                          {item.tipo_incidencia === 'SIN_INFORMACION' ? 'SIN INFO (-1)' : item.tipo_incidencia}
                         </span>
                       </td>
                       {/* Detalle de la Falla Hallada (No negrita) */}

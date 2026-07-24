@@ -358,8 +358,8 @@ def validate_rmr_sheet_data(
             rmr_map[k] = v
     if custom_map:
         for k, v in custom_map.items():
-            if v is not None and v > 0:
-                rmr_map[k] = v
+            if v is not None and isinstance(v, int) and v >= 0:
+                rmr_map[k] = v + 1
 
     print(f"[*] Iniciando escaneo de Validación_RMR. Fila inicial: {h_idx + 1}, Fila máxima: {ws_rmr.max_row}", flush=True)
 
@@ -403,13 +403,15 @@ def validate_rmr_sheet_data(
         celda_padre = taladro
         celda_hija = f"{taladro}-RMR{corrida_num if corrida_num > 0 else r}"
 
-        if celda_padre not in resumen_celdas:
-            resumen_celdas[celda_padre] = {
-                "total_hijas": 0, "vacios": 0, "sin_informacion": 0,
-                "advertencias": 0, "alertas": 0, "estado_celda": "OK",
-                "dist_celda": 0.0, "campania": "N/A"
-            }
-        resumen_celdas[celda_padre]["total_hijas"] += 1
+        if isinstance(resumen_celdas, dict):
+            if celda_padre not in resumen_celdas:
+                resumen_celdas[celda_padre] = {
+                    "total_hijas": 0, "vacios": 0, "sin_informacion": 0,
+                    "advertencias": 0, "alertas": 0, "estado_celda": "OK",
+                    "dist_celda": 0.0, "campania": "N/A"
+                }
+            resumen_celdas[celda_padre]["total_hijas"] += 1
+
         row_has_errors = False
 
         def reg_err_rmr(col, val, tipo, msg):
@@ -422,18 +424,22 @@ def validate_rmr_sheet_data(
             })
             if tipo == "VACIO":
                 r_counters["total_vacios"] += 1
-                resumen_celdas[celda_padre]["vacios"] += 1
+                if isinstance(resumen_celdas, dict) and celda_padre in resumen_celdas:
+                    resumen_celdas[celda_padre]["vacios"] += 1
             elif tipo == "SIN_INFORMACION":
                 r_counters["total_sin_informacion"] += 1
-                if "sin_informacion" not in resumen_celdas[celda_padre]:
-                    resumen_celdas[celda_padre]["sin_informacion"] = 0
-                resumen_celdas[celda_padre]["sin_informacion"] += 1
+                if isinstance(resumen_celdas, dict) and celda_padre in resumen_celdas:
+                    if "sin_informacion" not in resumen_celdas[celda_padre]:
+                        resumen_celdas[celda_padre]["sin_informacion"] = 0
+                    resumen_celdas[celda_padre]["sin_informacion"] += 1
             elif tipo == "ADVERTENCIA":
                 r_counters["total_advertencias"] += 1
-                resumen_celdas[celda_padre]["advertencias"] += 1
+                if isinstance(resumen_celdas, dict) and celda_padre in resumen_celdas:
+                    resumen_celdas[celda_padre]["advertencias"] += 1
             elif tipo == "ALERTA":
                 r_counters["total_alertas"] += 1
-                resumen_celdas[celda_padre]["alertas"] += 1
+                if isinstance(resumen_celdas, dict) and celda_padre in resumen_celdas:
+                    resumen_celdas[celda_padre]["alertas"] += 1
                 row_has_errors = True
 
         # 1. CLASIFICACIÓN DE CAMPOS VACÍOS VS SIN INFORMACIÓN (-1)
@@ -477,7 +483,7 @@ def validate_rmr_sheet_data(
                     break
 
         if matching_lgg_run is None:
-            reg_err_rmr("corrida", corrida_num, "ALERTA", f"Corrida en Validación RMR (Fila {r}, Corrida #{corrida_num}) no coincide con ninguna corrida registrada en LGG para el taladro '{taladro}'.")
+            reg_err_rmr("corrida", corrida_num, "ALERTA", f"Corrida en Validación RMR (Corrida #{corrida_num}) no coincide con ninguna corrida registrada en LGG para el taladro '{taladro}'.")
         else:
             # 3. REGLAS CRÍTICAS DE COINCIDENCIA E INSUMOS
             lgg_de = matching_lgg_run.get("de", 0.0)
@@ -511,7 +517,7 @@ def validate_rmr_sheet_data(
             if rec_m is not None and long_corrida is not None and long_corrida > 0 and rec_pct is not None:
                 expected_rec_pct = round((rec_m / long_corrida) * 100)
                 if abs(rec_pct - expected_rec_pct) > 1.0:
-                    reg_err_rmr("rec_pct", rec_pct, "ALERTA", f"Rec (%) en RMR ({rec_pct}%) no coincide con la fórmula Rec(m)/Long.Corrida(m) = {expected_rec_pct}%.")
+                    reg_err_rmr("rec_pct", rec_pct, "ALERTA", f"Rec (%) en RMR ({rec_pct}%) no coincide con la fórmula Rec(m)/Long.Corrida(m). Datos evaluados -> Rec({rec_m}m) / Long.Corrida({long_corrida}m) * 100 = {expected_rec_pct}%.")
 
             rqd_m = sanitize_val(row_dict.get("rqd_m"), float)
             lgg_rqd = matching_lgg_run.get("rqd_m", 0.0)
@@ -521,7 +527,7 @@ def validate_rmr_sheet_data(
             if rqd_m is not None and long_corrida is not None and long_corrida > 0 and rqd_pct is not None:
                 expected_rqd_pct = round((rqd_m / long_corrida) * 100)
                 if abs(rqd_pct - expected_rqd_pct) > 1.0:
-                    reg_err_rmr("rqd_pct", rqd_pct, "ALERTA", f"RQD (%) en RMR ({rqd_pct}%) no coincide con la fórmula RQD(m)/Long.Corrida(m) = {expected_rqd_pct}%.")
+                    reg_err_rmr("rqd_pct", rqd_pct, "ALERTA", f"RQD (%) en RMR ({rqd_pct}%) no coincide con la fórmula RQD(m)/Long.Corrida(m). Datos evaluados -> RQD({rqd_m}m) / Long.Corrida({long_corrida}m) * 100 = {expected_rqd_pct}%.")
 
             lrf_m = sanitize_val(row_dict.get("lrf_m"), float)
             lgg_lrf = matching_lgg_run.get("lrf_m", 0.0)
@@ -542,13 +548,13 @@ def validate_rmr_sheet_data(
             if frf is not None and frac_nat is not None and total_frac is not None:
                 expected_total_frac = round(frf + frac_nat)
                 if abs(total_frac - expected_total_frac) > 0.01:
-                    reg_err_rmr("total_frac", total_frac, "ALERTA", f"Total de Fracturas en RMR ({total_frac}) no coincide con FRF + FracNat ({expected_total_frac}).")
+                    reg_err_rmr("total_frac", total_frac, "ALERTA", f"Total de Fracturas en RMR ({total_frac}) no coincide con FRF + FracNat. Datos evaluados -> FRF({frf}) + FracNat({frac_nat}) = {expected_total_frac}.")
 
             ff_1m = sanitize_val(row_dict.get("ff_1m"), float)
             if total_frac is not None and long_corrida is not None and long_corrida > 0 and ff_1m is not None:
                 expected_ff_1m = round(total_frac / long_corrida)
                 if abs(ff_1m - expected_ff_1m) > 1.0:
-                    reg_err_rmr("ff_1m", ff_1m, "ALERTA", f"FF/1m en RMR ({ff_1m}) no coincide con TotalFracturas / Long.Corrida = {expected_ff_1m}.")
+                    reg_err_rmr("ff_1m", ff_1m, "ALERTA", f"FF/1m en RMR ({ff_1m}) no coincide con TotalFracturas / Long.Corrida. Datos evaluados -> TotalFracturas({total_frac}) / Long.Corrida({long_corrida}m) = {expected_ff_1m}.")
 
             espaciamiento = sanitize_val(row_dict.get("espaciamiento_mm"), float)
             if total_frac is not None and long_corrida is not None and long_corrida > 0 and espaciamiento is not None:
@@ -557,7 +563,7 @@ def validate_rmr_sheet_data(
                 else:
                     expected_esp = round(long_corrida * 1000 / total_frac)
                 if abs(espaciamiento - expected_esp) > 2.0:
-                    reg_err_rmr("espaciamiento_mm", espaciamiento, "ALERTA", f"Espaciamiento ({espaciamiento}mm) no coincide con la fórmula calculada ({expected_esp}mm).")
+                    reg_err_rmr("espaciamiento_mm", espaciamiento, "ALERTA", f"Espaciamiento ({espaciamiento}mm) no coincide con la fórmula calculada. Datos evaluados -> Long.Corrida({long_corrida}m) * 1000 / TotalFracturas({total_frac}) = {expected_esp}mm.")
 
             resistencia = safe_str(row_dict.get("resistencia"))
             lgg_res = safe_str(matching_lgg_run.get("resistencia"))
@@ -605,9 +611,17 @@ def validate_rmr_sheet_data(
             if espesor_rel is not None and abs(espesor_rel - lgg_esp) > 0.001:
                 reg_err_rmr("espesor_relleno", espesor_rel, "ALERTA", f"Espesor de relleno en RMR ({espesor_rel}mm) no coincide con LGG ({lgg_esp}mm).")
 
-            pres_agua = row_dict.get("presencia_agua")
-            if pres_agua is not None and str(pres_agua).strip() != "":
-                reg_err_rmr("presencia_agua", pres_agua, "ADVERTENCIA", f"Presencia de Agua en RMR ('{pres_agua}'): Validación de reglas avanzadas de hidrogeología pendiente.")
+            WATER_SCORES_76 = {"CDC": 10, "DPH": 7, "WTM": 7, "DGE": 4, "FGF": 0}
+            WATER_SCORES_89 = {"CDC": 15, "DPH": 10, "WTM": 7, "DGE": 4, "FGF": 0}
+            
+            pres_agua_code = safe_str(row_dict.get("presencia_agua")).upper().strip()
+            if pres_agua_code in WATER_SCORES_76:
+                r76_agua = WATER_SCORES_76[pres_agua_code]
+                r89_agua = WATER_SCORES_89[pres_agua_code]
+            else:
+                water_res = calculate_water_rating(a if a is not None else 0.0)
+                r76_agua = water_res["score_76"]
+                r89_agua = water_res["score_89"]
 
             # 4. REGLAS RATINGS RMR'76
             rmr76_excel = sanitize_val(row_dict.get("rmr76"), int)
@@ -620,15 +634,13 @@ def validate_rmr_sheet_data(
             r76_int = WEATHERING_RATINGS_76.get(intemperismo.upper(), 0)
             r76_pers = round((r76_ab + r76_rug + r76_rel + r76_int) / 4)
             r76_juntas = r76_ab + r76_rug + r76_rel + r76_int + r76_pers
-            water_res = calculate_water_rating(a if a is not None else 0.0)
-            r76_agua = water_res["score_76"]
 
             expected_rmr76 = r76_res + r76_rqd + r76_esp + r76_juntas + r76_agua
             if rmr76_excel is not None:
                 if rmr76_excel < 0 or rmr76_excel > 100:
                     reg_err_rmr("rmr76", rmr76_excel, "ALERTA", f"Puntaje RMR'76 ({rmr76_excel}) fuera del rango permitido de 0 a 100.")
                 if abs(rmr76_excel - expected_rmr76) > 1:
-                    reg_err_rmr("rmr76", rmr76_excel, "ALERTA", f"Descuadre en RMR'76: Excel registra {rmr76_excel}, pero los sub-ratings geomecánicos suman {expected_rmr76}.")
+                    reg_err_rmr("rmr76", rmr76_excel, "ALERTA", f"Descuadre en RMR'76: Excel registra {rmr76_excel}, pero los sub-ratings geomecánicos suman {expected_rmr76}. Desglose -> Resistencia({r76_res}) + RQD({r76_rqd}) + Espaciamiento({r76_esp}) + Juntas({r76_juntas} [Abertura:{r76_ab} + Rugosidad:{r76_rug} + Relleno:{r76_rel} + Intemperismo:{r76_int} + Persistencia:{r76_pers}]) + Agua({r76_agua}) = {expected_rmr76}.")
 
             r76_lito_excel = safe_str(row_dict.get("r76_litologia"))
             if r76_lito_excel and rmr_l1 and r76_lito_excel.upper() != rmr_l1.upper():
@@ -645,14 +657,13 @@ def validate_rmr_sheet_data(
             r89_int = WEATHERING_RATINGS_89.get(intemperismo.upper(), 0)
             r89_pers = round((r89_ab + r89_rug + r89_rel + r89_int) / 4)
             r89_juntas = r89_ab + r89_rug + r89_rel + r89_int + r89_pers
-            r89_agua = water_res["score_89"]
 
             expected_rmr89 = r89_res + r89_rqd + r89_esp + r89_juntas + r89_agua
             if rmr89_excel is not None:
                 if rmr89_excel < 0 or rmr89_excel > 100:
                     reg_err_rmr("rmr89", rmr89_excel, "ALERTA", f"Puntaje RMR'89 ({rmr89_excel}) fuera del rango permitido de 0 a 100.")
                 if abs(rmr89_excel - expected_rmr89) > 1:
-                    reg_err_rmr("rmr89", rmr89_excel, "ALERTA", f"Descuadre en RMR'89: Excel registra {rmr89_excel}, pero los sub-ratings geomecánicos suman {expected_rmr89}.")
+                    reg_err_rmr("rmr89", rmr89_excel, "ALERTA", f"Descuadre en RMR'89: Excel registra {rmr89_excel}, pero los sub-ratings geomecánicos suman {expected_rmr89}. Desglose -> Resistencia({r89_res}) + RQD({r89_rqd}) + Espaciamiento({r89_esp}) + Juntas({r89_juntas} [Abertura:{r89_ab} + Rugosidad:{r89_rug} + Relleno:{r89_rel} + Intemperismo:{r89_int} + Persistencia:{r89_pers}]) + Agua({r89_agua}) = {expected_rmr89}.")
 
         if not row_has_errors:
             r_counters["total_ok"] += 1
@@ -1077,8 +1088,23 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
 
         lgg_runs.append({
             "taladro": taladro, "de": de, "a": a, "corrida": corrida_num,
-            "resistencia": resistencia, "lito1": safe_str(row_dict.get("lito1")),
-            "lito2": safe_str(row_dict.get("lito2")), "lito3": safe_str(row_dict.get("lito3"))
+            "resistencia": resistencia,
+            "lito1": safe_str(row_dict.get("lito1")),
+            "lito2": safe_str(row_dict.get("lito2")),
+            "lito3": safe_str(row_dict.get("lito3")),
+            "rec_m": rec_m,
+            "rqd_m": rqd_m,
+            "lrf_m": lrf_m,
+            "small_frag_m": small_frag_m,
+            "frac_nat": frac_nat,
+            "frf": sanitize_val(row_dict.get("frf"), int),
+            "abertura": abertura,
+            "rugosidad": raw_rugosidad if raw_rugosidad is not None else row_dict.get("rugosidad"),
+            "jrc10": jrc10,
+            "intemperismo": weathering if 'weathering' in locals() else row_dict.get("intemperismo"),
+            "relleno1": relleno1 if 'relleno1' in locals() else row_dict.get("relleno1"),
+            "espesor": espesor,
+            "tipo_est1": tipo_est1 if 'tipo_est1' in locals() else row_dict.get("tipo_est1")
         })
 
         if not row_has_errors:
@@ -1357,6 +1383,7 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
     total_est_filas = 0
     
     total_vacios = 0
+    total_sin_informacion = 0
     total_advertencias = 0
     total_alertas = 0
     total_ok = 0
@@ -1423,11 +1450,16 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
             row_has_errors = False
 
             def reg_err(col, val, tipo, msg, mod="LGG", hija=celda_hija):
-                nonlocal total_vacios, total_advertencias, total_alertas, row_has_errors
+                nonlocal total_vacios, total_sin_informacion, total_advertencias, total_alertas, row_has_errors
                 incidencias.append({"fila_excel": r, "celda_padre": celda_padre, "celda_hija": hija, "columna": col, "valor_actual": val, "tipo_incidencia": tipo, "mensaje": msg, "campania": str(camp) if camp else "N/A", "geotecnico": geo if geo else "N/A", "sector_geotecnico": "N/A", "modulo": mod})
                 if tipo == "VACIO":
                     total_vacios += 1
                     resumen_celdas[celda_padre]["vacios"] += 1
+                elif tipo == "SIN_INFORMACION":
+                    total_sin_informacion += 1
+                    if "sin_informacion" not in resumen_celdas[celda_padre]:
+                        resumen_celdas[celda_padre]["sin_informacion"] = 0
+                    resumen_celdas[celda_padre]["sin_informacion"] += 1
                 elif tipo == "ADVERTENCIA":
                     total_advertencias += 1
                     resumen_celdas[celda_padre]["advertencias"] += 1
@@ -1480,8 +1512,11 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
             mandatory_lgg = ["corrida", "de", "a", "rec_m", "rqd_m", "lrf_m", "small_frag_m", "frac_nat", "lito1", "resistencia", "tipo_est1", "frac_buz30", "frac_buz60", "frac_buz90", "abertura", "rugosidad", "jrc10", "intemperismo", "relleno1", "espesor", "agua_obs", "campana", "geologo"]
             for key in mandatory_lgg:
                 if key not in l_map: continue
-                v_san = sanitize_val(row_dict.get(key), str)
-                if v_san is None: reg_err(key, None, "VACIO", f"El campo obligatorio '{key}' se encuentra vacío o es -1.")
+                val_raw = row_dict.get(key)
+                if val_raw is None or str(val_raw).strip() == "":
+                    reg_err(key, None, "VACIO", f"El campo obligatorio '{key}' se encuentra vacío.")
+                elif str(val_raw).strip() in ["-1", "-1.0", "-1,0"]:
+                    reg_err(key, val_raw, "SIN_INFORMACION", f"El campo obligatorio '{key}' no contiene información (-1).")
 
             # --- 3. VALIDACIÓN DE CATÁLOGOS ---
             tipo_est1_can = get_canonical_value(tipo_est1_raw, VALID_STRUCTURES)
@@ -1508,45 +1543,45 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
                 resumen_celdas[celda_padre]["dist_celda"] = max(resumen_celdas[celda_padre]["dist_celda"], a)
 
             raw_de = row_dict.get("de")
-            if de is not None and de < 0:
+            if de is not None and de < -0.0001:
                 reg_err("de", raw_de, "ALERTA", f"El valor de 'de:' ({de}m) no puede ser negativo.")
             raw_a = row_dict.get("a")
-            if a is not None and a < 0:
+            if a is not None and a < -0.0001:
                 reg_err("a", raw_a, "ALERTA", f"El valor de 'a:' ({a}m) no puede ser negativo.")
             raw_rec = row_dict.get("rec_m")
-            if rec_m is not None and rec_m < 0:
+            if rec_m is not None and rec_m < -0.0001:
                 reg_err("rec_m", raw_rec, "ALERTA", f"La longitud recuperada ({rec_m}m) no puede ser negativa.")
             raw_rqd = row_dict.get("rqd_m")
-            if rqd_m is not None and rqd_m < 0:
+            if rqd_m is not None and rqd_m < -0.0001:
                 reg_err("rqd_m", raw_rqd, "ALERTA", f"El metraje RQD ({rqd_m}m) no puede ser negativo.")
             raw_lrf = row_dict.get("lrf_m")
-            if lrf_m is not None and lrf_m < 0:
+            if lrf_m is not None and lrf_m < -0.0001:
                 reg_err("lrf_m", raw_lrf, "ALERTA", f"La longitud de roca fracturada LRF ({lrf_m}m) no puede ser negativa.")
             raw_small = row_dict.get("small_frag_m")
-            if small_frag_m is not None and small_frag_m < 0:
+            if small_frag_m is not None and small_frag_m < -0.0001:
                 reg_err("small_frag_m", raw_small, "ALERTA", f"El metraje de fragmentos <10cm ({small_frag_m}m) no puede ser negativo.")
 
             raw_frac_nat = row_dict.get("frac_nat")
-            if frac_nat is not None and frac_nat < 0:
+            if frac_nat is not None and frac_nat < -0.0001:
                 reg_err("frac_nat", raw_frac_nat, "ALERTA", f"El número de fracturas naturales ({frac_nat}) no puede ser negativo.")
             raw_b30 = row_dict.get("frac_buz30")
-            if b30 is not None and b30 < 0:
+            if b30 is not None and b30 < -0.0001:
                 reg_err("frac_buz30", raw_b30, "ALERTA", f"El número de fracturas en Buz<30° ({b30}) no puede ser negativo.")
             raw_b60 = row_dict.get("frac_buz60")
-            if b60 is not None and b60 < 0:
+            if b60 is not None and b60 < -0.0001:
                 reg_err("frac_buz60", raw_b60, "ALERTA", f"El número de fracturas en 30°-60° ({b60}) no puede ser negativo.")
             raw_b90 = row_dict.get("frac_buz90")
-            if b90 is not None and b90 < 0:
+            if b90 is not None and b90 < -0.0001:
                 reg_err("frac_buz90", raw_b90, "ALERTA", f"El número de fracturas en Buz>60° ({b90}) no puede ser negativo.")
 
             raw_abertura = row_dict.get("abertura")
-            if abertura is not None and abertura < 0:
+            if abertura is not None and abertura < -0.0001:
                 reg_err("abertura", raw_abertura, "ALERTA", f"La abertura de junta ({abertura}mm) no puede ser negativa.")
             raw_espesor = row_dict.get("espesor")
-            if espesor is not None and espesor < 0:
+            if espesor is not None and espesor < -0.0001:
                 reg_err("espesor", raw_espesor, "ALERTA", f"El espesor de relleno ({espesor}mm) no puede ser negativo.")
             raw_camp = row_dict.get("campana")
-            if camp is not None and camp < 0:
+            if camp is not None and camp < -0.0001:
                 reg_err("campana", raw_camp, "ALERTA", f"El año de campaña ({camp}) no puede ser negativo.")
 
             for key, val_raw in [("frac_nat", raw_frac_nat), ("frac_buz30", raw_b30), ("frac_buz60", raw_b60), ("frac_buz90", raw_b90)]:
@@ -1621,10 +1656,27 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
             if raw_rugosidad is not None and not rugosidad_can:
                 reg_err("rugosidad", raw_rugosidad, "ALERTA", f"Código de Rugosidad no válido. Permitidos: {', '.join(VALID_RUGOSITY)}")
 
+            frf_val = sanitize_val(row_dict.get("frf"), int) if "frf" in l_map else None
+
             lgg_runs.append({
                 "taladro": taladro, "de": de, "a": a, "corrida": corrida_num,
-                "resistencia": resistencia, "lito1": safe_str(row_dict.get("lito1")),
-                "lito2": safe_str(row_dict.get("lito2")), "lito3": safe_str(row_dict.get("lito3"))
+                "resistencia": resistencia,
+                "lito1": safe_str(row_dict.get("lito1")),
+                "lito2": safe_str(row_dict.get("lito2")),
+                "lito3": safe_str(row_dict.get("lito3")),
+                "rec_m": rec_m,
+                "rqd_m": rqd_m,
+                "lrf_m": lrf_m,
+                "small_frag_m": small_frag_m,
+                "frac_nat": frac_nat,
+                "frf": frf_val,
+                "abertura": abertura,
+                "rugosidad": raw_rugosidad if raw_rugosidad is not None else row_dict.get("rugosidad"),
+                "jrc10": jrc10,
+                "intemperismo": weathering if 'weathering' in locals() else row_dict.get("intemperismo"),
+                "relleno1": relleno1 if 'relleno1' in locals() else row_dict.get("relleno1"),
+                "espesor": espesor,
+                "tipo_est1": tipo_est1 if 'tipo_est1' in locals() else row_dict.get("tipo_est1")
             })
             if not row_has_errors: total_ok += 1
 
@@ -1673,11 +1725,16 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
             row_has_errors = False
 
             def reg_err_est(col, val, tipo, msg):
-                nonlocal total_vacios, total_advertencias, total_alertas, row_has_errors
+                nonlocal total_vacios, total_sin_informacion, total_advertencias, total_alertas, row_has_errors
                 incidencias.append({"fila_excel": r, "celda_padre": celda_padre, "celda_hija": celda_hija, "columna": col, "valor_actual": val, "tipo_incidencia": tipo, "mensaje": msg, "campania": str(camp) if camp else "N/A", "geotecnico": geo if geo else "N/A", "sector_geotecnico": "N/A", "modulo": "Estructural"})
                 if tipo == "VACIO":
                     total_vacios += 1
                     resumen_celdas[celda_padre]["vacios"] += 1
+                elif tipo == "SIN_INFORMACION":
+                    total_sin_informacion += 1
+                    if "sin_informacion" not in resumen_celdas[celda_padre]:
+                        resumen_celdas[celda_padre]["sin_informacion"] = 0
+                    resumen_celdas[celda_padre]["sin_informacion"] += 1
                 elif tipo == "ADVERTENCIA":
                     total_advertencias += 1
                     resumen_celdas[celda_padre]["advertencias"] += 1
@@ -1731,20 +1788,23 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
             mandatory_est = ["profundidad", "alfa", "beta", "forma", "rugosidad", "jrc10", "abertura", "weathering", "espesor", "relleno1", "dureza_pared", "agua", "geotecnico", "campana"]
             for key in mandatory_est:
                 if key not in e_map: continue
-                v_san = sanitize_val(row_dict.get(key), str)
-                if v_san is None: reg_err_est(key, None, "VACIO", f"El campo obligatorio '{key}' se encuentra vacío o es -1.")
+                val_raw = row_dict.get(key)
+                if val_raw is None or str(val_raw).strip() == "":
+                    reg_err_est(key, None, "VACIO", f"El campo obligatorio '{key}' se encuentra vacío.")
+                elif str(val_raw).strip() in ["-1", "-1.0", "-1,0"]:
+                    reg_err_est(key, val_raw, "SIN_INFORMACION", f"El campo obligatorio '{key}' no contiene información (-1).")
 
             raw_depth = row_dict.get("profundidad")
-            if depth is not None and depth < 0:
+            if depth is not None and depth < -0.0001:
                 reg_err_est("profundidad", raw_depth, "ALERTA", f"Profundidad ({depth}m) no puede ser negativa.")
             raw_abertura = row_dict.get("abertura")
-            if abertura is not None and abertura < 0:
+            if abertura is not None and abertura < -0.0001:
                 reg_err_est("abertura", raw_abertura, "ALERTA", f"La abertura ({abertura}mm) no puede ser negativa.")
             raw_espesor = row_dict.get("espesor")
-            if espesor is not None and espesor < 0:
+            if espesor is not None and espesor < -0.0001:
                 reg_err_est("espesor", raw_espesor, "ALERTA", f"El espesor de relleno ({espesor}mm) no puede ser negativo.")
             raw_camp = row_dict.get("campana")
-            if camp is not None and camp < 0:
+            if camp is not None and camp < -0.0001:
                 reg_err_est("campana", raw_camp, "ALERTA", f"El año de campaña ({camp}) no puede ser negativo.")
 
             raw_dip = row_dict.get("dip")

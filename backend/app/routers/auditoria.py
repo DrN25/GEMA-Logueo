@@ -32,21 +32,87 @@ def simplify_message(msg):
     msg_clean = str(msg or "").strip()
     msg_up = msg_clean.upper()
     
-    # 1. Campos obligatorios vacíos (Máxima prioridad para evitar secuestros)
-    if "VACIO" in msg_up or "VACÍO" in msg_up or "OBLIGATORIO" in msg_up:
+    # 1. Sin Información (-1) -> Exclusivo para celdas con -1 o sin dato registrado (-1)
+    if "SIN INFORMACION" in msg_up or "SIN INFORMACIÓN" in msg_up or "NO CONTIENE INFORMACIÓN" in msg_up or "NO CONTIENE INFORMACION" in msg_up or "(-1)" in msg_up:
+        return "Campo obligatorio sin información (-1)."
+
+    # 2. Campos obligatorios vacíos (Celda totalmente nula o vacía)
+    if "VACIO" in msg_up or "VACÍO" in msg_up:
         return "Campo obligatorio se encuentra vacío."
-        
-    # 2. Negativos generales (Captura todos los negativos, incluyendo FRF negativo)
+
+    # 3. Validación RMR -> Reglas agrupadas sin parámetros dinámicos
+    if "LONGITUD DE CORRIDA" in msg_up and ("HASTA" in msg_up or "DESDE" in msg_up or "TOLERANCIA" in msg_up or "NO COINCIDE CON" in msg_up):
+        return "Longitud de corrida en RMR no coincide con (Hasta - Desde)."
+    if "INTERVALO DESDE/HASTA" in msg_up or ("INTERVALO" in msg_up and "RMR" in msg_up and "LGG" in msg_up):
+        return "Intervalo Desde/Hasta en RMR no coincide con el intervalo de LGG."
+    if "CORRIDA EN VALIDACIÓN RMR" in msg_up or "CORRIDA EN VALIDACION RMR" in msg_up or ("RMR" in msg_up and "CORRIDA" in msg_up and "NO COINCIDE" in msg_up):
+        return "Corrida en Validación RMR no coincide con ninguna corrida registrada en LGG."
+    if "PRESENCIA DE AGUA EN RMR" in msg_up or "PRESENCIA DE AGUA" in msg_up:
+        return "Presencia de Agua en RMR difiere de las observaciones de LGG."
+    if "LITOLOGÍA" in msg_up or "LITOLOGIA" in msg_up:
+        return "Litología en RMR difiere de Litho 1 en LGG."
+    if "ESPESOR DE RELLENO EN RMR" in msg_up:
+        return "Espesor de relleno en RMR no coincide con LGG."
+    if "ABERTURA EN RMR" in msg_up:
+        return "Abertura de junta en RMR no coincide con LGG."
+    if "FRACTURAS NATURALES EN RMR" in msg_up:
+        return "Fracturas Naturales en RMR no coincide con LGG."
+    if "REC (M) EN RMR" in msg_up or "RECUPERACIÓN DE LGG" in msg_up or ("REC" in msg_up and "RMR" in msg_up and "COINCIDE" in msg_up):
+        return "Recuperación Rec (m) en RMR no coincide con LGG."
+    if "RQD (M) EN RMR" in msg_up or "RQD DE LGG" in msg_up or ("RQD" in msg_up and "RMR" in msg_up and "COINCIDE" in msg_up):
+        return "Metraje RQD (m) en RMR no coincide con LGG."
+    if "LONGITUD DE TRAMO FRACTURADO" in msg_up:
+        return "Longitud de Tramo Fracturado LRF en RMR no coincide con LGG."
+    if "FRF EN RMR" in msg_up:
+        return "FRF en RMR no coincide con LGG."
+    if "TOTAL DE FRACTURAS EN RMR" in msg_up:
+        return "Total de Fracturas en RMR no coincide con la suma calculada."
+    if "FF/1M EN RMR" in msg_up:
+        return "Frecuencia de Fracturas FF/1m en RMR no coincide con la fórmula."
+    if "ESPACIAMIENTO EN RMR" in msg_up:
+        return "Espaciamiento en RMR no coincide con la fórmula calculada."
+    if "RESISTENCIA EN RMR" in msg_up:
+        return "Resistencia ISRM en RMR no coincide con LGG."
+    if "TIPO DE ESTRUCTURA EN RMR" in msg_up:
+        return "Tipo de Estructura en RMR no coincide con LGG."
+    if "RUGOSIDAD EN RMR" in msg_up:
+        return "Rugosidad en RMR no coincide con LGG."
+    if "RELLENO EN RMR" in msg_up:
+        return "Tipo de Relleno en RMR no coincide con LGG."
+    if "CLASIFICACIÓN DE RELLENO" in msg_up or "CLASIFICACION DE RELLENO" in msg_up:
+        return "Clasificación de Relleno en RMR no coincide con la clase esperada."
+    if "INTEMPERISMO EN RMR" in msg_up:
+        return "Intemperismo en RMR no coincide con LGG."
+    if "JRC10 EN RMR" in msg_up:
+        return "JRC10 en RMR no coincide con LGG."
+    if "RMR'76" in msg_up or "RMR 76" in msg_up:
+        return "Descuadre matemático en RMR'76 registrado."
+    if "RMR'89" in msg_up or "RMR 89" in msg_up:
+        return "Descuadre matemático en RMR'89 registrado."
+
+    # 4. Negativos agrupados dinámicamente
+    if "FRAGMENTOS <10CM" in msg_up and "NEGATIV" in msg_up:
+        return "El metraje de fragmentos <10cm no puede ser negativo."
+    if "FRACTURAS NATURALES" in msg_up and "NEGATIV" in msg_up:
+        return "El número de fracturas naturales no puede ser negativo."
+    if "LONGITUD RECUPERADA" in msg_up and "NEGATIV" in msg_up:
+        return "La longitud recuperada no puede ser negativa."
+    if "METRAJE RQD" in msg_up and "NEGATIV" in msg_up:
+        return "El metraje RQD no puede ser negativo."
+    if "LONGITUD DE ROCA FRACTURADA" in msg_up and "NEGATIV" in msg_up:
+        return "La longitud de roca fracturada LRF no puede ser negativa."
+    if "VALOR DE FRF" in msg_up and "NEGATIV" in msg_up:
+        return "El valor de FRF no puede ser negativo."
     if "NEGATIV" in msg_up:
         return "El valor no puede ser negativo."
         
-    # 3. Reglas de FRF restantes (Fórmula y formato entero)
+    # 5. Reglas de FRF restantes (Fórmula y formato entero)
     if "FRF" in msg_up:
         if "ENTERO" in msg_up:
             return "El valor de FRF debe ser un número entero."
         return "El valor de FRF no coincide con el calculado por la fórmula."
 
-    # 4. Inconsistencias físicas de metraje (RQD, LRF y Recuperada)
+    # 6. Inconsistencias físicas de metraje (RQD, LRF y Recuperada)
     if "RQD" in msg_up and "RECUPERADA" in msg_up:
         return "Metraje RQD es mayor que la longitud recuperada."
     if "LRF" in msg_up and "RECUPERADA" in msg_up:
@@ -54,7 +120,7 @@ def simplify_message(msg):
     if "RECUPERADA" in msg_up and "AVANCE" in msg_up:
         return "La longitud recuperada es mayor que el avance perforado."
 
-    # 5. Resto de reglas específicas
+    # 7. Resto de reglas específicas
     if "RUPTURA DE CONTINUIDAD" in msg_up:
         return "Ruptura de continuidad espacial detectada."
     if "LÍMITE CRÍTICO DE 1.6M" in msg_up or "LIMITE CRITICO DE 1.6M" in msg_up:
@@ -92,7 +158,7 @@ def simplify_message(msg):
     if "NO SE HA REGISTRADO ESPESOR DE RELLENO" in msg_up or "LA ABERTURA DE JUNTA ES MAYOR A 0MM" in msg_up:
         return "La abertura de junta es mayor a 0mm pero no se ha registrado espesor de relleno."
 
-    if "ESPESOR DE RELLENO NO PUEDE SER MAYOR" in msg_up or "ESPESOR DE RELLENO" in msg_up and "SUPERA A LA ABERTURA" in msg_up:
+    if "ESPESOR DE RELLENO NO PUEDE SER MAYOR" in msg_up or ("ESPESOR DE RELLENO" in msg_up and "ABERTURA DE JUNTA" in msg_up and "MAYOR" in msg_up):
         if "EXCEPTO" in msg_up or "ESTRUCTURAS" in msg_up:
             return "El espesor de relleno no puede ser mayor que la abertura de junta excepto en estructuras F, RF, VN, SZ, F+10 o BED."
         return "El espesor de relleno no puede ser mayor que la abertura de junta."
@@ -134,6 +200,35 @@ def get_safe_sheet_name(title, index):
     suffix = f" ({index})"
     max_title_len = 31 - len(suffix)
     return f"{clean_title[:max_title_len].strip()}{suffix}"
+
+def get_module_label(rule):
+    matches = rule.get("matches", [])
+    if matches:
+        modulos = set(m.get("modulo", "") for m in matches if m.get("modulo"))
+        clean_mods = []
+        for m in modulos:
+            m_up = m.upper()
+            if "RMR" in m_up:
+                clean_mods.append("RMR")
+            elif "ESTRUCTURAL" in m_up or "EST" in m_up:
+                clean_mods.append("Estructural")
+            elif "LGG" in m_up:
+                clean_mods.append("LGG")
+            elif "COLLAR" in m_up or "SURVEY" in m_up:
+                clean_mods.append("Collar / Survey")
+            else:
+                clean_mods.append(m)
+        if clean_mods:
+            return " / ".join(sorted(set(clean_mods)))
+    
+    msg_up = str(rule.get("msg", "")).upper()
+    if "RMR" in msg_up:
+        return "RMR"
+    if "ESTRUCTURAL" in msg_up or "ALFA" in msg_up or "BETA" in msg_up or "HUÉRFANA" in msg_up or "HUERFANA" in msg_up:
+        return "Estructural"
+    if "COLLAR" in msg_up or "SURVEY" in msg_up or "EOH" in msg_up:
+        return "Collar / Survey"
+    return "LGG"
 
 def safe_replace(src: str, dst: str, retries: int = 5, delay: float = 0.2):
     for i in range(retries):
@@ -403,7 +498,7 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
     ws_cat.cell(row=2, column=2, value="CATÁLOGO DE REGLAS DE CONSISTENCIA").font = font_title
     ws_cat.cell(row=3, column=2, value="Índice maestro de validación geomecánica ordenado por frecuencia. Use los hipervínculos para navegar.").font = font_subtitle
     
-    headers_cat = ["ID", "Gravedad", "Mensaje de Regla Evaluada", "Casos Hallados (N)", "Enlace Detallado"]
+    headers_cat = ["ID", "Gravedad", "Módulo Afectado", "Mensaje de Regla Evaluada", "Casos Hallados (N)", "Enlace Detallado"]
     for idx, col in enumerate(headers_cat, start=2):
         cell = ws_cat.cell(row=5, column=idx, value=col)
         cell.font = font_header
@@ -443,6 +538,8 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
     r_cat = 6
     active_sheets_mapping = {}
     
+    fill_mod_est = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+
     for c_idx, rule in enumerate(catalog_frequencies, start=1):
         ws_cat.cell(row=r_cat, column=2, value=c_idx).font = font_regular
         ws_cat.cell(row=r_cat, column=2).alignment = alignment_center
@@ -456,16 +553,26 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
         elif rule["severity"] == "ADVERTENCIA": c_sev.fill = fill_accent_orange
         else: c_sev.fill = fill_accent_yellow
         
-        ws_cat.cell(row=r_cat, column=4, value=rule["msg"]).font = font_bold if rule["count"] > 0 else font_regular
-        ws_cat.cell(row=r_cat, column=4).border = border_thin
+        mod_label = get_module_label(rule)
+        c_mod = ws_cat.cell(row=r_cat, column=4, value=mod_label)
+        c_mod.font = font_bold
+        c_mod.alignment = alignment_center
+        c_mod.border = border_thin
+        if "RMR" in mod_label: c_mod.fill = fill_accent_yellow
+        elif "Estructural" in mod_label: c_mod.fill = fill_mod_est
+        elif "LGG" in mod_label: c_mod.fill = fill_accent_green
+        else: c_mod.fill = fill_kpi_gray
+
+        ws_cat.cell(row=r_cat, column=5, value=rule["msg"]).font = font_bold if rule["count"] > 0 else font_regular
+        ws_cat.cell(row=r_cat, column=5).border = border_thin
         
-        c_count = ws_cat.cell(row=r_cat, column=5, value=rule["count"])
+        c_count = ws_cat.cell(row=r_cat, column=6, value=rule["count"])
         c_count.font = font_bold
         c_count.alignment = alignment_right
         c_count.number_format = '#,##0'
         c_count.border = border_thin
         
-        c_link = ws_cat.cell(row=r_cat, column=6)
+        c_link = ws_cat.cell(row=r_cat, column=7)
         if rule["count"] > 0:
             tab_name = get_safe_sheet_name(rule["msg"], c_idx)
             active_sheets_mapping[rule["msg"]] = {"tab_name": tab_name, "records": rule["matches"]}
@@ -614,38 +721,6 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
             c_yp.number_format = '0.00%'
             c_yp.border = border_thin
             curr_y_r += 1
-            
-        # Distribución por Geólogo
-        ws_err.cell(row=10, column=6, value="DISTRIBUCIÓN POR REGISTRADOR (GEÓLOGO)").font = font_section
-        for idx, col in enumerate(["Logger Geotécnico", "Ocurrencias", "% Contribución"], start=6):
-            cell = ws_err.cell(row=11, column=idx, value=col)
-            cell.font = font_header
-            cell.fill = fill_primary
-            cell.alignment = alignment_center
-            cell.border = border_thin
-            
-        r_dist_sc = defaultdict(int)
-        for r in err_records:
-            r_dist_sc[str(r.get("geotecnico", "N/A"))] += 1
-            
-        curr_s_r = 12
-        for sc, s_qty in sorted(r_dist_sc.items()):
-            ws_err.cell(row=curr_s_r, column=6, value=sc).font = font_bold
-            ws_err.cell(row=curr_s_r, column=6).alignment = alignment_center
-            ws_err.cell(row=curr_s_r, column=6).border = border_thin
-            
-            c_sq = ws_err.cell(row=curr_s_r, column=7, value=s_qty)
-            c_sq.font = font_regular
-            c_sq.alignment = alignment_right
-            c_sq.number_format = '#,##0'
-            c_sq.border = border_thin
-            
-            c_sp = ws_err.cell(row=curr_s_r, column=8, value=s_qty / max(1, tot_affected))
-            c_sp.font = font_regular
-            c_sp.alignment = alignment_right
-            c_sp.number_format = '0.00%'
-            c_sp.border = border_thin
-            curr_s_r += 1
 
         # Detalle de Registros
         ws_err.append([])

@@ -274,7 +274,7 @@ export const EXPECTED_RMR_FIELDS: MappingField[] = [
   { key: 'lrf_m', label: 'Long. Tramo fracturado (m)', required: true, synonyms: ['longtramofracturadom', 'lrfm', 'lrf'] },
   { key: 'frf', label: 'FRF (zonas trituradas)', required: true, synonyms: ['frf', 'frfzonastrituradas'] },
   { key: 'frac_nat', label: 'Fracturas naturales', required: true, synonyms: ['fracturasnaturales', 'fracnat', 'fn'] },
-  { key: 'total_frac', label: 'Total de Fracturas', required: true, synonyms: ['totaldefracturas', 'totalfracturas'] },
+  { key: 'total_frac', label: 'Total de Fracturas', required: true, synonyms: ['toraldefracturas', 'totaldefracturas', 'totalfracturas'] },
   { key: 'ff_1m', label: 'FF/1m', required: true, synonyms: ['ff1m', 'ff/1m'] },
   { key: 'espaciamiento_mm', label: 'Espaciamiento (mm)', required: true, synonyms: ['espaciamientomm', 'espaciamiento'] },
   { key: 'resistencia', label: 'Resistencia', required: true, synonyms: ['resistencia', 'resistisrm'] },
