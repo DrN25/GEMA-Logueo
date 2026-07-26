@@ -615,55 +615,60 @@ def validate_rmr_sheet_data(
             WATER_SCORES_89 = {"CDC": 15, "DPH": 10, "WTM": 7, "DGE": 4, "FGF": 0}
             
             pres_agua_code = safe_str(row_dict.get("presencia_agua")).upper().strip()
-            if pres_agua_code in WATER_SCORES_76:
-                r76_agua = WATER_SCORES_76[pres_agua_code]
-                r89_agua = WATER_SCORES_89[pres_agua_code]
+            r76_agua = WATER_SCORES_76.get(pres_agua_code, 0) if (pres_agua_code and pres_agua_code != "-1") else 0
+            r89_agua = WATER_SCORES_89.get(pres_agua_code, 0) if (pres_agua_code and pres_agua_code != "-1") else 0
+
+            # 4. REGLAS RATINGS RMR'76 (SUMA PURA DE SUB-RATINGS REGISTRADOS)
+            rmr76_excel = sanitize_val(row_dict.get("rmr76"), float)
+            r76_res = sanitize_val(row_dict.get("r76_resistencia"), float) or 0.0
+            r76_rqd = sanitize_val(row_dict.get("r76_rqd"), float) or 0.0
+            r76_esp = sanitize_val(row_dict.get("r76_espaciamiento"), float) or 0.0
+            
+            r76_juntas_reg = sanitize_val(row_dict.get("r76_juntas"), float)
+            if r76_juntas_reg is not None:
+                r76_juntas = r76_juntas_reg
             else:
-                water_res = calculate_water_rating(a if a is not None else 0.0)
-                r76_agua = water_res["score_76"]
-                r89_agua = water_res["score_89"]
+                r76_ab = sanitize_val(row_dict.get("r76_abertura"), float) or 0.0
+                r76_rug = sanitize_val(row_dict.get("r76_rugosidad"), float) or 0.0
+                r76_rel = sanitize_val(row_dict.get("r76_relleno"), float) or 0.0
+                r76_int = sanitize_val(row_dict.get("r76_intemperismo"), float) or 0.0
+                r76_pers = sanitize_val(row_dict.get("r76_persistencia"), float) or 0.0
+                r76_juntas = r76_ab + r76_rug + r76_rel + r76_int + r76_pers
 
-            # 4. REGLAS RATINGS RMR'76
-            rmr76_excel = sanitize_val(row_dict.get("rmr76"), int)
-            r76_res = STRENGTH_RATINGS.get(resistencia, 0)
-            r76_rqd = calculate_rqd_rating(rqd_pct) if rqd_pct is not None else 0
-            r76_esp = calculate_spacing_rating_76(espaciamiento) if espaciamiento is not None else 0
-            r76_ab = calculate_aperture_rating_76(abertura) if abertura is not None else 0
-            r76_rug = ROUGHNESS_RATINGS_76.get(safe_int(rugosidad), 0)
-            r76_rel = calculate_filling_rating_76(relleno, espesor_rel if espesor_rel is not None else 0.0)
-            r76_int = WEATHERING_RATINGS_76.get(intemperismo.upper(), 0)
-            r76_pers = round((r76_ab + r76_rug + r76_rel + r76_int) / 4)
-            r76_juntas = r76_ab + r76_rug + r76_rel + r76_int + r76_pers
-
+            r76_agua = sanitize_val(row_dict.get("r76_agua"), float) or 0.0
             expected_rmr76 = r76_res + r76_rqd + r76_esp + r76_juntas + r76_agua
+
             if rmr76_excel is not None:
                 if rmr76_excel < 0 or rmr76_excel > 100:
                     reg_err_rmr("rmr76", rmr76_excel, "ALERTA", f"Puntaje RMR'76 ({rmr76_excel}) fuera del rango permitido de 0 a 100.")
-                if abs(rmr76_excel - expected_rmr76) > 1:
-                    reg_err_rmr("rmr76", rmr76_excel, "ALERTA", f"Descuadre en RMR'76: Excel registra {rmr76_excel}, pero los sub-ratings geomecánicos suman {expected_rmr76}. Desglose -> Resistencia({r76_res}) + RQD({r76_rqd}) + Espaciamiento({r76_esp}) + Juntas({r76_juntas} [Abertura:{r76_ab} + Rugosidad:{r76_rug} + Relleno:{r76_rel} + Intemperismo:{r76_int} + Persistencia:{r76_pers}]) + Agua({r76_agua}) = {expected_rmr76}.")
+                if abs(rmr76_excel - expected_rmr76) > 0.5:
+                    reg_err_rmr("rmr76", rmr76_excel, "ALERTA", f"Descuadre en RMR'76: Excel registra {rmr76_excel}, pero los sub-ratings registrados suman {expected_rmr76}. Desglose -> Resistencia({r76_res}) + RQD({r76_rqd}) + Espaciamiento({r76_esp}) + Condición de Juntas({r76_juntas}) + Presencia de Agua({r76_agua}) = {expected_rmr76}.")
 
-            r76_lito_excel = safe_str(row_dict.get("r76_litologia"))
-            if r76_lito_excel and rmr_l1 and r76_lito_excel.upper() != rmr_l1.upper():
-                reg_err_rmr("r76_litologia", r76_lito_excel, "ADVERTENCIA", f"Litología en columna RMR'76 ('{r76_lito_excel}') difiere de Litho 1 ('{rmr_l1}').")
+            # 5. REGLAS RATINGS RMR'89 (SUMA PURA DE SUB-RATINGS REGISTRADOS)
+            rmr89_excel = sanitize_val(row_dict.get("rmr89"), float)
+            r89_res = sanitize_val(row_dict.get("r89_resistencia"), float) or 0.0
+            r89_rqd = sanitize_val(row_dict.get("r89_rqd"), float) or 0.0
+            r89_esp = sanitize_val(row_dict.get("r89_espaciamiento"), float) or 0.0
+            
+            r89_juntas_reg = sanitize_val(row_dict.get("r89_juntas"), float)
+            if r89_juntas_reg is not None:
+                r89_juntas = r89_juntas_reg
+            else:
+                r89_ab = sanitize_val(row_dict.get("r89_abertura"), float) or 0.0
+                r89_rug = sanitize_val(row_dict.get("r89_rugosidad"), float) or 0.0
+                r89_rel = sanitize_val(row_dict.get("r89_relleno"), float) or 0.0
+                r89_int = sanitize_val(row_dict.get("r89_intemperismo"), float) or 0.0
+                r89_pers = sanitize_val(row_dict.get("r89_persistencia"), float) or 0.0
+                r89_juntas = r89_ab + r89_rug + r89_rel + r89_int + r89_pers
 
-            # 5. REGLAS RATINGS RMR'89
-            rmr89_excel = sanitize_val(row_dict.get("rmr89"), int)
-            r89_res = STRENGTH_RATINGS.get(resistencia, 0)
-            r89_rqd = calculate_rqd_rating(rqd_pct) if rqd_pct is not None else 0
-            r89_esp = calculate_spacing_rating_89(espaciamiento) if espaciamiento is not None else 0
-            r89_ab = calculate_aperture_rating_89(abertura) if abertura is not None else 0
-            r89_rug = ROUGHNESS_RATINGS_89.get(safe_int(rugosidad), 0)
-            r89_rel = calculate_filling_rating_89(relleno, espesor_rel if espesor_rel is not None else 0.0)
-            r89_int = WEATHERING_RATINGS_89.get(intemperismo.upper(), 0)
-            r89_pers = round((r89_ab + r89_rug + r89_rel + r89_int) / 4)
-            r89_juntas = r89_ab + r89_rug + r89_rel + r89_int + r89_pers
-
+            r89_agua = sanitize_val(row_dict.get("r89_agua"), float) or 0.0
             expected_rmr89 = r89_res + r89_rqd + r89_esp + r89_juntas + r89_agua
+
             if rmr89_excel is not None:
                 if rmr89_excel < 0 or rmr89_excel > 100:
                     reg_err_rmr("rmr89", rmr89_excel, "ALERTA", f"Puntaje RMR'89 ({rmr89_excel}) fuera del rango permitido de 0 a 100.")
-                if abs(rmr89_excel - expected_rmr89) > 1:
-                    reg_err_rmr("rmr89", rmr89_excel, "ALERTA", f"Descuadre en RMR'89: Excel registra {rmr89_excel}, pero los sub-ratings geomecánicos suman {expected_rmr89}. Desglose -> Resistencia({r89_res}) + RQD({r89_rqd}) + Espaciamiento({r89_esp}) + Juntas({r89_juntas} [Abertura:{r89_ab} + Rugosidad:{r89_rug} + Relleno:{r89_rel} + Intemperismo:{r89_int} + Persistencia:{r89_pers}]) + Agua({r89_agua}) = {expected_rmr89}.")
+                if abs(rmr89_excel - expected_rmr89) > 0.5:
+                    reg_err_rmr("rmr89", rmr89_excel, "ALERTA", f"Descuadre en RMR'89: Excel registra {rmr89_excel}, pero los sub-ratings registrados suman {expected_rmr89}. Desglose -> Resistencia({r89_res}) + RQD({r89_rqd}) + Espaciamiento({r89_esp}) + Condición de Juntas({r89_juntas}) + Presencia de Agua({r89_agua}) = {expected_rmr89}.")
 
         if not row_has_errors:
             r_counters["total_ok"] += 1

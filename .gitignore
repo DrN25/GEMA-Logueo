@@ -28,3 +28,6 @@ node_modules/
 venv/
 *.xlsx
 *.json
+*.pyc
+__pycache__/
+backend/uploads/*
