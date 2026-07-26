@@ -286,7 +286,9 @@ export function getLggColumns({
         if (!isSelected) {
           return (
             <div className="w-full h-full flex items-center justify-center px-1" style={style}>
-              <span className="font-bold py-1.5 truncate text-center select-all">{row.lito1}</span>
+              <span className="font-bold py-1.5 truncate text-center select-all">
+                {(!row.lito1 || row.lito1 === "-1") ? "-" : row.lito1}
+              </span>
             </div>
           );
         }
@@ -294,12 +296,16 @@ export function getLggColumns({
           <div className="w-full h-full flex items-center justify-center px-1" style={style}>
             <select
               id={`lgg-cell-${row.originalIndex}-lito1`}
-              value={row.lito1}
+              value={row.lito1 || '-1'}
               onChange={(e) => handleCellChange(row.originalIndex, 'lito1', e.target.value)}
               className="w-full bg-transparent border-0 py-1 text-center font-bold focus:outline-none cursor-pointer text-xs"
               style={{ color: style.color }}
             >
-              {LITO1_OPTIONS.map(opt => (
+              <option value="-1" className={isDark ? "bg-navy-950 text-slate-500" : "bg-white text-slate-400"}>S/D</option>
+              {(!LITO1_OPTIONS.includes(row.lito1) && row.lito1 && row.lito1 !== "-1") && (
+                <option value={row.lito1}>{row.lito1}</option>
+              )}
+              {LITO1_OPTIONS.filter(o => o !== "-1").map(opt => (
                 <option key={opt} value={opt} className={isDark ? "bg-navy-950 text-slate-300" : "bg-white text-slate-800"}>
                   {opt}
                 </option>
@@ -335,6 +341,9 @@ export function getLggColumns({
               style={{ color: style.color }}
             >
               <option value="-1" className={isDark ? "bg-navy-950 text-slate-500" : "bg-white text-slate-400"}>S/D</option>
+              {(!LITO2_OPTIONS.includes(row.lito2) && row.lito2 && row.lito2 !== "-1") && (
+                <option value={row.lito2}>{row.lito2}</option>
+              )}
               {LITO2_OPTIONS.filter(o => o !== "-1").map(opt => (
                 <option key={opt} value={opt} className={isDark ? "bg-navy-950 text-slate-300" : "bg-white text-slate-800"}>
                   {opt}
@@ -371,6 +380,9 @@ export function getLggColumns({
               style={{ color: style.color }}
             >
               <option value="-1" className={isDark ? "bg-navy-950 text-slate-500" : "bg-white text-slate-400"}>S/D</option>
+              {(!LITO3_OPTIONS.includes(row.lito3) && row.lito3 && row.lito3 !== "-1") && (
+                <option value={row.lito3}>{row.lito3}</option>
+              )}
               {LITO3_OPTIONS.filter(o => o !== "-1").map(opt => (
                 <option key={opt} value={opt} className={isDark ? "bg-navy-950 text-slate-300" : "bg-white text-slate-800"}>
                   {opt}

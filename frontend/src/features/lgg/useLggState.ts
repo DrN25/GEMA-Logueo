@@ -121,8 +121,8 @@ export function useLggState({
         return prev; // Reutilización de referencia estricta en memoria
       }
 
-      // Clave rápida de cálculo geomecánico
-      const cacheKey = `${row.de}|${row.a}|${row.rec_m}|${row.rqd_m}|${row.lrf_m}|${row.small_frag_m}|${row.mec_frac}|${row.frac_nat}|${row.resistencia}|${row.abertura}|${row.rugosidad}|${row.intemperismo}|${row.relleno1}|${row.espesor}|${row.agua_obs}|${waterTableM}`;
+      // Clave rápida de cálculo geomecánico que abarca todos los campos reactivos de la corrida
+      const cacheKey = `${row.corrida}|${row.de}|${row.a}|${row.rec_m}|${row.rqd_m}|${row.lrf_m}|${row.small_frag_m}|${row.mec_frac}|${row.lito1}|${row.lito2}|${row.lito3}|${row.resistencia}|${row.orientacion}|${row.offset}|${row.tipo_est1}|${row.tipo_est2}|${row.frac_nat}|${row.frac_buz30}|${row.frac_buz60}|${row.frac_buz90}|${row.abertura}|${row.rugosidad}|${row.jrc10}|${row.intemperismo}|${row.relleno1}|${row.relleno2}|${row.espesor}|${row.agua_obs}|${row.turno}|${row.comentarios}|${waterTableM}`;
 
       const cached = rmrCache.current.get(cacheKey);
       if (cached) {

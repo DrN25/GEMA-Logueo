@@ -135,7 +135,7 @@ class GemaMigrationEngine:
             sondaje.Geotecnico = data.get("geologo", "RD/RB")
             sondaje.TurnoID = resolved_turno_id
 
-        # Guardar Collar (Oficial)
+        # Guardar Collar (Oficial y Proyectado)
         collar = self.db.query(models.Collar).filter_by(SondajeID=sondaje.SondajeID).first()
         if not collar:
             collar = models.Collar(
@@ -144,17 +144,45 @@ class GemaMigrationEngine:
                 CoordenadaNorte=self.sanitize_val(data.get("collar_norte", 8441000.0)),
                 Elevacion=self.sanitize_val(data.get("collar_cota", 4000.0)),
                 ProfundidadTotal=self.sanitize_val(data.get("prof_final_eoh", 100.0)),
+                Comentarios=data.get("comentarios", ""),
+                CoordenadaEsteProyectado=self.sanitize_val(data.get("collar_este_proyectado")),
+                CoordenadaNorteProyectado=self.sanitize_val(data.get("collar_norte_proyectado")),
+                ElevacionProyectado=self.sanitize_val(data.get("collar_cota_proyectado")),
+                ProfundidadTotalProyectada=self.sanitize_val(data.get("prof_final_eoh_proyectada")),
+                ComentariosProyectado=data.get("comentarios_proyectado", ""),
                 FechaRegistro=datetime.datetime.now()
             )
             self.db.add(collar)
         else:
             collar.CoordenadaEste = self.sanitize_val(data.get("collar_este", 794000.0))
-            collar.CoordenadaNorte = self.sanitize_val(data.get("collar_norte", 794000.0))
+            collar.CoordenadaNorte = self.sanitize_val(data.get("collar_norte", 8441000.0))
             collar.Elevacion = self.sanitize_val(data.get("collar_cota", 4000.0))
             collar.ProfundidadTotal = self.sanitize_val(data.get("prof_final_eoh", 100.0))
+            collar.Comentarios = data.get("comentarios", "")
+            collar.CoordenadaEsteProyectado = self.sanitize_val(data.get("collar_este_proyectado"))
+            collar.CoordenadaNorteProyectado = self.sanitize_val(data.get("collar_norte_proyectado"))
+            collar.ElevacionProyectado = self.sanitize_val(data.get("collar_cota_proyectado"))
+            collar.ProfundidadTotalProyectada = self.sanitize_val(data.get("prof_final_eoh_proyectada"))
+            collar.ComentariosProyectado = data.get("comentarios_proyectado", "")
         
         self.db.flush()
         return sondaje.SondajeID
+
+    def migrate_surveys(self, sondaje_id: int, surveys: list):
+        """Persiste las trayectorias de Survey en la tabla dbo.Survey."""
+        self.db.query(models.Survey).filter_by(SondajeID=sondaje_id).delete()
+        self.db.flush()
+
+        for s in surveys:
+            survey = models.Survey(
+                SondajeID=sondaje_id,
+                Profundidad=self.sanitize_val(s.get("depth")),
+                Inclinacion=self.sanitize_val(s.get("dip")),
+                Azimut=self.sanitize_val(s.get("azimuth")),
+                FechaRegistro=datetime.datetime.now()
+            )
+            self.db.add(survey)
+        self.db.flush()
 
     def migrate_corridas_and_calculate_rmr(self, sondaje_id: int, campana_id: int, geotecnico_id: int, corridas: list):
         """Inserta las corridas en dbo.LogueoGeotecnicoGeneral y procesa Validación RMR."""

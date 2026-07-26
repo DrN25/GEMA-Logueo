@@ -304,15 +304,19 @@ def save_taladro(taladro: TaladroSchema, db: Session = Depends(get_db)):
         campana_id = engine.resolve_campana(taladro.campana or "2020")
         geotecnico_id = engine.resolve_geotecnico(taladro.geologo or "RD/RB")
         
-        # 2. Guardar Corridas y calcular RMR en ValidaciónRMR
+        # 2. Guardar Surveys / Trayectorias
+        surveys_list = [s.dict() for s in taladro.surveys]
+        engine.migrate_surveys(sondaje_id, surveys_list)
+        
+        # 3. Guardar Corridas y calcular RMR en ValidaciónRMR
         corridas_list = [c.dict() for c in taladro.corridas]
         engine.migrate_corridas_and_calculate_rmr(sondaje_id, campana_id, geotecnico_id, corridas_list)
         
-        # 3. Guardar Discontinuidades Estructurales
+        # 4. Guardar Discontinuidades Estructurales
         discontinuidades_list = [d.dict() for d in taladro.discontinuidades]
         engine.migrate_discontinuidades(sondaje_id, campana_id, geotecnico_id, discontinuidades_list)
         
-        # 4. Guardar Ensayos PLT
+        # 5. Guardar Ensayos PLT
         plt_list = [p.dict() for p in taladro.ensayos_plt]
         engine.migrate_ensayos_plt(sondaje_id, campana_id, plt_list)
         
@@ -331,7 +335,6 @@ def delete_taladro(name: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Sondaje no encontrado en GEMA")
         
     try:
-        db.query(models.EnsayoPLT).filter_by(SondajeID=s.SondajeID).delete()
         db.delete(s)
         db.commit()
         return {"status": "success", "message": f"Taladro {name} y todas sus dependencias eliminadas correctamente de GEMA"}

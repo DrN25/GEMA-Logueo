@@ -49,6 +49,8 @@ class Sondaje(Base):
     # ─── 2. NUEVOS MAPEOS UNIDIRECCIONALES SÍNCRONOS ───
     registros = relationship("LogueoGeotecnicoGeneral", cascade="all, delete-orphan")
     ensayos_plt = relationship("EnsayoPLT", cascade="all, delete-orphan")
+    validaciones_rmr = relationship("ValidacionRMR", cascade="all, delete-orphan")
+    logueo_estructural = relationship("LogueoEstructural", cascade="all, delete-orphan")
 
 class Collar(Base):
     __tablename__ = "Collar"

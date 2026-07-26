@@ -350,7 +350,20 @@ function GridRowInner<T>({
                 max={col.max}
                 value={getDisplayVal(col.key as keyof T)}
                 onChange={(e) => {
-                  setEditing(prev => ({ ...prev, [colKeyStr]: e.target.value }));
+                  const strVal = e.target.value;
+                  setEditing(prev => ({ ...prev, [colKeyStr]: strVal }));
+
+                  const colDef = columns.find(c => c.key === col.key);
+                  let parsed: any = strVal;
+                  if (colDef?.type === 'number') {
+                    if (strVal === '' || strVal === '-') {
+                      parsed = -1;
+                    } else {
+                      const p = parseFloat(strVal);
+                      parsed = isNaN(p) ? -1 : p;
+                    }
+                  }
+                  onCellChange(rowIndex, col.key as keyof T, parsed);
                 }}
                 onBlur={() => {
                   commitField(col.key as keyof T);
