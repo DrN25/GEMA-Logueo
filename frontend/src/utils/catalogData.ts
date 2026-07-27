@@ -288,3 +288,19 @@ export const INTEMPERISMO_OPTIONS = ["UWF", "SWD", "MWM", "HWA", "CWC", "RS", "-
 export const AGUA_OPTIONS = Object.keys(GROUNDWATER_CATALOG);
 export const ORIENTACION_OPTIONS = ["N", "S", "X"];
 export const ESTRUCTURA_OPTIONS = [...Object.keys(STRUCTURE_CATALOG), "-1"];
+
+/**
+ * Normaliza cualquier valor de resistencia (ej: 0..6, "0".."6", "r4", "R4") a su código canónico ("R0".."R6" o "-1")
+ */
+export function normalizeStrength(val: any): string {
+  if (val === undefined || val === null) return '-1';
+  const str = String(val).trim().toUpperCase();
+  if (!str || str === '-1' || str === 'NONE' || str === 'S/D' || str === '-' || str === 'NULL') return '-1';
+  if (/^[0-6]$/.test(str)) {
+    return `R${str}`;
+  }
+  if (/^R[0-6]$/.test(str)) {
+    return str;
+  }
+  return '-1';
+}

@@ -32,6 +32,18 @@ def make_taladro_name(prefix: str, year: int, number: int) -> str:
     year_str = str(year)[-2:]
     return f"{prefix}{year_str}-{number:03d}"
 
+def normalize_strength(val) -> str:
+    if val is None:
+        return "-1"
+    val_str = str(val).strip().upper()
+    if val_str in ("", "-1", "-1.0", "NONE", "NULL", "S/D", "-"):
+        return "-1"
+    if val_str in ("0", "1", "2", "3", "4", "5", "6"):
+        return f"R{val_str}"
+    if val_str in ("R0", "R1", "R2", "R3", "R4", "R5", "R6"):
+        return val_str
+    return "-1"
+
 def to_m(val) -> float:
     try:
         v = float(val) if val is not None else 0.0
@@ -158,6 +170,7 @@ def get_taladro(name: str, db: Session = Depends(get_db)):
         rec_val = float(c.LongitudRecuperada) if c.LongitudRecuperada is not None else 0.0
         rqd_val = float(c.SumaFragmentos10cm) if c.SumaFragmentos10cm is not None else 0.0
         lrf_val = float(c.LongitudRocaFracturada) if c.LongitudRocaFracturada is not None else 0.0
+        frf_val = int(c.FRF) if c.FRF is not None else (math.floor(round(lrf_val * 100) / 5) + 1 if lrf_val > 0 else 0)
         
         # Reconstrucción matemática del balance de fragmentos del testigo
         calculated_small_frag = max(0.0, round(rec_val - rqd_val - lrf_val, 2))
@@ -169,12 +182,12 @@ def get_taladro(name: str, db: Session = Depends(get_db)):
             rec_m=rec_val,
             rqd_m=rqd_val,
             lrf_m=lrf_val,
+            frf=frf_val,
             small_frag_m=calculated_small_frag, # Campo calculado dinámicamente
-            mec_frac=0,                         # Campo opcional por defecto
             lito1=lito_map.get(c.Litologia1ID, "LMT"),
             lito2=lito_map.get(c.Litologia2ID, "-1"),
             lito3=lito_map.get(c.Litologia3ID, "-1"),
-            resistencia=c.ResistenciaEstimada or "-1",
+            resistencia=normalize_strength(c.ResistenciaEstimada),
             orientacion="X",                    # Campo opcional por defecto
             offset=0.0,                         # Campo opcional por defecto
             tipo_est1=est_map.get(c.TipoEstructura1ID, "-1"),
@@ -218,7 +231,7 @@ def get_taladro(name: str, db: Session = Depends(get_db)):
             espesor=float(d.EspesorRelleno) if d.EspesorRelleno is not None else 0.0,
             relleno1=d.TipoRelleno1 or "cwf",
             relleno2=d.TipoRelleno2 or "-1",
-            dureza_pared=d.DurezaParedEstructura or "-1",
+            dureza_pared=normalize_strength(d.DurezaParedEstructura),
             agua=d.PresenciaAgua or "CDC",
             geotecnico=s.Geotecnico or "RD/RB",
             comentario=d.IntervaloComentario or "",

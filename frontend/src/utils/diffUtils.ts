@@ -154,7 +154,7 @@ export function computeTaladroDiff(before: any, after: any): TaladroDiffSummary 
     after.corridas || [],
     'corrida',
     [
-      'de', 'a', 'rec_m', 'rqd_m', 'lrf_m', 'mec_frac', 'lito1', 'lito2', 'lito3',
+      'de', 'a', 'rec_m', 'rqd_m', 'lrf_m', 'frf', 'lito1', 'lito2', 'lito3',
       'resistencia', 'tipo_est1', 'tipo_est2', 'frac_nat', 'frac_buz30', 'frac_buz60',
       'frac_buz90', 'abertura', 'rugosidad', 'jrc10', 'intemperismo', 'relleno1',
       'relleno2', 'espesor', 'agua_obs', 'comentarios'
@@ -289,7 +289,7 @@ export function computeAllTaladrosDiff(
 function compareArrays(
   beforeArr: any[],
   afterArr: any[],
-  keyProp: string,
+  _keyProp: string,
   fieldsToCompare: string[]
 ): ModuleDiff {
   let added = 0;

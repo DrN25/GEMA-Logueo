@@ -7,7 +7,8 @@ import {
   RELLENO_OPTIONS,
   INTEMPERISMO_OPTIONS,
   RESISTENCIA_OPTIONS,
-  AGUA_OPTIONS
+  AGUA_OPTIONS,
+  normalizeStrength
 } from '../../utils/catalogData';
 
 export interface Discontinuidad {
@@ -579,18 +580,19 @@ export function getStructuralColumns({
       type: 'select',
       headerBgClass: 'text-emerald-300',
       renderCell: (row, _idx, isSelected) => {
+        const normDureza = normalizeStrength(row.disc.dureza_pared);
         if (!isSelected) {
           return (
             <span className="text-slate-300 block text-center truncate py-1.5 font-bold">
-              {row.disc.dureza_pared === "-1" ? "-" : row.disc.dureza_pared}
+              {normDureza === "-1" ? "-" : normDureza}
             </span>
           );
         }
         return (
           <select
             id={`struct-cell-${row.originalIndex}-dureza_pared`}
-            value={row.disc.dureza_pared}
-            onChange={(e) => handleCellChange(row.originalIndex, 'dureza_pared', e.target.value)}
+            value={normDureza}
+            onChange={(e) => handleCellChange(row.originalIndex, 'dureza_pared', normalizeStrength(e.target.value))}
             onKeyDown={(e) => handleKeyDown(e, row.originalIndex, 'dureza_pared')}
             className="w-full bg-transparent border-0 px-2 py-1 text-cyan-200 focus:outline-none cursor-pointer text-center font-bold text-xs"
           >

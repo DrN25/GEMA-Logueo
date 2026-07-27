@@ -41,7 +41,6 @@ const EXPORT_FIELDS: ExportField[] = [
   { key: 'offset', label: 'Desplaz. 0°-360° (Offset)', isCheck: false, group: 'Registro Estructural' },
   { key: 'tipo_est1', label: 'Tipo Estructura', isCheck: false, group: 'Registro Estructural' },
   { key: 'tipo_est2', label: 'Tipo Estructura 2', isCheck: false, group: 'Registro Estructural' },
-  { key: 'mec_frac', label: 'N° Fract. Mecanic.', isCheck: false, group: 'Registro Estructural' },
   { key: 'frf', label: 'FRF', isCheck: false, group: 'Registro Estructural' },
   { key: 'frac_nat', label: 'N° Fract. Naturales', isCheck: false, group: 'Registro Estructural' },
   { key: 'frac_buz30', label: 'N° Fract. Natural. (Buz <30°)', isCheck: false, group: 'Registro Estructural' },
@@ -185,7 +184,6 @@ export default function LggExportModal({
       case 'small_frag_m': return clean(row.small_frag_m, true);
       case 'sum_control': return sumControlVal;
       case 'check_lr_rqd_lrf': return errLrRqdLrf ? '✘' : '✔';
-      case 'mec_frac': return clean(row.mec_frac, true);
       case 'frf': return row.lrf_m > 0 ? Math.floor(Math.round(row.lrf_m * 100) / 5) + 1 : 0;
       case 'frac_nat': return clean(row.frac_nat, true);
       case 'lito1': return clean(row.lito1);

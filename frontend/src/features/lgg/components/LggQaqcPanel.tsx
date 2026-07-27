@@ -23,7 +23,6 @@ interface Corrida {
   rqd_m: number;
   lrf_m: number;
   small_frag_m: number;
-  mec_frac: number;
   lito1: string;
   resistencia: string;
   frac_nat: number;

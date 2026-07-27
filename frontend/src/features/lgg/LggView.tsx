@@ -34,7 +34,7 @@ interface LggViewProps {
 const LITO_OPTIONS = Object.keys(LITHOLOGY_CATALOG);
 
 const EDITABLE_COLS: (keyof Corrida)[] = [
-  'de', 'a', 'rec_m', 'rqd_m', 'lrf_m', 'small_frag_m', 'mec_frac',
+  'de', 'a', 'rec_m', 'rqd_m', 'lrf_m', 'small_frag_m',
   'frac_nat', 'lito1', 'lito2', 'lito3', 'resistencia', 'orientacion', 'offset',
   'tipo_est1', 'tipo_est2', 'frac_buz30', 'frac_buz60', 'frac_buz90',
   'abertura', 'rugosidad', 'jrc10', 'intemperismo', 'relleno1', 'relleno2',

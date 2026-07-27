@@ -24,7 +24,6 @@ export const EXPECTED_FIELDS: MappingField[] = [
   { key: 'rqd_m', label: 'RQD (m)', required: true, synonyms: ['rqdm', 'rqd', 'rqdmfragmentos10cm', 'frag10cmm', 'sumfrags10cm', 'rqdsumfrags10cmm', 'fragmentos10cmm', 'frags10cmm'] },
   { key: 'lrf_m', label: 'Roca Fracturada (m)', required: false, synonyms: ['longitudrocafracturadam', 'lrfm', 'lrf', 'longitudrocafracturada', 'rocafracturadam', 'rocafracturada'] },
   { key: 'small_frag_m', label: 'Frag. < 10cm (m)', required: false, synonyms: ['sumfrags10cmm', 'smallfragm', 'smallfrag', 'sumfrags10cmquenoentranalrqd', 'sumfrags10cmquenoentranalrqdm', 'frags10cmquenoentranalrqdm', 'frags10cmm', 'sumfrags10cm'] },
-  { key: 'mec_frac', label: 'N° Fracturas Mecán.', required: false, synonyms: ['nfracmecan', 'nfracmecanic', 'nfracmecanicas', 'mecfrac', 'fracturasmecanicas', 'fracmecanicas', 'mecanicas'] },
   { key: 'frac_nat', label: 'N° Fracturas Natural.', required: false, synonyms: ['ndefracnaturales', 'nfracnatur', 'nfracnaturales', 'fracnat', 'fracturasnaturales', 'naturales'] },
   { key: 'lito1', label: 'Litología 1', required: true, synonyms: ['lito1', 'lito12023', 'litologia1', 'litologia12023', 'litologia'] },
   { key: 'lito2', label: 'Litología 2', required: false, synonyms: ['lito2', 'lito22023', 'litologia2', 'litologia22023'] },

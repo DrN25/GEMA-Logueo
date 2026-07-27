@@ -9,8 +9,8 @@ export interface Corrida {
   rec_m: number;
   rqd_m: number;
   lrf_m: number;
+  frf?: number;
   small_frag_m: number;
-  mec_frac: number;
   lito1: string;
   lito2?: string;
   lito3?: string;
@@ -122,7 +122,7 @@ export function useLggState({
       }
 
       // Clave rápida de cálculo geomecánico que abarca todos los campos reactivos de la corrida
-      const cacheKey = `${row.corrida}|${row.de}|${row.a}|${row.rec_m}|${row.rqd_m}|${row.lrf_m}|${row.small_frag_m}|${row.mec_frac}|${row.lito1}|${row.lito2}|${row.lito3}|${row.resistencia}|${row.orientacion}|${row.offset}|${row.tipo_est1}|${row.tipo_est2}|${row.frac_nat}|${row.frac_buz30}|${row.frac_buz60}|${row.frac_buz90}|${row.abertura}|${row.rugosidad}|${row.jrc10}|${row.intemperismo}|${row.relleno1}|${row.relleno2}|${row.espesor}|${row.agua_obs}|${row.turno}|${row.comentarios}|${waterTableM}`;
+      const cacheKey = `${row.corrida}|${row.de}|${row.a}|${row.rec_m}|${row.rqd_m}|${row.lrf_m}|${row.frf}|${row.small_frag_m}|${row.lito1}|${row.lito2}|${row.lito3}|${row.resistencia}|${row.orientacion}|${row.offset}|${row.tipo_est1}|${row.tipo_est2}|${row.frac_nat}|${row.frac_buz30}|${row.frac_buz60}|${row.frac_buz90}|${row.abertura}|${row.rugosidad}|${row.jrc10}|${row.intemperismo}|${row.relleno1}|${row.relleno2}|${row.espesor}|${row.agua_obs}|${row.turno}|${row.comentarios}|${waterTableM}`;
 
       const cached = rmrCache.current.get(cacheKey);
       if (cached) {
@@ -143,8 +143,12 @@ export function useLggState({
               rmrRes.rmr_89 >= 21 ? 'Mala' : 'Muy Mala';
       }
 
+      const calcFrf = row.lrf_m > 0 ? Math.floor(Math.round(row.lrf_m * 100) / 5) + 1 : 0;
+      const frfVal = rmrRes.frf !== undefined ? rmrRes.frf : (row.frf !== undefined ? row.frf : calcFrf);
+
       const enrichedRow: CorridaEnriquecida = {
         ...row,
+        frf: frfVal,
         rmr76Score: isErr || rmrRes.rmr_76 === undefined ? 'ERR' : rmrRes.rmr_76,
         rmr89Score: isErr || rmrRes.rmr_89 === undefined ? 'ERR' : rmrRes.rmr_89,
         rmr76Class: isErr ? 'ERROR' : rmrRes.class_76 || '',
@@ -232,7 +236,6 @@ export function useLggState({
       rqd_m: -1,         // <-- Vacío
       lrf_m: -1,         // <-- Vacío
       small_frag_m: -1,  // <-- Vacío
-      mec_frac: -1,      // <-- Vacío
       lito1: '-1',       // <-- Vacío (Sin litología inicial)
       lito2: '-1',
       lito3: '-1',
@@ -333,7 +336,7 @@ export function useLggState({
       } else {
         const camposMinimoCero: (keyof Corrida)[] = ['de', 'a'];
         const camposMinimoMenosUno: (keyof Corrida)[] = [
-          'rec_m', 'rqd_m', 'lrf_m', 'small_frag_m', 'mec_frac', 'frac_nat',
+          'rec_m', 'rqd_m', 'lrf_m', 'small_frag_m', 'frac_nat',
           'frac_buz30', 'frac_buz60', 'frac_buz90', 'abertura', 'espesor', 'offset'
         ];
 

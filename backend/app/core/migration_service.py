@@ -1,4 +1,5 @@
 import datetime
+import math
 from sqlalchemy.orm import Session
 from app import models
 from app.calculator import calculate_row_rmr
@@ -23,12 +24,25 @@ class GemaMigrationEngine:
         if val is None:
             return None
         val_str = str(val).strip().upper()
-        if val_str in ["", "-1", "-1.0", "N/A", "NAN", "NONE", "-", "-1,0"]:
+        if val_str in ("", "-1", "N/A", "NULL", "NONE"):
             return None
         try:
             return target_type(val)
         except (ValueError, TypeError):
             return None
+
+    def normalize_strength(self, val):
+        """Normaliza cualquier código o índice de resistencia (ej: 0..6, '0'..'6', 'r4') a 'R0'..'R6' o NULL."""
+        if val is None:
+            return None
+        val_str = str(val).strip().upper()
+        if val_str in ("", "-1", "-1.0", "NONE", "NULL", "S/D", "-"):
+            return None
+        if val_str in ("0", "1", "2", "3", "4", "5", "6"):
+            return f"R{val_str}"
+        if val_str in ("R0", "R1", "R2", "R3", "R4", "R5", "R6"):
+            return val_str
+        return None
 
     def resolve_campana(self, name_str: str) -> int:
         clean_name = str(name_str).strip().upper()
@@ -202,6 +216,11 @@ class GemaMigrationEngine:
             tipo_est1_id = self.resolve_estructura(c.get("tipo_est1"))
             tipo_est2_id = self.resolve_estructura(c.get("tipo_est2"))
 
+            lrf_val = self.sanitize_val(c.get("lrf_m"))
+            frf_val = c.get("frf")
+            if frf_val is None or frf_val == 0:
+                frf_val = math.floor(round((lrf_val or 0.0) * 100) / 5) + 1 if (lrf_val and lrf_val > 0) else 0
+
             # 1. Grabar Logueo Geotécnico General (LGG)
             lgg_row = models.LogueoGeotecnicoGeneral(
                 SondajeID=sondaje_id,
@@ -210,13 +229,13 @@ class GemaMigrationEngine:
                 IntervaloA=a_val,
                 LongitudRecuperada=self.sanitize_val(c.get("rec_m")),
                 SumaFragmentos10cm=self.sanitize_val(c.get("rqd_m")),
-                LongitudRocaFracturada=self.sanitize_val(c.get("lrf_m")),
-                FRF=self.sanitize_val(c.get("lrf_m")) * 20 if self.sanitize_val(c.get("lrf_m")) else 0, # Fórmula del LRF
+                LongitudRocaFracturada=lrf_val,
+                FRF=frf_val,
                 NumFracturasNaturales=self.sanitize_val(c.get("frac_nat"), int),
                 Litologia1ID=l1_id,
                 Litologia2ID=l2_id,
                 Litologia3ID=l3_id,
-                ResistenciaEstimada=self.sanitize_val(c.get("resistencia"), str),
+                ResistenciaEstimada=self.normalize_strength(c.get("resistencia")),
                 TipoEstructura1ID=tipo_est1_id,
                 TipoEstructura2ID=tipo_est2_id,
                 NumFracBuz30=self.sanitize_val(c.get("frac_buz30"), int),
@@ -340,7 +359,7 @@ class GemaMigrationEngine:
                 EspesorRelleno=self.sanitize_val(d.get("espesor")),
                 TipoRelleno1=self.sanitize_val(d.get("relleno1"), str),
                 TipoRelleno2=self.sanitize_val(d.get("relleno2"), str),
-                DurezaParedEstructura=self.sanitize_val(d.get("dureza_pared"), str),
+                DurezaParedEstructura=self.normalize_strength(d.get("dureza_pared")),
                 PresenciaAgua=self.sanitize_val(d.get("agua"), str),
                 GeotecnicoID=self.resolve_geotecnico(d.get("geotecnico")),
                 IntervaloComentario=d.get("comentario", ""),

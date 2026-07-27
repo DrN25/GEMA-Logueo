@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Construction,
   Database
@@ -25,7 +25,7 @@ import BulkAuditor from './features/auditor/BulkAuditor';
 import { validateCollarAndSurvey, validateRowQAQC, validateStructuralQAQC, validatePltQAQC, type ValidationAlert } from './utils/qaqcValidator';
 import { resolveLithologyCascade } from './utils/catalogData';
 import { computeTaladroHash } from './utils/hashUtils';
-import { computeTaladroDiff, computeAllTaladrosDiff, type TaladroDiffSummary, type AllTaladrosDiffSummary } from './utils/diffUtils';
+import { computeTaladroDiff, computeAllTaladrosDiff, type TaladroDiffSummary } from './utils/diffUtils';
 
 interface Survey {
   depth: number;
@@ -40,8 +40,8 @@ interface Corrida {
   rec_m: number;
   rqd_m: number;
   lrf_m: number;
+  frf?: number;
   small_frag_m: number;
-  mec_frac: number;
   lito1: string;
   lito2?: string;
   lito3?: string;
@@ -469,7 +469,7 @@ export default function App() {
           corridas: [
             {
               corrida: 1, de: 0, a: 1.5, rec_m: 1.5, rqd_m: 1.3, lrf_m: 0.1, small_frag_m: 0.1,
-              mec_frac: 0, lito1: "LMT", resistencia: "R4", orientacion: "X", offset: 0.0,
+              lito1: "LMT", resistencia: "R4", orientacion: "X", offset: 0.0,
               tipo_est1: "JN", frac_nat: 1, frac_buz30: 0, frac_buz60: 1, frac_buz90: 0,
               abertura: 0.1, rugosidad: 2, jrc10: 10, intemperismo: "UWF", relleno1: "cwf",
               espesor: 0, agua_obs: "CDC", comentarios: "Corrida inicial"

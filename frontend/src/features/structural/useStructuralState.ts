@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useRef } from 'react';
 import type { Discontinuidad, Corrida } from './structuralColumns';
+import { normalizeStrength } from '../../utils/catalogData';
 
 interface UseStructuralStateProps {
   discontinuidades: Discontinuidad[];
@@ -108,7 +109,7 @@ export function useStructuralState({
             lito1: matchingCorrida.lito1,
             lito2: matchingCorrida.lito2 || '-1',
             lito3: matchingCorrida.lito3 || '-1',
-            dureza_pared: matchingCorrida.resistencia
+            dureza_pared: normalizeStrength(matchingCorrida.resistencia)
           };
         } else {
           updated[index] = {

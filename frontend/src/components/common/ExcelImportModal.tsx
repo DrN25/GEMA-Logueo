@@ -27,7 +27,8 @@ import {
   GROUNDWATER_CATALOG,
   RELLENO_CATALOG,
   STRUCTURE_CATALOG,
-  resolveLithologyCascade
+  resolveLithologyCascade,
+  normalizeStrength
 } from '../../utils/catalogData';
 
 interface InfoBannerProps {
@@ -376,6 +377,10 @@ export default function ExcelImportModal({
     const findCatalogKey = (val: any, catalog: Record<string, any>, fallback: string): string => {
       const cleaned = String(val || '').trim();
       if (!cleaned || cleaned === '-1' || cleaned.toUpperCase() === 'NONE') return fallback;
+      if (catalog === STRENGTH_CATALOG) {
+        const norm = normalizeStrength(cleaned);
+        if (norm !== '-1') return norm;
+      }
       const matched = Object.keys(catalog).find(k => k.toLowerCase() === cleaned.toLowerCase());
       return matched || fallback;
     };
@@ -627,7 +632,6 @@ export default function ExcelImportModal({
         rqd_m: rqd,
         lrf_m: lrf,
         small_frag_m: small,
-        mec_frac: parseInt(r.mec_frac) || 0,
         lito1,
         lito2,
         lito3,
