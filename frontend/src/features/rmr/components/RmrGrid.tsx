@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import BaseEditableGrid, { type GridColumn } from '../../../components/common/BaseEditableGrid';
+import { FormulaTooltipTrigger } from '../../../components/common/FormulaTooltip';
 
 interface RmrGridProps {
   calculatedRows?: any[];
@@ -183,16 +184,96 @@ export default function RmrGrid({
 
     // RMR'76 Columnas de Evaluación
     list.push(
-      { key: 's_76', label: '[76] Res.', width: 'w-16', type: 'readonly', headerBgClass: 'bg-cyan-950/20 text-cyan-300 font-bold', cellClassName: 'text-center' },
-      { key: 'rqd_76', label: '[76] RQD', width: 'w-16', type: 'readonly', headerBgClass: 'bg-cyan-950/20 text-cyan-300 font-bold', cellClassName: 'text-center' },
-      { key: 'sp_76', label: '[76] Espac.', width: 'w-16', type: 'readonly', headerBgClass: 'bg-cyan-950/20 text-cyan-300 font-bold', cellClassName: 'text-center' },
-      { key: 'ab_76', label: '[76] Abert.', width: 'w-16', type: 'readonly', headerBgClass: 'bg-cyan-950/20 text-cyan-300 font-bold', cellClassName: 'text-center' },
-      { key: 'rg_76', label: '[76] Rug.', width: 'w-16', type: 'readonly', headerBgClass: 'bg-cyan-950/20 text-cyan-300 font-bold', cellClassName: 'text-center' },
-      { key: 'fl_76', label: '[76] Rell.', width: 'w-16', type: 'readonly', headerBgClass: 'bg-cyan-950/20 text-cyan-300 font-bold', cellClassName: 'text-center' },
-      { key: 'wt_76', label: '[76] Intemp.', width: 'w-16', type: 'readonly', headerBgClass: 'bg-cyan-950/20 text-cyan-300 font-bold', cellClassName: 'text-center' },
-      { key: 'p_76', label: '[76] Pers.', width: 'w-16', type: 'readonly', headerBgClass: 'bg-cyan-950/20 text-cyan-300 font-bold', cellClassName: 'text-center' },
-      { key: 'j_76', label: '[76] Juntas', width: 'w-18', type: 'readonly', headerBgClass: 'bg-cyan-950/20 text-cyan-400 font-bold', cellClassName: 'text-center font-bold text-cyan-400' },
-      { key: 'w_76', label: '[76] Agua', width: 'w-16', type: 'readonly', headerBgClass: 'bg-cyan-950/20 text-cyan-300 font-bold', cellClassName: 'text-center' },
+      {
+        key: 's_76', label: '[76] Res.', width: 'w-16', type: 'readonly',
+        headerBgClass: 'bg-cyan-950/20 text-cyan-300 font-bold',
+        renderCell: (row) => (
+          <FormulaTooltipTrigger formulaId="rmr_strength" params={{ code: row.resistencia, val: row.s_76 }} position="bottom">
+            <div className="text-center py-1.5">{row.s_76}</div>
+          </FormulaTooltipTrigger>
+        )
+      },
+      {
+        key: 'rqd_76', label: '[76] RQD', width: 'w-16', type: 'readonly',
+        headerBgClass: 'bg-cyan-950/20 text-cyan-300 font-bold',
+        renderCell: (row) => (
+          <FormulaTooltipTrigger formulaId="rmr_rqd" params={{ rqd: row.rqd_pct, val: row.rqd_76 }} position="bottom">
+            <div className="text-center py-1.5">{row.rqd_76}</div>
+          </FormulaTooltipTrigger>
+        )
+      },
+      {
+        key: 'sp_76', label: '[76] Espac.', width: 'w-16', type: 'readonly',
+        headerBgClass: 'bg-cyan-950/20 text-cyan-300 font-bold',
+        renderCell: (row) => (
+          <FormulaTooltipTrigger formulaId="rmr_spacing_76" params={{ spacing: row.spacing_mm, val: row.sp_76 }} position="bottom">
+            <div className="text-center py-1.5">{row.sp_76}</div>
+          </FormulaTooltipTrigger>
+        )
+      },
+      {
+        key: 'ab_76', label: '[76] Abert.', width: 'w-16', type: 'readonly',
+        headerBgClass: 'bg-cyan-950/20 text-cyan-300 font-bold',
+        renderCell: (row) => (
+          <FormulaTooltipTrigger formulaId="rmr_aperture_76" params={{ aperture: row.abertura, val: row.ab_76 }} position="bottom">
+            <div className="text-center py-1.5">{row.ab_76}</div>
+          </FormulaTooltipTrigger>
+        )
+      },
+      {
+        key: 'rg_76', label: '[76] Rug.', width: 'w-16', type: 'readonly',
+        headerBgClass: 'bg-cyan-950/20 text-cyan-300 font-bold',
+        renderCell: (row) => (
+          <FormulaTooltipTrigger formulaId="rmr_roughness_76" params={{ roughness: row.rugosidad, val: row.rg_76 }} position="bottom">
+            <div className="text-center py-1.5">{row.rg_76}</div>
+          </FormulaTooltipTrigger>
+        )
+      },
+      {
+        key: 'fl_76', label: '[76] Rell.', width: 'w-16', type: 'readonly',
+        headerBgClass: 'bg-cyan-950/20 text-cyan-300 font-bold',
+        renderCell: (row) => (
+          <FormulaTooltipTrigger formulaId="rmr_filling_76" params={{ code: row.relleno1, thickness: row.espesor, val: row.fl_76 }} position="bottom">
+            <div className="text-center py-1.5">{row.fl_76}</div>
+          </FormulaTooltipTrigger>
+        )
+      },
+      {
+        key: 'wt_76', label: '[76] Intemp.', width: 'w-16', type: 'readonly',
+        headerBgClass: 'bg-cyan-950/20 text-cyan-300 font-bold',
+        renderCell: (row) => (
+          <FormulaTooltipTrigger formulaId="rmr_weathering_76" params={{ code: row.intemperismo, val: row.wt_76 }} position="bottom">
+            <div className="text-center py-1.5">{row.wt_76}</div>
+          </FormulaTooltipTrigger>
+        )
+      },
+      {
+        key: 'p_76', label: '[76] Pers.', width: 'w-16', type: 'readonly',
+        headerBgClass: 'bg-cyan-950/20 text-cyan-300 font-bold',
+        renderCell: (row) => (
+          <FormulaTooltipTrigger formulaId="rmr_persistence_76" params={{ ab: row.ab_76, rg: row.rg_76, fl: row.fl_76, wt: row.wt_76, val: row.p_76 }} position="bottom">
+            <div className="text-center py-1.5">{row.p_76}</div>
+          </FormulaTooltipTrigger>
+        )
+      },
+      {
+        key: 'j_76', label: '[76] Juntas', width: 'w-18', type: 'readonly',
+        headerBgClass: 'bg-cyan-950/20 text-cyan-400 font-bold',
+        renderCell: (row) => (
+          <FormulaTooltipTrigger formulaId="rmr_joints_76" params={{ ab: row.ab_76, rg: row.rg_76, fl: row.fl_76, wt: row.wt_76, pe: row.p_76, val: row.j_76 }} position="bottom">
+            <div className="text-center font-bold text-cyan-400 py-1.5">{row.j_76}</div>
+          </FormulaTooltipTrigger>
+        )
+      },
+      {
+        key: 'w_76', label: '[76] Agua', width: 'w-16', type: 'readonly',
+        headerBgClass: 'bg-cyan-950/20 text-cyan-300 font-bold',
+        renderCell: (row) => (
+          <FormulaTooltipTrigger formulaId="rmr_water" params={{ depth: row.a, wt: 97, code: row.agua_obs, val76: row.w_76, val89: row.w_89 }} position="bottom">
+            <div className="text-center py-1.5">{row.w_76}</div>
+          </FormulaTooltipTrigger>
+        )
+      },
       {
         key: 'rmr_76',
         label: "RMR'76",
@@ -209,11 +290,13 @@ export default function RmrGrid({
             );
           }
           return (
-            <div className="flex justify-center items-center h-full w-full py-0.5">
-              <span className={`inline-flex items-center justify-center w-12 py-0.5 rounded font-black text-[11px] border ${getQualityColor(score)}`}>
-                {score}
-              </span>
-            </div>
+            <FormulaTooltipTrigger formulaId="rmr_total_76" params={{ s: row.s_76, rqd: row.rqd_76, sp: row.sp_76, j: row.j_76, w: row.w_76 }} position="top">
+              <div className="flex justify-center items-center h-full w-full py-0.5">
+                <span className={`inline-flex items-center justify-center w-12 py-0.5 rounded font-black text-[11px] border ${getQualityColor(score)}`}>
+                  {score}
+                </span>
+              </div>
+            </FormulaTooltipTrigger>
           );
         }
       },
@@ -224,27 +307,109 @@ export default function RmrGrid({
         type: 'readonly',
         headerBgClass: 'bg-cyan-950/30 text-cyan-400 font-bold',
         renderCell: (row) => (
-          <div className="flex justify-center items-center h-full w-full py-0.5">
-            <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded text-[10px] font-bold uppercase ${getQualityColor(row.rmr_76 === 'ERR' ? 0 : row.rmr_76)}`}>
-              {row.class_76}
-            </span>
-          </div>
+          <FormulaTooltipTrigger formulaId="rmr_class" params={{ rmr: row.rmr_76 === 'ERR' ? 0 : row.rmr_76, val: row.class_76 }} position="top">
+            <div className="flex justify-center items-center h-full w-full py-0.5">
+              <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded text-[10px] font-bold uppercase ${getQualityColor(row.rmr_76 === 'ERR' ? 0 : row.rmr_76)}`}>
+                {row.class_76}
+              </span>
+            </div>
+          </FormulaTooltipTrigger>
         )
       }
     );
 
     // RMR'89 Columnas de Evaluación
     list.push(
-      { key: 's_89', label: '[89] Res.', width: 'w-16', type: 'readonly', headerBgClass: 'bg-emerald-950/20 text-emerald-300 font-bold', cellClassName: 'text-center' },
-      { key: 'rqd_89', label: '[89] RQD', width: 'w-16', type: 'readonly', headerBgClass: 'bg-emerald-950/20 text-emerald-300 font-bold', cellClassName: 'text-center' },
-      { key: 'sp_89', label: '[89] Espac.', width: 'w-16', type: 'readonly', headerBgClass: 'bg-emerald-950/20 text-emerald-300 font-bold', cellClassName: 'text-center' },
-      { key: 'ab_89', label: '[89] Abert.', width: 'w-16', type: 'readonly', headerBgClass: 'bg-emerald-950/20 text-emerald-300 font-bold', cellClassName: 'text-center' },
-      { key: 'rg_89', label: '[89] Rug.', width: 'w-16', type: 'readonly', headerBgClass: 'bg-emerald-950/20 text-emerald-300 font-bold', cellClassName: 'text-center' },
-      { key: 'fl_89', label: '[89] Rell.', width: 'w-16', type: 'readonly', headerBgClass: 'bg-emerald-950/20 text-emerald-300 font-bold', cellClassName: 'text-center' },
-      { key: 'wt_89', label: '[89] Intemp.', width: 'w-16', type: 'readonly', headerBgClass: 'bg-emerald-950/20 text-emerald-300 font-bold', cellClassName: 'text-center' },
-      { key: 'p_89', label: '[89] Pers.', width: 'w-16', type: 'readonly', headerBgClass: 'bg-emerald-950/20 text-emerald-300 font-bold', cellClassName: 'text-center' },
-      { key: 'j_89', label: '[89] Juntas', width: 'w-18', type: 'readonly', headerBgClass: 'bg-emerald-950/20 text-emerald-400 font-bold', cellClassName: 'text-center font-bold text-emerald-400' },
-      { key: 'w_89', label: '[89] Agua', width: 'w-16', type: 'readonly', headerBgClass: 'bg-emerald-950/20 text-emerald-300 font-bold', cellClassName: 'text-center' },
+      {
+        key: 's_89', label: '[89] Res.', width: 'w-16', type: 'readonly',
+        headerBgClass: 'bg-emerald-950/20 text-emerald-300 font-bold',
+        renderCell: (row) => (
+          <FormulaTooltipTrigger formulaId="rmr_strength" params={{ code: row.resistencia, val: row.s_89 }} position="bottom">
+            <div className="text-center py-1.5">{row.s_89}</div>
+          </FormulaTooltipTrigger>
+        )
+      },
+      {
+        key: 'rqd_89', label: '[89] RQD', width: 'w-16', type: 'readonly',
+        headerBgClass: 'bg-emerald-950/20 text-emerald-300 font-bold',
+        renderCell: (row) => (
+          <FormulaTooltipTrigger formulaId="rmr_rqd" params={{ rqd: row.rqd_pct, val: row.rqd_89 }} position="bottom">
+            <div className="text-center py-1.5">{row.rqd_89}</div>
+          </FormulaTooltipTrigger>
+        )
+      },
+      {
+        key: 'sp_89', label: '[89] Espac.', width: 'w-16', type: 'readonly',
+        headerBgClass: 'bg-emerald-950/20 text-emerald-300 font-bold',
+        renderCell: (row) => (
+          <FormulaTooltipTrigger formulaId="rmr_spacing_89" params={{ spacing: row.spacing_mm, val: row.sp_89 }} position="bottom">
+            <div className="text-center py-1.5">{row.sp_89}</div>
+          </FormulaTooltipTrigger>
+        )
+      },
+      {
+        key: 'ab_89', label: '[89] Abert.', width: 'w-16', type: 'readonly',
+        headerBgClass: 'bg-emerald-950/20 text-emerald-300 font-bold',
+        renderCell: (row) => (
+          <FormulaTooltipTrigger formulaId="rmr_aperture_89" params={{ aperture: row.abertura, val: row.ab_89 }} position="bottom">
+            <div className="text-center py-1.5">{row.ab_89}</div>
+          </FormulaTooltipTrigger>
+        )
+      },
+      {
+        key: 'rg_89', label: '[89] Rug.', width: 'w-16', type: 'readonly',
+        headerBgClass: 'bg-emerald-950/20 text-emerald-300 font-bold',
+        renderCell: (row) => (
+          <FormulaTooltipTrigger formulaId="rmr_roughness_89" params={{ roughness: row.rugosidad, val: row.rg_89 }} position="bottom">
+            <div className="text-center py-1.5">{row.rg_89}</div>
+          </FormulaTooltipTrigger>
+        )
+      },
+      {
+        key: 'fl_89', label: '[89] Rell.', width: 'w-16', type: 'readonly',
+        headerBgClass: 'bg-emerald-950/20 text-emerald-300 font-bold',
+        renderCell: (row) => (
+          <FormulaTooltipTrigger formulaId="rmr_filling_89" params={{ code: row.relleno1, thickness: row.espesor, val: row.fl_89 }} position="bottom">
+            <div className="text-center py-1.5">{row.fl_89}</div>
+          </FormulaTooltipTrigger>
+        )
+      },
+      {
+        key: 'wt_89', label: '[89] Intemp.', width: 'w-16', type: 'readonly',
+        headerBgClass: 'bg-emerald-950/20 text-emerald-300 font-bold',
+        renderCell: (row) => (
+          <FormulaTooltipTrigger formulaId="rmr_weathering_89" params={{ code: row.intemperismo, val: row.wt_89 }} position="bottom">
+            <div className="text-center py-1.5">{row.wt_89}</div>
+          </FormulaTooltipTrigger>
+        )
+      },
+      {
+        key: 'p_89', label: '[89] Pers.', width: 'w-16', type: 'readonly',
+        headerBgClass: 'bg-emerald-950/20 text-emerald-300 font-bold',
+        renderCell: (row) => (
+          <FormulaTooltipTrigger formulaId="rmr_persistence_89" params={{ ab: row.ab_89, rg: row.rg_89, fl: row.fl_89, wt: row.wt_89, val: row.p_89 }} position="bottom">
+            <div className="text-center py-1.5">{row.p_89}</div>
+          </FormulaTooltipTrigger>
+        )
+      },
+      {
+        key: 'j_89', label: '[89] Juntas', width: 'w-18', type: 'readonly',
+        headerBgClass: 'bg-emerald-950/20 text-emerald-400 font-bold',
+        renderCell: (row) => (
+          <FormulaTooltipTrigger formulaId="rmr_joints_89" params={{ ab: row.ab_89, rg: row.rg_89, fl: row.fl_89, wt: row.wt_89, pe: row.p_89, val: row.j_89 }} position="bottom">
+            <div className="text-center font-bold text-emerald-400 py-1.5">{row.j_89}</div>
+          </FormulaTooltipTrigger>
+        )
+      },
+      {
+        key: 'w_89', label: '[89] Agua', width: 'w-16', type: 'readonly',
+        headerBgClass: 'bg-emerald-950/20 text-emerald-300 font-bold',
+        renderCell: (row) => (
+          <FormulaTooltipTrigger formulaId="rmr_water" params={{ depth: row.a, wt: 97, code: row.agua_obs, val76: row.w_76, val89: row.w_89 }} position="bottom">
+            <div className="text-center py-1.5">{row.w_89}</div>
+          </FormulaTooltipTrigger>
+        )
+      },
       {
         key: 'rmr_89',
         label: "RMR'89",
@@ -261,11 +426,13 @@ export default function RmrGrid({
             );
           }
           return (
-            <div className="flex justify-center items-center h-full w-full py-0.5">
-              <span className={`inline-flex items-center justify-center w-12 py-0.5 rounded font-black text-[11px] border ${getQualityColor(score)}`}>
-                {score}
-              </span>
-            </div>
+            <FormulaTooltipTrigger formulaId="rmr_total_89" params={{ s: row.s_89, rqd: row.rqd_89, sp: row.sp_89, j: row.j_89, w: row.w_89 }} position="top">
+              <div className="flex justify-center items-center h-full w-full py-0.5">
+                <span className={`inline-flex items-center justify-center w-12 py-0.5 rounded font-black text-[11px] border ${getQualityColor(score)}`}>
+                  {score}
+                </span>
+              </div>
+            </FormulaTooltipTrigger>
           );
         }
       },
@@ -276,11 +443,13 @@ export default function RmrGrid({
         type: 'readonly',
         headerBgClass: 'bg-emerald-950/30 text-emerald-400 font-bold',
         renderCell: (row) => (
-          <div className="flex justify-center items-center h-full w-full py-0.5">
-            <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded text-[10px] font-bold uppercase ${getQualityColor(row.rmr_89 === 'ERR' ? 0 : row.rmr_89)}`}>
-              {row.class_89}
-            </span>
-          </div>
+          <FormulaTooltipTrigger formulaId="rmr_class" params={{ rmr: row.rmr_89 === 'ERR' ? 0 : row.rmr_89, val: row.class_89 }} position="top">
+            <div className="flex justify-center items-center h-full w-full py-0.5">
+              <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded text-[10px] font-bold uppercase ${getQualityColor(row.rmr_89 === 'ERR' ? 0 : row.rmr_89)}`}>
+                {row.class_89}
+              </span>
+            </div>
+          </FormulaTooltipTrigger>
         )
       }
     );

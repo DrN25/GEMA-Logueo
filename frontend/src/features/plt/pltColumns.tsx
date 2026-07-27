@@ -1,5 +1,6 @@
 import { Trash2, Check, X } from 'lucide-react';
 import type { GridColumn } from '../../components/common/BaseEditableGrid';
+import { FormulaTooltipTrigger } from '../../components/common/FormulaTooltip';
 import type { EnsayoPlt } from '../../App';
 import {
   LITHOLOGY_CATALOG,
@@ -201,17 +202,19 @@ export function getPltColumns({
       headerBgClass: 'bg-blue-500/10 text-blue-600 dark:text-cyan-400 border-blue-500/20',
       cellClassName: getCellSectionClass('verif_corrida'),
       renderCell: (row) => (
-        <div className="flex items-center justify-center py-1.5">
-          {row.verif_corrida === 'OK' ? (
-            <span className="inline-flex items-center justify-center p-0.5 rounded-full bg-emerald-500/10 text-emerald-500">
-              <Check size={14} className="stroke-[3]" />
-            </span>
-          ) : (
-            <span className="inline-flex items-center justify-center p-0.5 rounded-full bg-red-500/10 text-red-500" title="Inconsistencia física detectada">
-              <X size={14} className="stroke-[3]" />
-            </span>
-          )}
-        </div>
+        <FormulaTooltipTrigger formulaId="plt_verif_corrida" params={{ from: row.from_m, to: row.to_m, valid: row.verif_corrida === 'OK' }} position="bottom">
+          <div className="flex items-center justify-center py-1.5">
+            {row.verif_corrida === 'OK' ? (
+              <span className="inline-flex items-center justify-center p-0.5 rounded-full bg-emerald-500/10 text-emerald-500">
+                <Check size={14} className="stroke-[3]" />
+              </span>
+            ) : (
+              <span className="inline-flex items-center justify-center p-0.5 rounded-full bg-red-500/10 text-red-500" title="Inconsistencia física detectada">
+                <X size={14} className="stroke-[3]" />
+              </span>
+            )}
+          </div>
+        </FormulaTooltipTrigger>
       )
     },
     {
@@ -397,17 +400,19 @@ export function getPltColumns({
       headerBgClass: 'bg-blue-500/10 text-blue-600 dark:text-cyan-400 border-blue-500/20',
       cellClassName: getCellSectionClass('verif_de_longitud'),
       renderCell: (row) => (
-        <div className="flex items-center justify-center py-1.5">
-          {row.verif_de_longitud === 'OK' ? (
-            <span className="inline-flex items-center justify-center p-0.5 rounded-full bg-emerald-500/10 text-emerald-500">
-              <Check size={14} className="stroke-[3]" />
-            </span>
-          ) : (
-            <span className="inline-flex items-center justify-center p-0.5 rounded-full bg-red-500/10 text-red-500" title="Inconsistencia física detectada">
-              <X size={14} className="stroke-[3]" />
-            </span>
-          )}
-        </div>
+        <FormulaTooltipTrigger formulaId="plt_verif_longitud" params={{ from: row.from_m, to: row.to_m, d: row.d_mm, valid: row.verif_de_longitud === 'OK' }} position="bottom">
+          <div className="flex items-center justify-center py-1.5">
+            {row.verif_de_longitud === 'OK' ? (
+              <span className="inline-flex items-center justify-center p-0.5 rounded-full bg-emerald-500/10 text-emerald-500">
+                <Check size={14} className="stroke-[3]" />
+              </span>
+            ) : (
+              <span className="inline-flex items-center justify-center p-0.5 rounded-full bg-red-500/10 text-red-500" title="Inconsistencia física detectada">
+                <X size={14} className="stroke-[3]" />
+              </span>
+            )}
+          </div>
+        </FormulaTooltipTrigger>
       )
     },
     {
@@ -448,7 +453,14 @@ export function getPltColumns({
       width: 'w-24',
       type: 'readonly',
       headerBgClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border-emerald-500/20',
-      cellClassName: getCellSectionClass('is_mpa')
+      cellClassName: getCellSectionClass('is_mpa'),
+      renderCell: (row) => (
+        <FormulaTooltipTrigger formulaId="plt_is_mpa" params={{ p: row.p_instr_kn, d: row.d_mm, val: row.is_mpa }} position="bottom">
+          <div className="text-center text-slate-200 py-1.5 font-bold font-mono select-all">
+            {typeof row.is_mpa === 'number' ? row.is_mpa.toFixed(2) : row.is_mpa}
+          </div>
+        </FormulaTooltipTrigger>
+      )
     },
     {
       key: 'fact_corr',
@@ -458,9 +470,11 @@ export function getPltColumns({
       headerBgClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border-emerald-500/20',
       cellClassName: getCellSectionClass('fact_corr'),
       renderCell: (row) => (
-        <div className="text-center text-slate-400 py-1.5 font-medium font-mono select-all">
-          {typeof row.fact_corr === 'number' ? row.fact_corr.toFixed(3) : row.fact_corr}
-        </div>
+        <FormulaTooltipTrigger formulaId="plt_fact_corr" params={{ d: row.d_mm, val: row.fact_corr }} position="bottom">
+          <div className="text-center text-slate-400 py-1.5 font-medium font-mono select-all">
+            {typeof row.fact_corr === 'number' ? row.fact_corr.toFixed(3) : row.fact_corr}
+          </div>
+        </FormulaTooltipTrigger>
       )
     },
     {
@@ -469,7 +483,14 @@ export function getPltColumns({
       width: 'w-28',
       type: 'readonly',
       headerBgClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border-emerald-500/20',
-      cellClassName: getCellSectionClass('is_50_mpa')
+      cellClassName: getCellSectionClass('is_50_mpa'),
+      renderCell: (row) => (
+        <FormulaTooltipTrigger formulaId="plt_is50" params={{ is: row.is_mpa, f: row.fact_corr, val: row.is_50_mpa }} position="bottom">
+          <div className="text-center text-slate-200 py-1.5 font-bold font-mono select-all">
+            {typeof row.is_50_mpa === 'number' ? row.is_50_mpa.toFixed(2) : row.is_50_mpa}
+          </div>
+        </FormulaTooltipTrigger>
+      )
     },
     {
       key: 'factor_k',
@@ -477,7 +498,14 @@ export function getPltColumns({
       width: 'w-24',
       type: 'readonly',
       headerBgClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border-emerald-500/20',
-      cellClassName: getCellSectionClass('factor_k')
+      cellClassName: getCellSectionClass('factor_k'),
+      renderCell: (row) => (
+        <FormulaTooltipTrigger formulaId="plt_factor_k" params={{ lito1: row.litologia_1, lito2: row.litologia_2, lito3: row.litologia_3, val: row.factor_k }} position="bottom">
+          <div className="text-center text-slate-400 py-1.5 font-medium font-mono select-all">
+            {row.factor_k}
+          </div>
+        </FormulaTooltipTrigger>
+      )
     },
     {
       key: 'ucs',
@@ -485,7 +513,14 @@ export function getPltColumns({
       width: 'w-24',
       type: 'readonly',
       headerBgClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border-emerald-500/20',
-      cellClassName: getCellSectionClass('ucs')
+      cellClassName: getCellSectionClass('ucs'),
+      renderCell: (row) => (
+        <FormulaTooltipTrigger formulaId="plt_ucs" params={{ is50: row.is_50_mpa, k: row.factor_k, val: row.ucs }} position="bottom">
+          <div className="text-center text-emerald-400 py-1.5 font-black font-mono select-all">
+            {typeof row.ucs === 'number' ? row.ucs.toFixed(2) : row.ucs}
+          </div>
+        </FormulaTooltipTrigger>
+      )
     },
     {
       key: 'isrm_indice_r',
@@ -498,9 +533,11 @@ export function getPltColumns({
         const val = row.isrm_indice_r;
         const isStrong = ['R4', 'R5', 'R6'].includes(String(val));
         return (
-          <div className={`text-center py-1.5 font-bold truncate px-1 select-all ${isStrong ? 'text-orange-400 font-black' : 'text-slate-400'}`}>
-            {val}
-          </div>
+          <FormulaTooltipTrigger formulaId="plt_isrm" params={{ ucs: row.ucs, val }} position="bottom">
+            <div className={`text-center py-1.5 font-bold truncate px-1 select-all ${isStrong ? 'text-orange-400 font-black' : 'text-slate-400'}`}>
+              {val}
+            </div>
+          </FormulaTooltipTrigger>
         );
       }
     },

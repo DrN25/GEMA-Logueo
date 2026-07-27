@@ -1,6 +1,7 @@
 import React from 'react';
 import { Trash2, Copy, ShieldAlert } from 'lucide-react';
 import type { GridColumn } from '../../components/common/BaseEditableGrid';
+import { FormulaTooltipTrigger } from '../../components/common/FormulaTooltip';
 import {
   LITHOLOGY_CATALOG,
   ESTRUCTURA_OPTIONS,
@@ -210,9 +211,11 @@ export function getStructuralColumns({
         const matchingCorrida = corridas.find(c => row.disc.profundidad >= c.de && row.disc.profundidad < c.a) || corridas.find(c => row.disc.profundidad === c.a);
         const lito1 = matchingCorrida ? matchingCorrida.lito1 : (row.disc as any).lito1 || row.disc.litologia || '-';
         return (
-          <div className="w-full h-full flex items-center justify-center font-bold px-2 select-all text-center rounded py-1" style={getLithologyStyle(lito1, darkMode)}>
-            {lito1}
-          </div>
+          <FormulaTooltipTrigger formulaId="struct_lito_heredada" params={{ corrida: matchingCorrida?.corrida ?? row.disc.corrida, lito3: matchingCorrida?.lito3, lito1: matchingCorrida?.lito1, val: lito1 }} position="bottom">
+            <div className="w-full h-full flex items-center justify-center font-bold px-2 select-all text-center rounded py-1" style={getLithologyStyle(lito1, darkMode)}>
+              {lito1}
+            </div>
+          </FormulaTooltipTrigger>
         );
       }
     },

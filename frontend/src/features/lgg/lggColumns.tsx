@@ -1,6 +1,8 @@
 import { Trash2, Check, X, Copy } from 'lucide-react';
+import { FormulaTooltipTrigger } from '../../components/common/FormulaTooltip';
 import type { GridColumn } from '../../components/common/BaseEditableGrid';
 import type { CorridaEnriquecida } from './useLggState';
+import { calculateRowRmr } from '../../utils/formulaEngine';
 import {
   LITHOLOGY_CATALOG,
   LITO1_OPTIONS,
@@ -174,7 +176,11 @@ export function getLggColumns({
       width: 'w-16',
       type: 'readonly',
       headerBgClass: 'bg-blue-500/5 dark:bg-blue-500/10 text-blue-600 dark:text-blue-300',
-      renderCell: (row) => <div className="text-center font-bold text-blue-400 py-1.5">{(row.a - row.de).toFixed(2)}</div>
+      renderCell: (row) => (
+        <FormulaTooltipTrigger formulaId="lgg_perf" params={{ de: row.de, a: row.a, val: (row.a - row.de).toFixed(2) }} position="bottom">
+          <div className="text-center font-bold text-blue-400 py-1.5">{(row.a - row.de).toFixed(2)}</div>
+        </FormulaTooltipTrigger>
+      )
     },
     {
       key: 'alert_sum_control' as any,
@@ -187,17 +193,19 @@ export function getLggColumns({
         const rec = row.rec_m || 0;
         const hasError = rec > perf;
         return (
-          <div className="flex justify-center items-center py-1.5">
-            {hasError ? (
-              <span className="inline-flex items-center justify-center p-0.5 rounded-full bg-red-500/10 text-red-500" title="La longitud recuperada supera el avance">
-                <X size={14} className="stroke-[3]" />
-              </span>
-            ) : (
-              <span className="inline-flex items-center justify-center p-0.5 rounded-full bg-emerald-500/10 text-emerald-500">
-                <Check size={14} className="stroke-[3]" />
-              </span>
-            )}
-          </div>
+          <FormulaTooltipTrigger formulaId="lgg_rec_check" params={{ rec: rec.toFixed(2), perf: perf.toFixed(2), valid: !hasError }} position="bottom">
+            <div className="flex justify-center items-center py-1.5">
+              {hasError ? (
+                <span className="inline-flex items-center justify-center p-0.5 rounded-full bg-red-500/10 text-red-500" title="La longitud recuperada supera el avance">
+                  <X size={14} className="stroke-[3]" />
+                </span>
+              ) : (
+                <span className="inline-flex items-center justify-center p-0.5 rounded-full bg-emerald-500/10 text-emerald-500">
+                  <Check size={14} className="stroke-[3]" />
+                </span>
+              )}
+            </div>
+          </FormulaTooltipTrigger>
         );
       }
     },
@@ -235,7 +243,11 @@ export function getLggColumns({
         const lrf = row.lrf_m || 0;
         const calcFrf = lrf > 0 ? Math.floor(Math.round(lrf * 100) / 5) + 1 : 0;
         const val = row.frf !== undefined && row.frf !== null ? row.frf : calcFrf;
-        return <div className="text-center font-bold text-purple-400 py-1.5">{val}</div>;
+        return (
+          <FormulaTooltipTrigger formulaId="lgg_frf" params={{ lrf: lrf.toFixed(2), val }} position="bottom">
+            <div className="text-center font-bold text-purple-400 py-1.5">{val}</div>
+          </FormulaTooltipTrigger>
+        );
       }
     },
     {
@@ -254,7 +266,11 @@ export function getLggColumns({
       headerBgClass: 'bg-blue-500/5 dark:bg-blue-500/10 text-blue-600 dark:text-blue-300',
       renderCell: (row) => {
         const sum = parseFloat(((row.rqd_m || 0) + (row.lrf_m || 0) + (row.small_frag_m || 0)).toFixed(2));
-        return <div className="text-center font-bold text-slate-400 py-1.5">{sum}</div>;
+        return (
+          <FormulaTooltipTrigger formulaId="lgg_sum_control" params={{ rqd: (row.rqd_m || 0).toFixed(2), lrf: (row.lrf_m || 0).toFixed(2), small: (row.small_frag_m || 0).toFixed(2), val: sum.toFixed(2) }} position="bottom">
+            <div className="text-center font-bold text-slate-400 py-1.5">{sum}</div>
+          </FormulaTooltipTrigger>
+        );
       }
     },
     {
@@ -269,17 +285,19 @@ export function getLggColumns({
         const rec = row.rec_m || 0;
         const hasError = sum > perf || row.rqd_m > rec;
         return (
-          <div className="flex justify-center items-center py-1.5">
-            {hasError ? (
-              <span className="inline-flex items-center justify-center p-0.5 rounded-full bg-red-500/10 text-red-500" title="La sumatoria física no coincide con la recuperación o avance">
-                <X size={14} className="stroke-[3]" />
-              </span>
-            ) : (
-              <span className="inline-flex items-center justify-center p-0.5 rounded-full bg-emerald-500/10 text-emerald-500">
-                <Check size={14} className="stroke-[3]" />
-              </span>
-            )}
-          </div>
+          <FormulaTooltipTrigger formulaId="lgg_sum_control_check" params={{ sum: sum.toFixed(2), perf: perf.toFixed(2), rqd: (row.rqd_m || 0).toFixed(2), rec: rec.toFixed(2), valid: !hasError }} position="bottom">
+            <div className="flex justify-center items-center py-1.5">
+              {hasError ? (
+                <span className="inline-flex items-center justify-center p-0.5 rounded-full bg-red-500/10 text-red-500" title="La sumatoria física no coincide con la recuperación o avance">
+                  <X size={14} className="stroke-[3]" />
+                </span>
+              ) : (
+                <span className="inline-flex items-center justify-center p-0.5 rounded-full bg-emerald-500/10 text-emerald-500">
+                  <Check size={14} className="stroke-[3]" />
+                </span>
+              )}
+            </div>
+          </FormulaTooltipTrigger>
         );
       }
     },
@@ -496,7 +514,11 @@ export function getLggColumns({
       type: 'readonly',
       renderCell: (row) => {
         const sum = (row.frac_buz30 || 0) + (row.frac_buz60 || 0) + (row.frac_buz90 || 0);
-        return <div className="text-center font-bold text-slate-400 py-1.5">{sum}</div>;
+        return (
+          <FormulaTooltipTrigger formulaId="lgg_sum_frac" params={{ buz30: row.frac_buz30 || 0, buz60: row.frac_buz60 || 0, buz90: row.frac_buz90 || 0, val: sum }} position="bottom">
+            <div className="text-center font-bold text-slate-400 py-1.5">{sum}</div>
+          </FormulaTooltipTrigger>
+        );
       }
     },
     {
@@ -508,17 +530,19 @@ export function getLggColumns({
         const sum = (row.frac_buz30 || 0) + (row.frac_buz60 || 0) + (row.frac_buz90 || 0);
         const hasError = sum !== (row.frac_nat || 0);
         return (
-          <div className="flex justify-center items-center py-1.5">
-            {hasError ? (
-              <span className="inline-flex items-center justify-center p-0.5 rounded-full bg-red-500/10 text-red-500" title="La sumatoria no coincide con Frac Nat">
-                <X size={14} className="stroke-[3]" />
-              </span>
-            ) : (
-              <span className="inline-flex items-center justify-center p-0.5 rounded-full bg-emerald-500/10 text-emerald-500">
-                <Check size={14} className="stroke-[3]" />
-              </span>
-            )}
-          </div>
+          <FormulaTooltipTrigger formulaId="lgg_alert_fn" params={{ sumBuz: sum, fracNat: row.frac_nat || 0, valid: !hasError }} position="bottom">
+            <div className="flex justify-center items-center py-1.5">
+              {hasError ? (
+                <span className="inline-flex items-center justify-center p-0.5 rounded-full bg-red-500/10 text-red-500" title="La sumatoria no coincide con Frac Nat">
+                  <X size={14} className="stroke-[3]" />
+                </span>
+              ) : (
+                <span className="inline-flex items-center justify-center p-0.5 rounded-full bg-emerald-500/10 text-emerald-500">
+                  <Check size={14} className="stroke-[3]" />
+                </span>
+              )}
+            </div>
+          </FormulaTooltipTrigger>
         );
       }
     },
@@ -626,17 +650,19 @@ export function getLggColumns({
       renderCell: (row) => {
         const hasError = ((row.espesor || 0) > 0 && (row.abertura || 0) <= 0) || ((row.espesor || 0) === 0 && (row.abertura || 0) > 0);
         return (
-          <div className="flex justify-center items-center py-1.5">
-            {hasError ? (
-              <span className="inline-flex items-center justify-center p-0.5 rounded-full bg-red-500/10 text-red-500" title="Inconsistencia de Abertura vs Espesor">
-                <X size={14} className="stroke-[3]" />
-              </span>
-            ) : (
-              <span className="inline-flex items-center justify-center p-0.5 rounded-full bg-emerald-500/10 text-emerald-500">
-                <Check size={14} className="stroke-[3]" />
-              </span>
-            )}
-          </div>
+          <FormulaTooltipTrigger formulaId="lgg_alert_abert_rell" params={{ abertura: row.abertura || 0, espesor: row.espesor || 0, valid: !hasError }} position="bottom">
+            <div className="flex justify-center items-center py-1.5">
+              {hasError ? (
+                <span className="inline-flex items-center justify-center p-0.5 rounded-full bg-red-500/10 text-red-500" title="Inconsistencia de Abertura vs Espesor">
+                  <X size={14} className="stroke-[3]" />
+                </span>
+              ) : (
+                <span className="inline-flex items-center justify-center p-0.5 rounded-full bg-emerald-500/10 text-emerald-500">
+                  <Check size={14} className="stroke-[3]" />
+                </span>
+              )}
+            </div>
+          </FormulaTooltipTrigger>
         );
       }
     },
@@ -734,12 +760,16 @@ export function getLggColumns({
         if (score === 'ERR') {
           return <div className="text-center text-red-500 font-black py-1.5">ERR</div>;
         }
+        const calcRes = calculateRowRmr(row, 97.0);
+        const scores = !calcRes.error && calcRes.scores ? { s: calcRes.scores.resistencia, rqd: calcRes.scores.rqd, sp: calcRes.scores.spacing_76, j: calcRes.scores.juntas_76, w: calcRes.scores.agua_76 } : undefined;
         return (
-          <div className="flex justify-center items-center py-1.5">
-            <span className={`px-2.5 py-0.5 rounded text-xs font-black border ${score >= 81 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border-emerald-500/20' : score >= 61 ? 'bg-blue-500/10 text-blue-600 dark:text-cyan-400 border-blue-500/20' : score >= 41 ? 'bg-amber-500/10 text-amber-600 dark:text-amber-300 border-amber-500/20' : 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20'}`}>
-              {score}
-            </span>
-          </div>
+          <FormulaTooltipTrigger formulaId="rmr_total_76" params={scores} position="top">
+            <div className="flex justify-center items-center py-1.5">
+              <span className={`px-2.5 py-0.5 rounded text-xs font-black border ${score >= 81 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border-emerald-500/20' : score >= 61 ? 'bg-blue-500/10 text-blue-600 dark:text-cyan-400 border-blue-500/20' : score >= 41 ? 'bg-amber-500/10 text-amber-600 dark:text-amber-300 border-amber-500/20' : 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20'}`}>
+                {score}
+              </span>
+            </div>
+          </FormulaTooltipTrigger>
         );
       }
     },
@@ -756,12 +786,16 @@ export function getLggColumns({
         if (score === 'ERR') {
           return <div className="text-center text-red-500 font-black py-1.5">ERR</div>;
         }
+        const calcRes = calculateRowRmr(row, 97.0);
+        const scores = !calcRes.error && calcRes.scores ? { s: calcRes.scores.resistencia, rqd: calcRes.scores.rqd, sp: calcRes.scores.spacing_89, j: calcRes.scores.juntas_89, w: calcRes.scores.agua_89 } : undefined;
         return (
-          <div className="flex justify-center items-center py-1.5">
-            <span className={`px-2.5 py-0.5 rounded text-xs font-black border ${score >= 81 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border-emerald-500/20' : score >= 61 ? 'bg-blue-500/10 text-blue-600 dark:text-cyan-400 border-blue-500/20' : score >= 41 ? 'bg-amber-500/10 text-amber-600 dark:text-amber-300 border-amber-500/20' : 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20'}`}>
-              {score}
-            </span>
-          </div>
+          <FormulaTooltipTrigger formulaId="rmr_total_89" params={scores} position="top">
+            <div className="flex justify-center items-center py-1.5">
+              <span className={`px-2.5 py-0.5 rounded text-xs font-black border ${score >= 81 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border-emerald-500/20' : score >= 61 ? 'bg-blue-500/10 text-blue-600 dark:text-cyan-400 border-blue-500/20' : score >= 41 ? 'bg-amber-500/10 text-amber-600 dark:text-amber-300 border-amber-500/20' : 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20'}`}>
+                {score}
+              </span>
+            </div>
+          </FormulaTooltipTrigger>
         );
       }
     },
