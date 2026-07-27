@@ -565,14 +565,7 @@ def validate_rmr_sheet_data(
                 if abs(espaciamiento - expected_esp) > 2.0:
                     reg_err_rmr("espaciamiento_mm", espaciamiento, "ALERTA", f"Espaciamiento ({espaciamiento}mm) no coincide con la fórmula calculada. Datos evaluados -> Long.Corrida({long_corrida}m) * 1000 / TotalFracturas({total_frac}) = {expected_esp}mm.")
 
-            # DETECCIÓN DE DEPENDENCIAS VACÍAS O NEGATIVAS EN CAMPOS CALCULADOS DE RMR
-            for (f_k, f_v, f_lbl) in [
-                ("total_frac", total_frac, "Total de Fracturas"),
-                ("ff_1m", ff_1m, "FF/1m"),
-                ("espaciamiento_mm", espaciamiento, "Espaciamiento (mm)")
-            ]:
-                if f_v is not None and f_v < 0:
-                    reg_err_rmr(f_k, f_v, "DEP_VACIA", f"Campo erróneo debido a dependencias vacías o mal calculadas en LGG/RMR: '{f_lbl}' ({f_v}) es negativo.")
+            # OMITIDO A SOLICITUD: No se registran incidencias por dependencias vacías/cálculos negativos en RMR
 
             resistencia = safe_str(row_dict.get("resistencia"))
             lgg_res = safe_str(matching_lgg_run.get("resistencia"))
@@ -838,8 +831,7 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
             registrar_lgg_error("small_frag_m", raw_small, "ALERTA", f"El metraje de fragmentos <10cm ({small_frag_m}m) no puede ser negativo.")
 
         raw_frac_nat = row_dict.get("frac_nat")
-        if frac_nat is not None and frac_nat < 0:
-            registrar_lgg_error("frac_nat", raw_frac_nat, "DEP_VACIA", "Campo erróneo debido a dependencias vacías o mal calculadas en LGG/RMR.")
+        # OMITIDO A SOLICITUD: No se registran incidencias por valores negativos de frac_nat por dependencias vacías
         raw_b30 = row_dict.get("frac_buz30")
         if b30 is not None and b30 < 0:
             registrar_lgg_error("frac_buz30", raw_b30, "ALERTA", f"El número de fracturas en Buz<30° ({b30}) no puede ser negativo.")
@@ -874,9 +866,7 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
             frf_raw = row_dict.get("frf")
             frf_val = sanitize_val(frf_raw, int)
             if frf_val is not None and str(frf_raw).strip() not in ["-1", "-1.0", ""]:
-                if frf_val < 0:
-                    registrar_lgg_error("frf", frf_raw, "DEP_VACIA", "Campo erróneo debido a dependencias vacías o mal calculadas en LGG/RMR.")
-                else:
+                if frf_val >= 0:
                     try:
                         f_frf = float(frf_raw)
                         if not f_frf.is_integer():

@@ -204,6 +204,82 @@ export default function App() {
   const [showCatalogsModal, setShowCatalogsModal] = useState<boolean>(false);
   const [showFormulasModal, setShowFormulasModal] = useState<boolean>(false);
 
+  // Estados del Dashboard: KPIs, paginación, filtros de fecha y búsqueda por botón
+  const [dashboardKpis, setDashboardKpis] = useState<any>(null);
+  const [dashboardLoading, setDashboardLoading] = useState<boolean>(false);
+  const [page, setPage] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('geolog_dashboard_page');
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed) && parsed > 0) return parsed;
+      }
+    } catch (e) {}
+    return 1;
+  });
+  const [pageSize, setPageSize] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('geolog_dashboard_pagesize');
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed) && parsed > 0) return parsed;
+      }
+    } catch (e) {}
+    return 20;
+  });
+  const [activeDateRange, setActiveDateRange] = useState<string>(() => {
+    try {
+      return localStorage.getItem('geolog_dashboard_date_range') || 'todo';
+    } catch (e) {
+      return 'todo';
+    }
+  });
+  const [searchTerm, setSearchTerm] = useState<string>(() => {
+    try {
+      return localStorage.getItem('geolog_dashboard_search_term') || '';
+    } catch (e) {
+      return '';
+    }
+  });
+  const [isGlobalSearch, setIsGlobalSearch] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('geolog_dashboard_is_global') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+
+  // Persistir parámetros de dashboard en localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('geolog_dashboard_page', String(page));
+    } catch (e) {}
+  }, [page]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('geolog_dashboard_pagesize', String(pageSize));
+    } catch (e) {}
+  }, [pageSize]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('geolog_dashboard_date_range', activeDateRange);
+    } catch (e) {}
+  }, [activeDateRange]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('geolog_dashboard_search_term', searchTerm);
+    } catch (e) {}
+  }, [searchTerm]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('geolog_dashboard_is_global', String(isGlobalSearch));
+    } catch (e) {}
+  }, [isGlobalSearch]);
+
   // Synchronization feedback states
   const [syncStatus, setSyncStatus] = useState<'synced' | 'unsaved' | 'saving' | 'offline'>('synced');
   const [syncMessage, setSyncMessage] = useState<string>('Conectado al servidor de base de datos.');
@@ -284,10 +360,94 @@ export default function App() {
     }
   }, [darkMode]);
 
+  // Cargar estadísticas KPI del Dashboard desde el servidor
+  const fetchDashboardStats = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/taladros/dashboard-stats`);
+      if (res.ok) {
+        const data = await res.json();
+        setDashboardKpis(data);
+      }
+    } catch (e) {
+      console.warn("No se pudieron cargar estadísticas KPI del servidor backend:", e);
+    }
+  };
+
   // Fetch drillhole lists on mount
   useEffect(() => {
     fetchTaladros();
+    fetchDashboardStats();
   }, []);
+
+  // Filtrado y paginación en memoria para resiliencia offline/online
+  const filteredTaladros = useMemo(() => {
+    let list = [...taladros];
+
+    // 1. Filtrado por rango de fechas
+    const now = new Date();
+    if (!isGlobalSearch) {
+      if (activeDateRange === 'hoy') {
+        const todayStr = now.toISOString().split('T')[0];
+        list = list.filter(t => t.fecha_registro === todayStr);
+      } else if (activeDateRange === 'ayer') {
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yestStr = yesterday.toISOString().split('T')[0];
+        list = list.filter(t => t.fecha_registro === yestStr);
+      } else if (activeDateRange === 'semana') {
+        const weekAgo = new Date(now);
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        list = list.filter(t => new Date(t.fecha_registro) >= weekAgo);
+      } else if (activeDateRange === 'mes') {
+        const monthAgo = new Date(now);
+        monthAgo.setMonth(monthAgo.getMonth() - 1);
+        list = list.filter(t => new Date(t.fecha_registro) >= monthAgo);
+      } else if (activeDateRange === 'ano') {
+        const yearStart = new Date(now.getFullYear(), 0, 1);
+        list = list.filter(t => new Date(t.fecha_registro) >= yearStart);
+      }
+    }
+
+    // 2. Búsqueda por texto (código de taladro, geólogo o proyecto)
+    if (searchTerm.trim()) {
+      const query = searchTerm.toLowerCase().trim();
+      list = list.filter(t =>
+        t.name.toLowerCase().includes(query) ||
+        (t.geologo && t.geologo.toLowerCase().includes(query)) ||
+        (t.proyecto && t.proyecto.toLowerCase().includes(query))
+      );
+    }
+
+    return list;
+  }, [taladros, activeDateRange, searchTerm, isGlobalSearch]);
+
+  const totalFilteredTaladros = filteredTaladros.length;
+  const totalDashboardPages = Math.max(1, Math.ceil(totalFilteredTaladros / pageSize));
+
+  const paginatedTaladros = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filteredTaladros.slice(start, start + pageSize);
+  }, [filteredTaladros, page, pageSize]);
+
+  // Handlers para búsqueda y paginación
+  const handleSearchSubmit = (term: string, isGlobal: boolean) => {
+    setSearchTerm(term);
+    setIsGlobalSearch(isGlobal);
+    setPage(1);
+  };
+
+  const handleClearSearch = () => {
+    setSearchTerm('');
+    setIsGlobalSearch(false);
+    setPage(1);
+  };
+
+  const handleFilterChange = (filters: { dateRange?: string }) => {
+    if (filters.dateRange) {
+      setActiveDateRange(filters.dateRange);
+      setPage(1);
+    }
+  };
 
   // Persistir la vista activa y el taladro activo en localStorage
   useEffect(() => {
@@ -1313,9 +1473,26 @@ export default function App() {
 
           {/* 1. Dashboard Principal (Solo se desmonta si no hay taladro activo) */}
           {(!activeTaladro || currentView === 'dashboard' || currentView === 'list') && (
-            <div className="flex-1 flex flex-col min-h-0">
+            <div className="flex-1 flex flex-col min-h-0 overflow-y-auto">
               <MainDashboard
-                taladros={taladros}
+                taladros={paginatedTaladros}
+                kpis={dashboardKpis}
+                page={page}
+                pageSize={pageSize}
+                totalFiltered={totalFilteredTaladros}
+                totalPages={totalDashboardPages}
+                loading={dashboardLoading}
+                searchTerm={searchTerm}
+                isGlobalSearch={isGlobalSearch}
+                activeDateRange={activeDateRange}
+                onSearchSubmit={handleSearchSubmit}
+                onClearSearch={handleClearSearch}
+                onPageChange={(newPage) => setPage(newPage)}
+                onPageSizeChange={(newSize) => {
+                  setPageSize(newSize);
+                  setPage(1);
+                }}
+                onFilterChange={handleFilterChange}
                 onSelectTaladro={handleSelectTaladro}
                 onCreateTaladro={handleCreateTaladro}
                 onDeleteTaladro={handleDeleteTaladro}

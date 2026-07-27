@@ -64,11 +64,15 @@ def to_int0(val) -> int:
 
 @router.get("/dashboard-stats")
 def get_dashboard_stats(db: Session = Depends(get_db)):
-    """Calcula estadísticas geomecánicas reales directo de SQL Server para el Dashboard."""
+    """Calcula estadísticas geomecánicas reales directo de SQL Server para el Dashboard de Logueo."""
     try:
         total_sondajes = db.query(models.Sondaje).count()
 
-        # Perforación total de HOY (Suma de IntervaloA - IntervaloDe de la tabla LogueoGeotecnicoGeneral)
+        # Perforación acumulada total y perforación de HOY
+        perf_total = db.query(
+            func.sum(models.LogueoGeotecnicoGeneral.IntervaloA - models.LogueoGeotecnicoGeneral.IntervaloDe)
+        ).scalar() or 0.0
+
         today_start = datetime.combine(date.today(), datetime.min.time())
         today_end = datetime.combine(date.today(), datetime.max.time())
         
@@ -79,20 +83,36 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
             models.LogueoGeotecnicoGeneral.FechaRegistro <= today_end
         ).scalar() or 0.0
 
-        # RMR Promedio Real (Matemático de la columna RMR89_Total en la tabla ValidacionRMR)
+        # RMR89 Promedio
         rmr_avg = db.query(func.avg(models.ValidacionRMR.RMR89_Total)).scalar() or 0.0
+
+        # RQD % Promedio: Suma(Fragmentos>=10cm) / Suma(Avance) * 100
+        rqd_avg = 0.0
+        tot_rqd_m = db.query(func.sum(models.LogueoGeotecnicoGeneral.SumaFragmentos10cm)).scalar() or 0.0
+        if perf_total > 0:
+            rqd_avg = min(100.0, max(0.0, (tot_rqd_m / perf_total) * 100.0))
+
+        # Geólogo / Mapeador más reciente
+        last_sondaje = db.query(models.Sondaje).order_by(models.Sondaje.FechaRegistro.desc()).first()
+        last_geologo = last_sondaje.Geotecnico if last_sondaje and last_sondaje.Geotecnico else "RD/RB"
 
         return {
             "total_taladros": total_sondajes,
-            "perf_total_hoy": float(perf_hoy),
-            "rmr_promedio": round(float(rmr_avg), 1)
+            "perf_total_m": round(float(perf_total), 2),
+            "perf_total_hoy": round(float(perf_hoy), 2),
+            "rmr_promedio": round(float(rmr_avg), 1),
+            "rqd_promedio": round(float(rqd_avg), 1),
+            "geologo_mas_reciente": last_geologo
         }
     except Exception as e:
         print("Error calculando estadísticas del dashboard en GEMA:", e)
         return {
             "total_taladros": 0,
+            "perf_total_m": 0.0,
             "perf_total_hoy": 0.0,
-            "rmr_promedio": 0.0
+            "rmr_promedio": 0.0,
+            "rqd_promedio": 0.0,
+            "geologo_mas_reciente": "N/A"
         }
 
 @router.get("")
