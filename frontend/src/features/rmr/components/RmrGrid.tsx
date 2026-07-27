@@ -141,44 +141,227 @@ export default function RmrGrid({
         label: 'Corrida',
         width: 'w-16',
         type: 'readonly',
-        cellClassName: 'font-black text-cyan-400 text-center'
+        renderCell: (row) => (
+          <FormulaTooltipTrigger formulaId="rmr_field_lgg_import" params={{ campo: "Número de Corrida", val: row.corrida }} position="bottom">
+            <div className="font-black text-cyan-400 text-center py-1.5">{row.corrida}</div>
+          </FormulaTooltipTrigger>
+        )
       },
       {
         key: 'lito1',
         label: 'Lito 1',
         width: 'w-20',
         type: 'readonly',
-        cellClassName: 'font-bold text-slate-400 text-center'
+        renderCell: (row) => (
+          <FormulaTooltipTrigger formulaId="rmr_lito_heredada" params={{ corrida: row.corrida, lito1: row.lito1, lito2: row.lito2, lito3: row.lito3 }} position="bottom">
+            <div className="font-bold text-slate-400 text-center py-1.5">{row.lito1}</div>
+          </FormulaTooltipTrigger>
+        )
       }
     ];
 
     if (showAllColumns) {
       list.push(
-        { key: 'lito2', label: 'Lito 2', width: 'w-20', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold', cellClassName: 'text-center' },
-        { key: 'lito3', label: 'Lito 3', width: 'w-20', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold', cellClassName: 'text-center' },
-        { key: 'de', label: 'Desde (m)', width: 'w-24', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold', cellClassName: 'text-center font-mono' },
-        { key: 'a', label: 'Hasta (m)', width: 'w-24', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold', cellClassName: 'text-center font-mono' },
-        { key: 'perf', label: 'Perf (m)', width: 'w-24', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold', cellClassName: 'text-center font-bold' },
-        { key: 'rec_m', label: 'Rec (m)', width: 'w-20', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold', cellClassName: 'text-center' },
-        { key: 'rec_pct', label: 'Rec (%)', width: 'w-20', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold', cellClassName: 'text-center' },
-        { key: 'rqd_m', label: 'RQD (m)', width: 'w-20', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold', cellClassName: 'text-center' },
-        { key: 'rqd_pct', label: 'RQD (%)', width: 'w-20', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold text-slate-300', cellClassName: 'text-center font-bold' },
-        { key: 'lrf_m', label: 'LRF (m)', width: 'w-24', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold', cellClassName: 'text-center' },
-        { key: 'frf', label: 'FRF', width: 'w-16', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold', cellClassName: 'text-center font-bold' },
-        { key: 'frac_nat', label: 'Frac Nat', width: 'w-20', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold', cellClassName: 'text-center' },
-        { key: 'total_frac', label: 'Total Frac', width: 'w-20', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold', cellClassName: 'text-center font-bold' },
-        { key: 'ff_1_m', label: 'FF/1m', width: 'w-16', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold', cellClassName: 'text-center' },
-        { key: 'spacing_mm', label: 'Espac (mm)', width: 'w-24', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold', cellClassName: 'text-center' },
-        { key: 'resistencia', label: 'Resistencia', width: 'w-24', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold font-semibold', cellClassName: 'text-center' },
-        { key: 'tipo_est1', label: 'Estructura', width: 'w-24', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold uppercase', cellClassName: 'text-center' },
-        { key: 'abertura', label: 'Abert (mm)', width: 'w-24', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold', cellClassName: 'text-center' },
-        { key: 'rugosidad', label: 'Rugosidad', width: 'w-20', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold', cellClassName: 'text-center' },
-        { key: 'relleno1', label: 'Relleno', width: 'w-20', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold uppercase', cellClassName: 'text-center' },
-        { key: 'clasif_relleno', label: 'Clasif Rell', width: 'w-24', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold', cellClassName: 'text-center' },
-        { key: 'intemperismo', label: 'Intemp', width: 'w-20', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold', cellClassName: 'text-center' },
-        { key: 'jrc10', label: 'JRC10', width: 'w-16', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold', cellClassName: 'text-center' },
-        { key: 'espesor', label: 'Espesor', width: 'w-20', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold', cellClassName: 'text-center' },
-        { key: 'agua_obs', label: 'Agua', width: 'w-20', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold', cellClassName: 'text-center' }
+        {
+          key: 'lito2', label: 'Lito 2', width: 'w-20', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold',
+          renderCell: (row) => (
+            <FormulaTooltipTrigger formulaId="rmr_lito_heredada" params={{ corrida: row.corrida, lito1: row.lito1, lito2: row.lito2, lito3: row.lito3 }} position="bottom">
+              <div className="text-center py-1.5">{row.lito2 === "-1" ? "-" : row.lito2}</div>
+            </FormulaTooltipTrigger>
+          )
+        },
+        {
+          key: 'lito3', label: 'Lito 3', width: 'w-20', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold',
+          renderCell: (row) => (
+            <FormulaTooltipTrigger formulaId="rmr_lito_heredada" params={{ corrida: row.corrida, lito1: row.lito1, lito2: row.lito2, lito3: row.lito3 }} position="bottom">
+              <div className="text-center py-1.5">{row.lito3 === "-1" ? "-" : row.lito3}</div>
+            </FormulaTooltipTrigger>
+          )
+        },
+        {
+          key: 'de', label: 'Desde (m)', width: 'w-24', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold',
+          renderCell: (row) => (
+            <FormulaTooltipTrigger formulaId="rmr_de_a" params={{ corrida: row.corrida, de: row.de, a: row.a }} position="bottom">
+              <div className="text-center font-mono py-1.5">{typeof row.de === 'number' ? row.de.toFixed(2) : row.de}</div>
+            </FormulaTooltipTrigger>
+          )
+        },
+        {
+          key: 'a', label: 'Hasta (m)', width: 'w-24', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold',
+          renderCell: (row) => (
+            <FormulaTooltipTrigger formulaId="rmr_de_a" params={{ corrida: row.corrida, de: row.de, a: row.a }} position="bottom">
+              <div className="text-center font-mono py-1.5">{typeof row.a === 'number' ? row.a.toFixed(2) : row.a}</div>
+            </FormulaTooltipTrigger>
+          )
+        },
+        {
+          key: 'perf', label: 'Perf (m)', width: 'w-24', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold',
+          renderCell: (row) => (
+            <FormulaTooltipTrigger formulaId="lgg_perf" params={{ de: row.de, a: row.a, val: row.perf }} position="bottom">
+              <div className="text-center font-bold py-1.5">{row.perf}</div>
+            </FormulaTooltipTrigger>
+          )
+        },
+        {
+          key: 'rec_m', label: 'Rec (m)', width: 'w-20', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold',
+          renderCell: (row) => (
+            <FormulaTooltipTrigger formulaId="rmr_field_lgg_import" params={{ campo: "Longitud Recuperada (m)", val: row.rec_m }} position="bottom">
+              <div className="text-center py-1.5">{row.rec_m}</div>
+            </FormulaTooltipTrigger>
+          )
+        },
+        {
+          key: 'rec_pct', label: 'Rec (%)', width: 'w-20', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold',
+          renderCell: (row) => (
+            <FormulaTooltipTrigger formulaId="rmr_rec_pct" params={{ rec: row.rec_m, perf: row.perf, val: row.rec_pct }} position="bottom">
+              <div className="text-center py-1.5">{row.rec_pct}</div>
+            </FormulaTooltipTrigger>
+          )
+        },
+        {
+          key: 'rqd_m', label: 'RQD (m)', width: 'w-20', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold',
+          renderCell: (row) => (
+            <FormulaTooltipTrigger formulaId="rmr_field_lgg_import" params={{ campo: "Metraje RQD ≥ 10cm (m)", val: row.rqd_m }} position="bottom">
+              <div className="text-center py-1.5">{row.rqd_m}</div>
+            </FormulaTooltipTrigger>
+          )
+        },
+        {
+          key: 'rqd_pct', label: 'RQD (%)', width: 'w-20', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold text-slate-300',
+          renderCell: (row) => (
+            <FormulaTooltipTrigger formulaId="rmr_rqd_pct" params={{ rqd: row.rqd_m, perf: row.perf, val: row.rqd_pct }} position="bottom">
+              <div className="text-center font-bold py-1.5">{row.rqd_pct}</div>
+            </FormulaTooltipTrigger>
+          )
+        },
+        {
+          key: 'lrf_m', label: 'LRF (m)', width: 'w-24', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold',
+          renderCell: (row) => (
+            <FormulaTooltipTrigger formulaId="rmr_field_lgg_import" params={{ campo: "Long. Roca Fracturada LRF (m)", val: row.lrf_m }} position="bottom">
+              <div className="text-center py-1.5">{row.lrf_m}</div>
+            </FormulaTooltipTrigger>
+          )
+        },
+        {
+          key: 'frf', label: 'FRF', width: 'w-16', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold',
+          renderCell: (row) => (
+            <FormulaTooltipTrigger formulaId="lgg_frf" params={{ lrf: row.lrf_m, val: row.frf }} position="bottom">
+              <div className="text-center font-bold py-1.5">{row.frf}</div>
+            </FormulaTooltipTrigger>
+          )
+        },
+        {
+          key: 'frac_nat', label: 'Frac Nat', width: 'w-20', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold',
+          renderCell: (row) => (
+            <FormulaTooltipTrigger formulaId="rmr_field_lgg_import" params={{ campo: "N° Fracturas Naturales", val: row.frac_nat }} position="bottom">
+              <div className="text-center py-1.5">{row.frac_nat}</div>
+            </FormulaTooltipTrigger>
+          )
+        },
+        {
+          key: 'total_frac', label: 'Total Frac', width: 'w-20', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold',
+          renderCell: (row) => (
+            <FormulaTooltipTrigger formulaId="rmr_total_frac" params={{ frf: row.frf, fracNat: row.frac_nat, val: row.total_frac }} position="bottom">
+              <div className="text-center font-bold py-1.5">{row.total_frac}</div>
+            </FormulaTooltipTrigger>
+          )
+        },
+        {
+          key: 'ff_1_m', label: 'FF/1m', width: 'w-16', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold',
+          renderCell: (row) => (
+            <FormulaTooltipTrigger formulaId="rmr_ff_1_m" params={{ totalFrac: row.total_frac, perf: row.perf, val: row.ff_1_m }} position="bottom">
+              <div className="text-center py-1.5">{row.ff_1_m}</div>
+            </FormulaTooltipTrigger>
+          )
+        },
+        {
+          key: 'spacing_mm', label: 'Espac (mm)', width: 'w-24', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold',
+          renderCell: (row) => (
+            <FormulaTooltipTrigger formulaId="rmr_spacing_calc" params={{ perf: row.perf, totalFrac: row.total_frac, val: row.spacing_mm }} position="bottom">
+              <div className="text-center py-1.5">{row.spacing_mm}</div>
+            </FormulaTooltipTrigger>
+          )
+        },
+        {
+          key: 'resistencia', label: 'Resistencia', width: 'w-24', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold font-semibold',
+          renderCell: (row) => (
+            <FormulaTooltipTrigger formulaId="rmr_field_lgg_import" params={{ campo: "Resistencia Estimada ISRM", val: row.resistencia }} position="bottom">
+              <div className="text-center py-1.5">{row.resistencia}</div>
+            </FormulaTooltipTrigger>
+          )
+        },
+        {
+          key: 'tipo_est1', label: 'Estructura', width: 'w-24', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold uppercase',
+          renderCell: (row) => (
+            <FormulaTooltipTrigger formulaId="rmr_field_lgg_import" params={{ campo: "Tipo de Estructura Principal", val: row.tipo_est1 }} position="bottom">
+              <div className="text-center py-1.5 uppercase">{row.tipo_est1}</div>
+            </FormulaTooltipTrigger>
+          )
+        },
+        {
+          key: 'abertura', label: 'Abert (mm)', width: 'w-24', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold',
+          renderCell: (row) => (
+            <FormulaTooltipTrigger formulaId="rmr_field_lgg_import" params={{ campo: "Abertura de Junta (mm)", val: row.abertura }} position="bottom">
+              <div className="text-center py-1.5">{row.abertura}</div>
+            </FormulaTooltipTrigger>
+          )
+        },
+        {
+          key: 'rugosidad', label: 'Rugosidad', width: 'w-20', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold',
+          renderCell: (row) => (
+            <FormulaTooltipTrigger formulaId="rmr_field_lgg_import" params={{ campo: "Perfil Rugosidad ISRM", val: row.rugosidad }} position="bottom">
+              <div className="text-center py-1.5">{row.rugosidad}</div>
+            </FormulaTooltipTrigger>
+          )
+        },
+        {
+          key: 'relleno1', label: 'Relleno', width: 'w-20', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold uppercase',
+          renderCell: (row) => (
+            <FormulaTooltipTrigger formulaId="rmr_field_lgg_import" params={{ campo: "Tipo de Relleno 1", val: row.relleno1 }} position="bottom">
+              <div className="text-center py-1.5 uppercase">{row.relleno1}</div>
+            </FormulaTooltipTrigger>
+          )
+        },
+        {
+          key: 'clasif_relleno', label: 'Clasif Rell', width: 'w-24', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold',
+          renderCell: (row) => (
+            <FormulaTooltipTrigger formulaId="rmr_clasif_relleno" params={{ code: row.relleno1, val: row.clasif_relleno }} position="bottom">
+              <div className="text-center py-1.5">{row.clasif_relleno}</div>
+            </FormulaTooltipTrigger>
+          )
+        },
+        {
+          key: 'intemperismo', label: 'Intemp', width: 'w-20', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold',
+          renderCell: (row) => (
+            <FormulaTooltipTrigger formulaId="rmr_field_lgg_import" params={{ campo: "Grado Intemperismo ISRM", val: row.intemperismo }} position="bottom">
+              <div className="text-center py-1.5">{row.intemperismo}</div>
+            </FormulaTooltipTrigger>
+          )
+        },
+        {
+          key: 'jrc10', label: 'JRC10', width: 'w-16', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold',
+          renderCell: (row) => (
+            <FormulaTooltipTrigger formulaId="rmr_field_lgg_import" params={{ campo: "Rugosidad JRC10", val: row.jrc10 }} position="bottom">
+              <div className="text-center py-1.5">{row.jrc10}</div>
+            </FormulaTooltipTrigger>
+          )
+        },
+        {
+          key: 'espesor', label: 'Espesor', width: 'w-20', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold',
+          renderCell: (row) => (
+            <FormulaTooltipTrigger formulaId="rmr_field_lgg_import" params={{ campo: "Espesor de Relleno (mm)", val: row.espesor }} position="bottom">
+              <div className="text-center py-1.5">{row.espesor}</div>
+            </FormulaTooltipTrigger>
+          )
+        },
+        {
+          key: 'agua_obs', label: 'Agua', width: 'w-20', type: 'readonly', headerBgClass: 'bg-purple-950/20 text-purple-300 font-bold',
+          renderCell: (row) => (
+            <FormulaTooltipTrigger formulaId="rmr_field_lgg_import" params={{ campo: "Condición de Agua Subterránea", val: row.agua_obs }} position="bottom">
+              <div className="text-center py-1.5">{row.agua_obs}</div>
+            </FormulaTooltipTrigger>
+          )
+        }
       );
     }
 

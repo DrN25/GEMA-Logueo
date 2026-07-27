@@ -14,9 +14,11 @@ ROUGHNESS_RATINGS_76 = {1: 5, 2: 4, 3: 3, 4: 4, 5: 3, 6: 1, 7: 3, 8: 1, 9: 0, -1
 ROUGHNESS_RATINGS_89 = {1: 6, 2: 5, 3: 3, 4: 5, 5: 3, 6: 1, 7: 3, 8: 1, 9: 0, -1: 0, '-1': 0}
 
 FILLING_CLASSES = {
-    'ca': 1, 'sand': 1, 'ch': 1, 'cl': 1, 'gy': 1, 'RXF': 1, 'GOU': 1, 'PAT': 1,  # Blandos (Clase 1)
-    'FBX': 2, 'SIO': 2, 'QZ': 2, 'SU': 2, 'OX': 2, 'ep': 2,                        # Duros (Clase 2)
-    'cwf': 3                                                                       # Sin relleno (Clase 3)
+    'ca': 1, 'sand': 1, 'ch': 1, 'cl': 1, 'gy': 1, 'rxf': 1, 'gou': 1, 'pat': 1,
+    'CA': 1, 'SAND': 1, 'CH': 1, 'CL': 1, 'GY': 1, 'RXF': 1, 'GOU': 1, 'PAT': 1,
+    'fbx': 2, 'sio': 2, 'qz': 2, 'su': 2, 'ox': 2, 'ep': 2,
+    'FBX': 2, 'SIO': 2, 'QZ': 2, 'SU': 2, 'OX': 2, 'EP': 2,
+    'cwf': 3, 'CWF': 3
 }
 
 def calculate_rqd_rating(rqd_pct: float) -> int:

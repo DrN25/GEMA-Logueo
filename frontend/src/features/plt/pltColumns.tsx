@@ -221,7 +221,12 @@ export function getPltColumns({
       key: 'long_de_corrida_m',
       label: 'Long. Corrida (m)',
       width: 'w-32',
-      type: 'readonly'
+      type: 'readonly',
+      renderCell: (row) => (
+        <FormulaTooltipTrigger formulaId="plt_long_corrida" params={{ corrida: row.verif_corrida === 'OK' ? row.nro_caja : '—', de: row.corrida_desde, a: row.corrida_hasta, val: row.long_de_corrida_m }} position="bottom">
+          <div className="text-center font-bold py-1.5">{typeof row.long_de_corrida_m === 'number' ? row.long_de_corrida_m.toFixed(2) : row.long_de_corrida_m}</div>
+        </FormulaTooltipTrigger>
+      )
     },
     {
       key: 'este_m',
@@ -247,7 +252,12 @@ export function getPltColumns({
       width: 'w-36',
       type: 'readonly',
       headerBgClass: 'bg-blue-500/10 text-blue-600 dark:text-cyan-400 border-blue-500/20',
-      cellClassName: getCellSectionClass('long_de_muestra_mm')
+      cellClassName: getCellSectionClass('long_de_muestra_mm'),
+      renderCell: (row) => (
+        <FormulaTooltipTrigger formulaId="plt_long_muestra" params={{ from: row.from_m, to: row.to_m, val: row.long_de_muestra_mm }} position="bottom">
+          <div className="text-center font-bold py-1.5">{row.long_de_muestra_mm}</div>
+        </FormulaTooltipTrigger>
+      )
     },
     {
       key: 'tipo_de_ensayo',
@@ -382,7 +392,12 @@ export function getPltColumns({
       width: 'w-32',
       type: 'readonly',
       headerBgClass: 'bg-purple-500/10 text-purple-600 dark:text-purple-300 border-purple-500/20',
-      cellClassName: getCellSectionClass('tipo_litologico')
+      cellClassName: getCellSectionClass('tipo_litologico'),
+      renderCell: (row) => (
+        <FormulaTooltipTrigger formulaId="plt_tipo_litologico" params={{ lito1: row.litologia_1, lito2: row.litologia_2, lito3: row.litologia_3, val: row.tipo_litologico }} position="bottom">
+          <div className="text-center font-bold py-1.5">{row.tipo_litologico}</div>
+        </FormulaTooltipTrigger>
+      )
     },
     {
       key: 'd_mm',

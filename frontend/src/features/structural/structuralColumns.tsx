@@ -140,9 +140,11 @@ export function getStructuralColumns({
       isSticky: true,
       stickyLeft: 176,
       renderCell: (row) => (
-        <div className="text-center text-slate-400 py-1.5">
-          {row.disc.de > 0 ? row.disc.de.toFixed(2) : '0.00'}
-        </div>
+        <FormulaTooltipTrigger formulaId="struct_de_a_heredada" params={{ corrida: row.disc.corrida, de: row.disc.de, a: row.disc.a }} position="bottom">
+          <div className="text-center text-slate-400 py-1.5 font-mono">
+            {row.disc.de > 0 ? row.disc.de.toFixed(2) : '0.00'}
+          </div>
+        </FormulaTooltipTrigger>
       )
     },
     {
@@ -153,9 +155,11 @@ export function getStructuralColumns({
       isSticky: true,
       stickyLeft: 256,
       renderCell: (row) => (
-        <div className="text-center text-slate-400 py-1.5">
-          {row.disc.a > 0 ? row.disc.a.toFixed(2) : '0.00'}
-        </div>
+        <FormulaTooltipTrigger formulaId="struct_de_a_heredada" params={{ corrida: row.disc.corrida, de: row.disc.de, a: row.disc.a }} position="bottom">
+          <div className="text-center text-slate-400 py-1.5 font-mono">
+            {row.disc.a > 0 ? row.disc.a.toFixed(2) : '0.00'}
+          </div>
+        </FormulaTooltipTrigger>
       )
     },
     {

@@ -76,7 +76,7 @@ export const FORMULA_DEFS: Record<string, FormulaDef> = {
   lgg_sum_frac: {
     title: "∑ Fracturas Naturales por Buzamiento",
     equation: "∑ = Buz<30° + 30°<Buz<60° + Buz>60°",
-    description: "Sumatoria de fracturas naturales clasificadas por ángulo de buzamiento. Debe coincidir exactamente con el N° de Fracturas Naturales declarado.",
+    description: "Sumatoria de fracturas naturales clasificadas por ángulo de buzamiento. Debe coincidir exactamente con el N° de Fracturas Naturales declared.",
     inputs: ["Frac Buz<30°", "Frac 30°-60°", "Frac Buz>60°"],
     calcExplanation: (p) => {
       if (!p) return "";
@@ -109,6 +109,102 @@ export const FORMULA_DEFS: Record<string, FormulaDef> = {
   // ═══════════════════════════════════════════════════════════════════════════
   // █  RMR — Rating del Macizo Rocoso (compartido LGG + RMR Grid)
   // ═══════════════════════════════════════════════════════════════════════════
+
+  rmr_field_lgg_import: {
+    title: "Dato Importado de LGG",
+    equation: "Valor = LGG[Corrida]." + "Campo",
+    description: "Valor heredado directamente del registro geotécnico de corridas LGG para la corrida actual.",
+    inputs: ["Hoja LGG", "N° Corrida"],
+    calcExplanation: (p) => {
+      if (!p) return "";
+      return `Campo "${p.campo ?? 'Dato'}": ${p.val ?? '—'} (Heredado de LGG)`;
+    }
+  },
+
+  rmr_lito_heredada: {
+    title: "Litología Heredada de LGG",
+    equation: "Litología = LGG[Corrida].Lito",
+    description: "Combinación litológica registrada en la corrida correspondiente de LGG.",
+    inputs: ["Lito 1", "Lito 2", "Lito 3"],
+    calcExplanation: (p) => {
+      if (!p) return "";
+      return `Corrida #${p.corrida ?? '—'} → Lito1: "${p.lito1 || '—'}" | Lito2: "${p.lito2 || '-'}" | Lito3: "${p.lito3 || '-'}"`;
+    }
+  },
+
+  rmr_de_a: {
+    title: "Profundidades Desde / Hasta",
+    equation: "Tramo = [Desde(m), Hasta(m)]",
+    description: "Intervalo de profundidad en metros correspondiente a la corrida de LGG.",
+    inputs: ["Profundidad De (m)", "Profundidad A (m)"],
+    calcExplanation: (p) => `Corrida #${p?.corrida ?? '—'}: [${p?.de ?? '—'}m , ${p?.a ?? '—'}m]`
+  },
+
+  rmr_rec_pct: {
+    title: "Porcentaje de Recuperación Rec(%)",
+    equation: "Rec(%) = ROUND((Rec(m) / Perf(m)) × 100, 0)",
+    description: "Porcentaje de recuperación del testigo de roca respecto a la longitud perforada del tramo.",
+    inputs: ["Long. Recuperada (m)", "Perforación (m)"],
+    calcExplanation: (p) => {
+      if (!p) return "";
+      return `ROUND((${p.rec ?? 0} / ${p.perf ?? 1}) × 100) = ${p.val ?? '—'}%`;
+    }
+  },
+
+  rmr_rqd_pct: {
+    title: "Rock Quality Designation RQD(%)",
+    equation: "RQD(%) = ROUND((RQD(m) / Perf(m)) × 100, 0)",
+    description: "Porcentaje de calidad del macizo rocoso calculado como el cociente de fragmentos ≥ 10 cm respecto al avance perforado.",
+    inputs: ["Metraje RQD ≥ 10cm (m)", "Perforación (m)"],
+    calcExplanation: (p) => {
+      if (!p) return "";
+      return `ROUND((${p.rqd ?? 0} / ${p.perf ?? 1}) × 100) = ${p.val ?? '—'}%`;
+    }
+  },
+
+  rmr_total_frac: {
+    title: "Total de Fracturas",
+    equation: "Total Fracturas = FRF + Frac. Naturales",
+    description: "Sumatoria del número de fracturas en zonas trituradas (FRF) y las fracturas naturales observadas.",
+    inputs: ["FRF (Zonas trituradas)", "N° Fracturas Naturales"],
+    calcExplanation: (p) => {
+      if (!p) return "";
+      return `${p.frf ?? 0} (FRF) + ${p.fracNat ?? 0} (FracNat) = ${p.val ?? '—'}`;
+    }
+  },
+
+  rmr_ff_1_m: {
+    title: "Frecuencia de Fracturas FF/1m",
+    equation: "FF/1m = ROUND(Total Fracturas / Perf(m), 0)",
+    description: "Frecuencia de fracturamiento por metro lineal redondeada a número entero según Reglas.md.",
+    inputs: ["Total de Fracturas", "Perforación (m)"],
+    calcExplanation: (p) => {
+      if (!p) return "";
+      return `ROUND(${p.totalFrac ?? 0} / ${p.perf ?? 1}, 0) = ${p.val ?? '—'} frac/m`;
+    }
+  },
+
+  rmr_spacing_calc: {
+    title: "Espaciamiento Medio Calculado (mm)",
+    equation: "TotalFrac > 0 → ROUND((Perf(m) / TotalFrac) × 1000, 0)\nTotalFrac = 0 → ROUND(Perf(m) × 1000, 0)",
+    description: "Espaciamiento medio entre discontinuidades en milímetros. Si Total Fracturas es 0, el espaciamiento es la longitud total perforada en mm.",
+    inputs: ["Perforación (m)", "Total de Fracturas"],
+    calcExplanation: (p) => {
+      if (!p) return "";
+      const tf = p.totalFrac ?? 0;
+      return tf > 0
+        ? `ROUND((${p.perf ?? 0} / ${tf}) × 1000) = ${p.val ?? '—'} mm`
+        : `ROUND(${p.perf ?? 0} × 1000) = ${p.val ?? '—'} mm`;
+    }
+  },
+
+  rmr_clasif_relleno: {
+    title: "Clasificación de Relleno (Categoría)",
+    equation: "1 = Relleno Blando | 2 = Relleno Duro | 3 = Sin Relleno",
+    description: "Categorización del mineral de relleno para la tabla de valoración. Blando: ca, sand, ch, cl, gy, RXF, GOU, PAT. Duro: FBX, SIO, QZ, SU, OX, ep. Sin Relleno: cwf.",
+    inputs: ["Código de Relleno 1"],
+    calcExplanation: (p) => `Código: "${p?.code || '—'}" → Categoría: ${p?.val ?? '—'}`
+  },
 
   rmr_strength: {
     title: "Rating de Resistencia (ISRM)",
@@ -148,8 +244,8 @@ export const FORMULA_DEFS: Record<string, FormulaDef> = {
     calcExplanation: (p) => {
       if (!p) return "";
       const s = p.spacing ?? 0;
-      const tramo = s < 850 ? "cuadrático" : s <= 2000 ? "lineal" : "cap máx";
-      return `S: ${s} mm (tramo ${tramo}) → Rating: ${p.val ?? '—'}`;
+      const tramo = s < 850 ? "cuadrático (<850mm)" : s <= 2000 ? "lineal (850-2000mm)" : "cap máx (>2000mm)";
+      return `S: ${s} mm (${tramo}) → Rating: ${p.val ?? '—'}`;
     }
   },
 
@@ -187,8 +283,8 @@ export const FORMULA_DEFS: Record<string, FormulaDef> = {
 
   rmr_filling_76: {
     title: "Rating Relleno (RMR'76)",
-    equation: "Rating = Función(Código, Espesor)",
-    description: "Sin relleno = 5pts. Relleno duro (FBX,QZ,SIO,SU,OX,ep): ≤5mm→4, >5mm→2. Relleno blando (ca,sand,ch,cl,gy,RXF,GOU,PAT): ≤5mm→2, >5mm→0.",
+    equation: "Sin relleno → 5 | Duro ≤5mm → 4 | Duro >5mm → 2 | Blando ≤5mm → 2 | Blando >5mm → 0",
+    description: "Valoración según dureza y espesor. Espesores ≤ 5.0 mm se evalúan en la categoría <=5mm.",
     inputs: ["Tipo de Relleno", "Espesor (mm)"],
     calcExplanation: (p) => {
       if (!p) return "";
@@ -198,8 +294,8 @@ export const FORMULA_DEFS: Record<string, FormulaDef> = {
 
   rmr_filling_89: {
     title: "Rating Relleno (RMR'89)",
-    equation: "Rating = Función(Código, Espesor)",
-    description: "Sin relleno = 6pts. Relleno duro: ≤5mm→4, >5mm→2. Relleno blando: ≤5mm→2, >5mm→0.",
+    equation: "Sin relleno → 6 | Duro ≤5mm → 4 | Duro >5mm → 2 | Blando ≤5mm → 2 | Blando >5mm → 0",
+    description: "Valoración según dureza y espesor para RMR'89. Espesores ≤ 5.0 mm se evalúan en la categoría <=5mm.",
     inputs: ["Tipo de Relleno", "Espesor (mm)"],
     calcExplanation: (p) => {
       if (!p) return "";
@@ -313,7 +409,7 @@ export const FORMULA_DEFS: Record<string, FormulaDef> = {
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // █  ESTRUCTURAL — Campos Heredados
+  // █  ESTRUCTURAL — Campos Heredados y Fórmulas
   // ═══════════════════════════════════════════════════════════════════════════
 
   struct_corrida_match: {
@@ -325,6 +421,14 @@ export const FORMULA_DEFS: Record<string, FormulaDef> = {
       if (!p) return "";
       return `Prof: ${p.depth ?? '—'} m → Corrida [${p.de ?? '—'}, ${p.a ?? '—'}] = Corrida #${p.corrida ?? '—'}`;
     }
+  },
+
+  struct_de_a_heredada: {
+    title: "Metraje [De, A] Heredado de LGG",
+    equation: "Intervalo = [Corrida.De, Corrida.A]",
+    description: "Rango de profundidad inicial (De) y final (A) de la corrida que contiene esta discontinuidad.",
+    inputs: ["Profundidad (m)", "Corrida LGG"],
+    calcExplanation: (p) => `Corrida #${p?.corrida ?? '—'}: [${p?.de ?? '—'}m , ${p?.a ?? '—'}m]`
   },
 
   struct_lito_heredada: {
@@ -352,6 +456,30 @@ export const FORMULA_DEFS: Record<string, FormulaDef> = {
   // ═══════════════════════════════════════════════════════════════════════════
   // █  PLT — Ensayos de Carga Puntual
   // ═══════════════════════════════════════════════════════════════════════════
+
+  plt_long_corrida: {
+    title: "Longitud de Corrida (m)",
+    equation: "Long. Corrida = Corrida.A − Corrida.De",
+    description: "Longitud del tramo de corrida en LGG que contiene a la muestra del ensayo PLT.",
+    inputs: ["Corrida.De (m)", "Corrida.A (m)"],
+    calcExplanation: (p) => `Corrida #${p?.corrida ?? '—'}: ${p?.a ?? '—'} − ${p?.de ?? '—'} = ${p?.val ?? '—'} m`
+  },
+
+  plt_long_muestra: {
+    title: "Longitud de Muestra (mm)",
+    equation: "Long. Muestra = (To − From) × 1000",
+    description: "Longitud física de la muestra ensayada convertida a milímetros.",
+    inputs: ["From (m)", "To (m)"],
+    calcExplanation: (p) => `(${p?.to ?? '—'} − ${p?.from ?? '—'}) × 1000 = ${p?.val ?? '—'} mm`
+  },
+
+  plt_tipo_litologico: {
+    title: "Tipo Litológico (Cascada Geomecánica)",
+    equation: "Clase = ResolveCascade(Lito 1, Lito 2, Lito 3)",
+    description: "Clasificación de la familia litológica (Ígnea, Sedimentaria, Metamórfica) resuelta por la cascada geomecánica de las tres litologías.",
+    inputs: ["Litología 1", "Litología 2", "Litología 3"],
+    calcExplanation: (p) => `Cascada: "${p?.lito1 || '—'}" → "${p?.lito2 || '-'}" → "${p?.lito3 || '-'}" = ${p?.val || '—'}`
+  },
 
   plt_is_mpa: {
     title: "Índice de Carga Puntual Is (MPa)",

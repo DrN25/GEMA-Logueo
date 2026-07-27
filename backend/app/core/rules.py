@@ -188,7 +188,7 @@ MASTER_ERROR_RULES = [
     },
     {
         "code": "R130",
-        "msg": "El número de fracturas naturales no puede ser negativo.",
+        "msg": "Campo erróneo debido a dependencias vacías o mal calculadas en LGG/RMR.",
         "severity": "ALERTA",
         "group": "LGG"
     },
@@ -236,13 +236,25 @@ MASTER_ERROR_RULES = [
     },
     {
         "code": "R138",
-        "msg": "El valor de FRF no puede ser negativo.",
+        "msg": "Campo erróneo debido a dependencias vacías o mal calculadas en LGG/RMR.",
         "severity": "ALERTA",
         "group": "LGG"
     },
     {
         "code": "R139",
         "msg": "El valor de FRF debe ser un número entero.",
+        "severity": "ALERTA",
+        "group": "LGG"
+    },
+    {
+        "code": "R140",
+        "msg": "Campo erróneo debido a dependencias vacías o mal calculadas en LGG/RMR.",
+        "severity": "ALERTA",
+        "group": "LGG"
+    },
+    {
+        "code": "R141",
+        "msg": "El número de fracturas naturales debe ser un número entero.",
         "severity": "ALERTA",
         "group": "LGG"
     },

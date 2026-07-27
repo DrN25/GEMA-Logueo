@@ -228,7 +228,7 @@ def sanitize_val(val, target_type):
         return val_str
     try:
         if target_type == int:
-            return int(float(val))
+            return int(round(float(val)))
         return target_type(val)
     except:
         return None
@@ -535,13 +535,13 @@ def validate_rmr_sheet_data(
                 reg_err_rmr("lrf_m", lrf_m, "ALERTA", f"Longitud de Tramo Fracturado ({lrf_m}m) no coincide con LRF de LGG ({lgg_lrf}m).")
 
             frf = sanitize_val(row_dict.get("frf"), int)
-            lgg_frf = matching_lgg_run.get("frf", 0)
-            if frf is not None and frf != lgg_frf:
+            lgg_frf = matching_lgg_run.get("frf")
+            if frf is not None and lgg_frf is not None and frf != lgg_frf:
                 reg_err_rmr("frf", frf, "ALERTA", f"FRF en RMR ({frf}) no coincide con FRF de LGG ({lgg_frf}).")
 
             frac_nat = sanitize_val(row_dict.get("frac_nat"), int)
-            lgg_fn = matching_lgg_run.get("frac_nat", 0)
-            if frac_nat is not None and frac_nat != lgg_fn:
+            lgg_fn = matching_lgg_run.get("frac_nat")
+            if frac_nat is not None and lgg_fn is not None and frac_nat != lgg_fn:
                 reg_err_rmr("frac_nat", frac_nat, "ALERTA", f"Fracturas Naturales en RMR ({frac_nat}) no coincide con Frac Nat de LGG ({lgg_fn}).")
 
             total_frac = sanitize_val(row_dict.get("total_frac"), float)
@@ -564,6 +564,15 @@ def validate_rmr_sheet_data(
                     expected_esp = round(long_corrida * 1000 / total_frac)
                 if abs(espaciamiento - expected_esp) > 2.0:
                     reg_err_rmr("espaciamiento_mm", espaciamiento, "ALERTA", f"Espaciamiento ({espaciamiento}mm) no coincide con la fórmula calculada. Datos evaluados -> Long.Corrida({long_corrida}m) * 1000 / TotalFracturas({total_frac}) = {expected_esp}mm.")
+
+            # DETECCIÓN DE DEPENDENCIAS VACÍAS O NEGATIVAS EN CAMPOS CALCULADOS DE RMR
+            for (f_k, f_v, f_lbl) in [
+                ("total_frac", total_frac, "Total de Fracturas"),
+                ("ff_1m", ff_1m, "FF/1m"),
+                ("espaciamiento_mm", espaciamiento, "Espaciamiento (mm)")
+            ]:
+                if f_v is not None and f_v < 0:
+                    reg_err_rmr(f_k, f_v, "DEP_VACIA", f"Campo erróneo debido a dependencias vacías o mal calculadas en LGG/RMR: '{f_lbl}' ({f_v}) es negativo.")
 
             resistencia = safe_str(row_dict.get("resistencia"))
             lgg_res = safe_str(matching_lgg_run.get("resistencia"))
@@ -592,7 +601,7 @@ def validate_rmr_sheet_data(
 
             clasif_relleno = sanitize_val(row_dict.get("clasificacion_relleno"), int)
             if relleno:
-                expected_class = FILLING_CLASSES.get(relleno.lower(), 1)
+                expected_class = FILLING_CLASSES.get(relleno.strip().lower(), 1)
                 if clasif_relleno is not None and clasif_relleno != expected_class:
                     reg_err_rmr("clasificacion_relleno", clasif_relleno, "ALERTA", f"Clasificación de Relleno ({clasif_relleno}) no coincide con el código '{relleno}' (Clase esperada: {expected_class}).")
 
@@ -611,30 +620,19 @@ def validate_rmr_sheet_data(
             if espesor_rel is not None and abs(espesor_rel - lgg_esp) > 0.001:
                 reg_err_rmr("espesor_relleno", espesor_rel, "ALERTA", f"Espesor de relleno en RMR ({espesor_rel}mm) no coincide con LGG ({lgg_esp}mm).")
 
-            WATER_SCORES_76 = {"CDC": 10, "DPH": 7, "WTM": 7, "DGE": 4, "FGF": 0}
-            WATER_SCORES_89 = {"CDC": 15, "DPH": 10, "WTM": 7, "DGE": 4, "FGF": 0}
-            
-            pres_agua_code = safe_str(row_dict.get("presencia_agua")).upper().strip()
-            r76_agua = WATER_SCORES_76.get(pres_agua_code, 0) if (pres_agua_code and pres_agua_code != "-1") else 0
-            r89_agua = WATER_SCORES_89.get(pres_agua_code, 0) if (pres_agua_code and pres_agua_code != "-1") else 0
+            # REGLA PRESENCIA DE AGUA SEGÚN PROFUNDIDAD HASTA (m)
+            if a is not None:
+                expected_water_code = "CDC" if a < 92.0 else ("DPH" if a < 97.0 else "WTM")
+                pres_agua_code = safe_str(row_dict.get("presencia_agua")).upper().strip()
+                if pres_agua_code and pres_agua_code != "-1" and pres_agua_code != expected_water_code:
+                    reg_err_rmr("presencia_agua", pres_agua_code, "ALERTA", f"Presencia de Agua en RMR ('{pres_agua_code}') no coincide con la tabla de profundidad para Hasta = {a}m (Código esperado: '{expected_water_code}').")
 
             # 4. REGLAS RATINGS RMR'76 (SUMA PURA DE SUB-RATINGS REGISTRADOS)
             rmr76_excel = sanitize_val(row_dict.get("rmr76"), float)
             r76_res = sanitize_val(row_dict.get("r76_resistencia"), float) or 0.0
             r76_rqd = sanitize_val(row_dict.get("r76_rqd"), float) or 0.0
             r76_esp = sanitize_val(row_dict.get("r76_espaciamiento"), float) or 0.0
-            
-            r76_juntas_reg = sanitize_val(row_dict.get("r76_juntas"), float)
-            if r76_juntas_reg is not None:
-                r76_juntas = r76_juntas_reg
-            else:
-                r76_ab = sanitize_val(row_dict.get("r76_abertura"), float) or 0.0
-                r76_rug = sanitize_val(row_dict.get("r76_rugosidad"), float) or 0.0
-                r76_rel = sanitize_val(row_dict.get("r76_relleno"), float) or 0.0
-                r76_int = sanitize_val(row_dict.get("r76_intemperismo"), float) or 0.0
-                r76_pers = sanitize_val(row_dict.get("r76_persistencia"), float) or 0.0
-                r76_juntas = r76_ab + r76_rug + r76_rel + r76_int + r76_pers
-
+            r76_juntas = sanitize_val(row_dict.get("r76_juntas"), float) or 0.0
             r76_agua = sanitize_val(row_dict.get("r76_agua"), float) or 0.0
             expected_rmr76 = r76_res + r76_rqd + r76_esp + r76_juntas + r76_agua
 
@@ -642,25 +640,14 @@ def validate_rmr_sheet_data(
                 if rmr76_excel < 0 or rmr76_excel > 100:
                     reg_err_rmr("rmr76", rmr76_excel, "ALERTA", f"Puntaje RMR'76 ({rmr76_excel}) fuera del rango permitido de 0 a 100.")
                 if abs(rmr76_excel - expected_rmr76) > 0.5:
-                    reg_err_rmr("rmr76", rmr76_excel, "ALERTA", f"Descuadre en RMR'76: Excel registra {rmr76_excel}, pero los sub-ratings registrados suman {expected_rmr76}. Desglose -> Resistencia({r76_res}) + RQD({r76_rqd}) + Espaciamiento({r76_esp}) + Condición de Juntas({r76_juntas}) + Presencia de Agua({r76_agua}) = {expected_rmr76}.")
+                    reg_err_rmr("rmr76", rmr76_excel, "ALERTA", f"Descuadre en RMR'76: Excel registra {rmr76_excel}, pero la suma de sub-ratings registrados es {expected_rmr76}. Desglose -> Resistencia({r76_res}) + RQD({r76_rqd}) + Espaciamiento({r76_esp}) + Condición de Juntas({r76_juntas}) + Presencia de Agua({r76_agua}) = {expected_rmr76}.")
 
             # 5. REGLAS RATINGS RMR'89 (SUMA PURA DE SUB-RATINGS REGISTRADOS)
             rmr89_excel = sanitize_val(row_dict.get("rmr89"), float)
             r89_res = sanitize_val(row_dict.get("r89_resistencia"), float) or 0.0
             r89_rqd = sanitize_val(row_dict.get("r89_rqd"), float) or 0.0
             r89_esp = sanitize_val(row_dict.get("r89_espaciamiento"), float) or 0.0
-            
-            r89_juntas_reg = sanitize_val(row_dict.get("r89_juntas"), float)
-            if r89_juntas_reg is not None:
-                r89_juntas = r89_juntas_reg
-            else:
-                r89_ab = sanitize_val(row_dict.get("r89_abertura"), float) or 0.0
-                r89_rug = sanitize_val(row_dict.get("r89_rugosidad"), float) or 0.0
-                r89_rel = sanitize_val(row_dict.get("r89_relleno"), float) or 0.0
-                r89_int = sanitize_val(row_dict.get("r89_intemperismo"), float) or 0.0
-                r89_pers = sanitize_val(row_dict.get("r89_persistencia"), float) or 0.0
-                r89_juntas = r89_ab + r89_rug + r89_rel + r89_int + r89_pers
-
+            r89_juntas = sanitize_val(row_dict.get("r89_juntas"), float) or 0.0
             r89_agua = sanitize_val(row_dict.get("r89_agua"), float) or 0.0
             expected_rmr89 = r89_res + r89_rqd + r89_esp + r89_juntas + r89_agua
 
@@ -668,7 +655,7 @@ def validate_rmr_sheet_data(
                 if rmr89_excel < 0 or rmr89_excel > 100:
                     reg_err_rmr("rmr89", rmr89_excel, "ALERTA", f"Puntaje RMR'89 ({rmr89_excel}) fuera del rango permitido de 0 a 100.")
                 if abs(rmr89_excel - expected_rmr89) > 0.5:
-                    reg_err_rmr("rmr89", rmr89_excel, "ALERTA", f"Descuadre en RMR'89: Excel registra {rmr89_excel}, pero los sub-ratings registrados suman {expected_rmr89}. Desglose -> Resistencia({r89_res}) + RQD({r89_rqd}) + Espaciamiento({r89_esp}) + Condición de Juntas({r89_juntas}) + Presencia de Agua({r89_agua}) = {expected_rmr89}.")
+                    reg_err_rmr("rmr89", rmr89_excel, "ALERTA", f"Descuadre en RMR'89: Excel registra {rmr89_excel}, pero la suma de sub-ratings registrados es {expected_rmr89}. Desglose -> Resistencia({r89_res}) + RQD({r89_rqd}) + Espaciamiento({r89_esp}) + Condición de Juntas({r89_juntas}) + Presencia de Agua({r89_agua}) = {expected_rmr89}.")
 
         if not row_has_errors:
             r_counters["total_ok"] += 1
@@ -852,7 +839,7 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
 
         raw_frac_nat = row_dict.get("frac_nat")
         if frac_nat is not None and frac_nat < 0:
-            registrar_lgg_error("frac_nat", raw_frac_nat, "ALERTA", f"El número de fracturas naturales ({frac_nat}) no puede ser negativo.")
+            registrar_lgg_error("frac_nat", raw_frac_nat, "DEP_VACIA", "Campo erróneo debido a dependencias vacías o mal calculadas en LGG/RMR.")
         raw_b30 = row_dict.get("frac_buz30")
         if b30 is not None and b30 < 0:
             registrar_lgg_error("frac_buz30", raw_b30, "ALERTA", f"El número de fracturas en Buz<30° ({b30}) no puede ser negativo.")
@@ -874,35 +861,32 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
             registrar_lgg_error("campana", raw_camp, "ALERTA", f"El año de campaña ({camp}) no puede ser negativo.")
 
         for key, val_raw in [("frac_nat", raw_frac_nat), ("frac_buz30", raw_b30), ("frac_buz60", raw_b60), ("frac_buz90", raw_b90)]:
-            if val_raw is not None and val_raw != -1:
+            if val_raw is not None and str(val_raw).strip() not in ["-1", "-1.0", ""]:
                 try:
                     f_val = float(val_raw)
                     if not f_val.is_integer():
-                        registrar_lgg_error(key, val_raw, "ALERTA", f"El campo '{key}' ({val_raw}) debe ser un número entero.")
+                        msg_int = "El número de fracturas naturales debe ser un número entero." if key == "frac_nat" else f"El campo '{key}' ({val_raw}) debe ser un número entero."
+                        registrar_lgg_error(key, val_raw, "ALERTA", msg_int)
                 except ValueError:
                     pass
 
         if "frf" in lgg_map:
             frf_raw = row_dict.get("frf")
             frf_val = sanitize_val(frf_raw, int)
-            if frf_val is not None and frf_val != -1:
+            if frf_val is not None and str(frf_raw).strip() not in ["-1", "-1.0", ""]:
                 if frf_val < 0:
-                    registrar_lgg_error("frf", frf_raw, "ALERTA", f"El valor de FRF ({frf_val}) no puede ser negativo.")
-                try:
-                    f_frf = float(frf_raw)
-                    if not f_frf.is_integer():
-                        registrar_lgg_error("frf", frf_raw, "ALERTA", f"El valor de FRF ({frf_raw}) debe ser un número entero.")
-                except ValueError:
-                    pass
-                if lrf_m is not None:
-                    calc_frf = math.floor(round(lrf_m * 100) / 5) + 1 if lrf_m > 0 else 0
-                    if frf_val != calc_frf:
-                        registrar_lgg_error(
-                            "frf", 
-                            frf_raw, 
-                            "ALERTA", 
-                            f"El valor de FRF ({frf_val}) no coincide con el calculado por la fórmula: FRF = PISO( REDOND(LRF * 100) / 5 ) + 1 (si LRF > 0, sino 0). Calculado: {calc_frf} basado en LRF ({lrf_m}m)."
-                        )
+                    registrar_lgg_error("frf", frf_raw, "DEP_VACIA", "Campo erróneo debido a dependencias vacías o mal calculadas en LGG/RMR.")
+                else:
+                    try:
+                        f_frf = float(frf_raw)
+                        if not f_frf.is_integer():
+                            registrar_lgg_error("frf", frf_raw, "ALERTA", "El valor de FRF debe ser un número entero.")
+                    except ValueError:
+                        pass
+                    if lrf_m is not None:
+                        calc_frf = math.floor(round(lrf_m * 100) / 5) + 1 if lrf_m > 0 else 0
+                        if frf_val != calc_frf:
+                            registrar_lgg_error("frf", frf_raw, "ALERTA", f"El valor de FRF ({frf_val}) no coincide con el calculado por la fórmula: FRF = PISO( REDOND(LRF * 100) / 5 ) + 1 (si LRF > 0, sino 0). Calculado: {calc_frf} basado en LRF ({lrf_m}m).")
 
         if a is not None:
             resumen_celdas[celda_padre]["dist_celda"] = max(resumen_celdas[celda_padre]["dist_celda"], a)

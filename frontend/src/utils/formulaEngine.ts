@@ -189,6 +189,7 @@ export function calculateRowRmr(row: any, waterTableM: number = 97.0) {
       spacing_mm,
       frf,
       total_frac,
+      ff_1_m: perf > 0 ? Math.round(total_frac / perf) : 0,
       scores: {
         resistencia: s_score,
         rqd: rqd_score,

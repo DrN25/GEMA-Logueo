@@ -576,9 +576,9 @@ export default function CatalogsModal({ isOpen, onClose }: CatalogsModalProps) {
                         <tbody>
                           {[
                             { name: "Sin relleno (Ninguno)", r89: 6, r76: 5 },
-                            { name: "Relleno duro < 5 mm", r89: 4, r76: 4 },
-                            { name: "Relleno duro > 5 mm", r89: 2, r76: 3 },
-                            { name: "Relleno blando < 5 mm", r89: 2, r76: 2 },
+                            { name: "Relleno duro ≤ 5 mm", r89: 4, r76: 4 },
+                            { name: "Relleno duro > 5 mm", r89: 2, r76: 2 },
+                            { name: "Relleno blando ≤ 5 mm", r89: 2, r76: 2 },
                             { name: "Relleno blando > 5 mm", r89: 0, r76: 0 }
                           ].map((r, idx) => (
                             <tr key={idx} className="border-b border-navy-900/50 hover:bg-navy-900/10">
@@ -790,9 +790,9 @@ export default function CatalogsModal({ isOpen, onClose }: CatalogsModalProps) {
                     <tbody>
                       {[
                         { r76: 5, r89: 6, desc: "Sin relleno (Ninguno)", col: "text-cyan-400 bg-blue-500/5" },
-                        { r76: 4, r89: 4, desc: "Relleno duro < 5 mm", col: "text-emerald-400 bg-emerald-500/5" },
+                        { r76: 4, r89: 4, desc: "Relleno duro ≤ 5 mm", col: "text-emerald-400 bg-emerald-500/5" },
                         { r76: 3, r89: 2, desc: "Relleno duro > 5 mm", col: "text-emerald-500 bg-emerald-500/5" },
-                        { r76: 2, r89: 2, desc: "Relleno blando < 5 mm", col: "text-amber-400 bg-amber-500/5" },
+                        { r76: 2, r89: 2, desc: "Relleno blando ≤ 5 mm", col: "text-amber-400 bg-amber-500/5" },
                         { r76: 0, r89: 0, desc: "Relleno blando > 5 mm", col: "text-red-400 bg-red-500/5" }
                       ].map((r, idx) => (
                         <tr key={idx} className="border-b border-navy-900 hover:bg-navy-900/10">

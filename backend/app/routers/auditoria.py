@@ -5,7 +5,8 @@ import shutil
 import math
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-from openpyxl.chart import BarChart, Reference
+from openpyxl.chart import BarChart, PieChart, Reference
+from openpyxl.chart.label import DataLabelList
 from openpyxl.utils import get_column_letter
 import time
 from datetime import datetime
@@ -32,6 +33,10 @@ def simplify_message(msg):
     msg_clean = str(msg or "").strip()
     msg_up = msg_clean.upper()
     
+    # 0. Regla DEP_VACIA (Campo erróneo debido a dependencias vacías o mal calculadas)
+    if "DEPENDENCIAS VACIAS" in msg_up or "DEPENDENCIAS VACÍAS" in msg_up or "CAMPO ERRONEO DEBIDO" in msg_up or "CAMPO ERRÓNEO DEBIDO" in msg_up:
+        return "Campo erróneo debido a dependencias vacías o mal calculadas en LGG/RMR."
+
     # 1. Sin Información (-1) -> Exclusivo para celdas con -1 o sin dato registrado (-1)
     if "SIN INFORMACION" in msg_up or "SIN INFORMACIÓN" in msg_up or "NO CONTIENE INFORMACIÓN" in msg_up or "NO CONTIENE INFORMACION" in msg_up or "(-1)" in msg_up:
         return "Campo obligatorio sin información (-1)."
@@ -94,7 +99,7 @@ def simplify_message(msg):
     if "FRAGMENTOS <10CM" in msg_up and "NEGATIV" in msg_up:
         return "El metraje de fragmentos <10cm no puede ser negativo."
     if "FRACTURAS NATURALES" in msg_up and "NEGATIV" in msg_up:
-        return "El número de fracturas naturales no puede ser negativo."
+        return "Campo erróneo debido a dependencias vacías o mal calculadas en LGG/RMR."
     if "LONGITUD RECUPERADA" in msg_up and "NEGATIV" in msg_up:
         return "La longitud recuperada no puede ser negativa."
     if "METRAJE RQD" in msg_up and "NEGATIV" in msg_up:
@@ -102,7 +107,7 @@ def simplify_message(msg):
     if "LONGITUD DE ROCA FRACTURADA" in msg_up and "NEGATIV" in msg_up:
         return "La longitud de roca fracturada LRF no puede ser negativa."
     if "VALOR DE FRF" in msg_up and "NEGATIV" in msg_up:
-        return "El valor de FRF no puede ser negativo."
+        return "Campo erróneo debido a dependencias vacías o mal calculadas en LGG/RMR."
     if "NEGATIV" in msg_up:
         return "El valor no puede ser negativo."
         

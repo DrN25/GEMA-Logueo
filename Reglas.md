@@ -51,7 +51,7 @@ TABLA VALORACION DE RELLENO
 | RMR_76 | RMR_89 | Descripción |
 | :---: | :---: | :--- |
 | 5 | 6 | Sin relleno (Ninguno) |
-| 4 | 4 | Relleno duro < 5 mm |
+| 4 | 4 | Relleno duro < 5 mm | 
 | 2 | 2 | Relleno duro > 5 mm |
 | 2 | 2 | Relleno blando < 5 mm |
 | 0 | 0 | Relleno blando > 5 mm |
@@ -114,3 +114,30 @@ TABLA DE RUGOSIDAD
 | Suave y Plana | 8 | 1 | 1 |
 | Estriada y Plana | 9 | 0 | 0 |
 | Sin Información | -1 | 0 | 0 |
+
+
+
+
+
+# NUEVOS COMENTARIOS
+- Crear una nueva categoria de error "CAMPO ERRONEO DEBIDO A DEPENDENCIAS VACIAS" o algo asi. Aqui deben de ingresar errores como tener <FRF (zonas trituradas) [LGG], Fracturas naturales [LGG], Toral de Fracturas, FF/1m, Espaciamiento (mm)>, que tengan NEGATIVAS para calcular sus valores (Si son negativos, se asume de que estas dependencias estan mal calculadas o vacias, por ende requieren de correccion). Por ende estos calculos, ya que son de por si erroneos, no deberian de aparecer en otros tipos de errores estas celdas (como x celda es negativa). 
+- La regla para: Presencia de Agua [CRITICA]: Segun su valor "Hasta (m)", seguir la tabla VALOR DE PRESENCIA DE AGUA
+
+VALOR DE PRESENCIA DE AGUA
+| Estado | Criterio de Profundidad (m) | Código |
+| :--- | :--- | :---: |
+| Seco | 0 <= Profundidad < 92 | CDC |
+| Húmedo | 92 <= Profundidad < 97 | DPH |
+| Mojado | 97 <= Profundidad <= 301.2 | WTM |
+
+- LGG [CRITICA]: FRF se halla con la formula que ya tenemos en el sistema
+
+- revisa la regla "Regla: CLASIFICACIÓN DE RELLENO EN RMR NO COINCIDE CON LA CLASE ESPERADA", debido a que actualmente dice que hay errores como Clasificación de Relleno (2) no coincide con el código 'OX' (Clase esperada: 1), cuando ox mapeandola en las tablas, especificamente en TABLA TIPO DE RELLENO Y VALORES, se tiene que: "| Oxido de cobre | OX | 2 | | 4 | 2 | | |", osea OX 2, osea el valor de clasificaicon de relleno de ox es 2 osea DURO, no 1, al igual que "Clasificación de Relleno (2) no coincide con el código 'SIO' (Clase esperada: 1).", asi que revisa a fondo la logica de ese error
+- hay un error llamado "Regla: PRESENCIA DE AGUA EN RMR DIFIERE DE LAS OBSERVACIONES DE LGG." que me confunde, ya que tenemos un error que verifica de que la suma de los 5 valores de rmr 76 y 89 correspondan a los del excel. El problema es que antes lo que se hacia era que para celdas que tuvieran alguno de estos 5 valores vacios (todos estos 5 pueden autocalcularse) se calculaban y se consideraba ese valor calculado por nuestra auditoria para comparar, PERO no deberia de ser asi, solo deberia de sumar defrente los 5 valores, donde si uno esta vacio, entonces sumaba 0. El problema es que este error me confunde, ya que habla de presencia de agua, pero la celda de error es la celda de rmr, ademas aqui parece que sigue cometiendo el error de el mismo autocalcular los vacios en lugar de usar 0. Este es un registro de ejemplo:
+
+Fila Excel	Módulo	Taladro Padre	ID/Prof Hija	Campaña	Logger Geotécnico	Columna de Falla	Valor Actual	Mensaje de Regla
+283	Validación RMR	FEGT20-002	FEGT20-002-RMR282	2020	N/A	rmr76	42	Descuadre en RMR'76: Excel registra 42.0, pero los sub-ratings registrados suman 46.0. Desglose -> Resistencia(4.0) + RQD(20.0) + Espaciamiento(8.0) + Condición de Juntas(4.0) + Presencia de Agua(10.0) = 46.0.
+283	Validación RMR	FEGT20-002	FEGT20-002-RMR282	2020	N/A	rmr89	46	Descuadre en RMR'89: Excel registra 46.0, pero los sub-ratings registrados suman 51.0. Desglose -> Resistencia(4.0) + RQD(20.0) + Espaciamiento(7.0) + Condición de Juntas(5.0) + Presencia de Agua(15.0) = 51.0.
+
+y aqui en el excel el registro de Condicion de Juntas esta vacio, pero aqui lo considera como 5, esta mal. Corrige el nombre o logica con este error, esta raro
+
