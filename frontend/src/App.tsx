@@ -1440,6 +1440,12 @@ export default function App() {
           darkMode={darkMode}
           onToggleDarkMode={() => setDarkMode(!darkMode)}
           selectedTaladro={activeTaladro ? activeTaladro.name : null}
+          activeTaladroObj={activeTaladro}
+          hasUnsavedChanges={syncStatus === 'unsaved'}
+          onClearActiveTaladro={() => {
+            setActiveTaladro(null);
+            setCurrentView('dashboard');
+          }}
         />
       </div>
 
@@ -1472,7 +1478,7 @@ export default function App() {
         <div className="flex-1 p-6 relative flex flex-col overflow-hidden">
 
           {/* 1. Dashboard Principal (Solo se desmonta si no hay taladro activo) */}
-          {(!activeTaladro || currentView === 'dashboard' || currentView === 'list') && (
+          {(!activeTaladro || currentView === 'dashboard') && (
             <div className="flex-1 flex flex-col min-h-0 overflow-y-auto">
               <MainDashboard
                 taladros={paginatedTaladros}
