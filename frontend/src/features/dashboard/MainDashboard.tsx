@@ -143,9 +143,9 @@ export default function Dashboard({
   const dateObj = new Date();
   const filterLabel = activeDateRange === 'hoy' ? 'Hoy' :
     activeDateRange === 'ayer' ? 'Ayer' :
-    activeDateRange === 'semana' ? 'Esta semana' :
-    activeDateRange === 'mes' ? 'Este mes' :
-    activeDateRange === 'ano' ? 'Este año' : 'Todo';
+      activeDateRange === 'semana' ? 'Esta semana' :
+        activeDateRange === 'mes' ? 'Este mes' :
+          activeDateRange === 'ano' ? 'Este año' : 'Todo';
 
   const totalGlobal = kpis?.total_taladros || taladros.length;
   const kpiSubset = totalFiltered !== totalGlobal
@@ -169,7 +169,7 @@ export default function Dashboard({
             className="flex items-center gap-2 bg-cyan-500/10 border border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-400 font-bold transition-all duration-200 active:scale-95 shadow-[0_0_12px_rgba(6,182,212,0.12)] px-4 py-2 rounded-lg text-xs"
           >
             <Plus size={16} />
-            <span>Registrar Nuevo Taladro</span>
+            <span>Crear Nuevo Taladro</span>
           </button>
         </div>
       </div>
@@ -187,11 +187,10 @@ export default function Dashboard({
           <button
             key={chip.key}
             onClick={() => onFilterChange({ dateRange: chip.key })}
-            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 border ${
-              activeDateRange === chip.key
-                ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300 shadow-[0_0_10px_rgba(6,182,212,0.15)]'
-                : 'bg-navy-900/40 border-navy-700/70 text-slate-400 hover:text-slate-200 hover:border-navy-600'
-            }`}
+            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 border ${activeDateRange === chip.key
+              ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300 shadow-[0_0_10px_rgba(6,182,212,0.15)]'
+              : 'bg-navy-900/40 border-navy-700/70 text-slate-400 hover:text-slate-200 hover:border-navy-600'
+              }`}
           >
             {chip.label}
           </button>
@@ -248,57 +247,69 @@ export default function Dashboard({
       </details>
 
       {/* Real Geotechnical KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
         {/* Date Card */}
-        <div className="glass-panel p-5 rounded-xl border border-navy-800 bg-navy-950/20 flex items-center justify-between shadow-lg">
-          <div className="space-y-1">
+        <div className="glass-panel p-4 rounded-xl border border-navy-800 bg-navy-950/20 flex items-center justify-between shadow-lg">
+          <div className="space-y-1 min-w-0">
             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Rango activo</span>
-            <span className="text-base font-black text-slate-100 block">{filterLabel}</span>
-            <span className="text-[10px] font-bold text-cyan-400 block leading-none">{formatDate(dateObj)}</span>
+            <span className="text-base font-black text-slate-100 block truncate">{filterLabel}</span>
+            <span className="text-[10px] font-bold text-cyan-400 block leading-none truncate">{formatDate(dateObj)}</span>
           </div>
-          <Calendar size={22} className="text-cyan-500/40" />
+          <Calendar size={20} className="text-cyan-500/40 shrink-0 ml-1" />
         </div>
 
         {/* Total Drillholes */}
-        <div className="glass-panel p-5 rounded-xl border border-navy-800 bg-navy-950/20 flex items-center justify-between shadow-lg">
-          <div className="space-y-1">
+        <div className="glass-panel p-4 rounded-xl border border-navy-800 bg-navy-950/20 flex items-center justify-between shadow-lg">
+          <div className="space-y-1 min-w-0">
             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Total Taladros</span>
-            <span className="text-xl font-black text-slate-100 block">{totalGlobal.toLocaleString()}</span>
-            <span className="text-[10px] font-bold text-slate-400 block leading-none">{kpiSubset}</span>
+            <span className="text-xl font-black text-slate-100 block">{(kpis?.total_taladros ?? totalFiltered).toLocaleString()}</span>
+            <span className="text-[10px] font-bold text-slate-400 block leading-none truncate">{kpiSubset}</span>
           </div>
-          <LayoutGrid size={22} className="text-cyan-500/40" />
+          <LayoutGrid size={20} className="text-cyan-500/40 shrink-0 ml-1" />
         </div>
 
         {/* Total Logged Meters */}
-        <div className="glass-panel p-5 rounded-xl border border-navy-800 bg-navy-950/20 flex items-center justify-between shadow-lg">
-          <div className="space-y-1">
+        <div className="glass-panel p-4 rounded-xl border border-navy-800 bg-navy-950/20 flex items-center justify-between shadow-lg">
+          <div className="space-y-1 min-w-0">
             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Metraje Logueado</span>
             <span className="text-xl font-black text-slate-100 block">{(kpis?.perf_total_m || 0).toFixed(1)} m</span>
-            <span className="text-[10px] font-bold text-emerald-400 block leading-none">Hoy: {(kpis?.perf_total_hoy || 0).toFixed(1)} m</span>
+            <span className="text-[10px] font-bold text-emerald-400 block leading-none truncate">Hoy: {(kpis?.perf_total_hoy || 0).toFixed(1)} m</span>
           </div>
-          <Construction size={22} className="text-emerald-500/40 animate-pulse" />
+          <Construction size={20} className="text-emerald-500/40 animate-pulse shrink-0 ml-1" />
         </div>
 
         {/* RMR 89 Avg */}
-        <div className="glass-panel p-5 rounded-xl border border-navy-800 bg-navy-950/20 flex items-center justify-between shadow-lg">
-          <div className="space-y-1">
+        <div className="glass-panel p-4 rounded-xl border border-navy-800 bg-navy-950/20 flex items-center justify-between shadow-lg">
+          <div className="space-y-1 min-w-0">
             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">RMR Promedio</span>
             <span className="text-xl font-black text-indigo-400 block">{kpis?.rmr_promedio ? kpis.rmr_promedio.toFixed(1) : '—'}</span>
-            <span className="text-[10px] font-bold text-indigo-400 block leading-none">RMR '89 General</span>
+            <span className="text-[10px] font-bold text-indigo-400 block leading-none truncate">
+              {kpis?.rmr_promedio ? (kpis.rmr_promedio >= 81 ? 'Clase I (Muy Buena)' : kpis.rmr_promedio >= 61 ? 'Clase II (Buena)' : kpis.rmr_promedio >= 41 ? 'Clase III (Regular)' : kpis.rmr_promedio >= 21 ? 'Clase IV (Mala)' : 'Clase V (Muy Mala)') : 'RMR \'89 General'}
+            </span>
           </div>
-          <TrendingUp size={22} className="text-indigo-400/40" />
+          <TrendingUp size={20} className="text-indigo-400/40 shrink-0 ml-1" />
+        </div>
+
+        {/* RQD Avg */}
+        <div className="glass-panel p-4 rounded-xl border border-navy-800 bg-navy-950/20 flex items-center justify-between shadow-lg">
+          <div className="space-y-1 min-w-0">
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">RQD Promedio</span>
+            <span className="text-xl font-black text-cyan-400 block">{kpis?.rqd_promedio ? `${kpis.rqd_promedio.toFixed(1)}%` : '—'}</span>
+            <span className="text-[10px] font-bold text-cyan-400 block leading-none truncate">Testigos ≥ 10cm</span>
+          </div>
+          <Activity size={20} className="text-cyan-400/40 shrink-0 ml-1" />
         </div>
 
         {/* Last Geologist */}
-        <div className="glass-panel p-5 rounded-xl border border-navy-800 bg-navy-950/20 flex items-center justify-between shadow-lg">
-          <div className="space-y-1">
+        <div className="glass-panel p-4 rounded-xl border border-navy-800 bg-navy-950/20 flex items-center justify-between shadow-lg">
+          <div className="space-y-1 min-w-0">
             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Último Geólogo</span>
-            <span className="text-base font-black text-slate-200 block truncate max-w-[130px]">
+            <span className="text-base font-black text-slate-200 block truncate" title={kpis?.geologo_mas_reciente || 'RD/RB'}>
               {kpis?.geologo_mas_reciente || 'RD/RB'}
             </span>
-            <span className="text-[10px] font-bold text-slate-400 block leading-none">Responsable reciente</span>
+            <span className="text-[10px] font-bold text-slate-400 block leading-none truncate">Responsable reciente</span>
           </div>
-          <User size={22} className="text-cyan-500/40" />
+          <User size={20} className="text-cyan-500/40 shrink-0 ml-1" />
         </div>
       </div>
 
@@ -347,11 +358,10 @@ export default function Dashboard({
 
               <button
                 onClick={() => onSearchSubmit(localSearch, true)}
-                className={`border font-bold px-3.5 py-2 rounded-lg text-xs transition-all shadow-md active:scale-95 flex items-center gap-1.5 whitespace-nowrap ${
-                  isGlobalSearch && searchTerm.trim()
-                    ? 'bg-violet-500 border-violet-400 text-white shadow-[0_0_12px_rgba(139,92,246,0.4)]'
-                    : 'bg-navy-900 border-navy-700 text-slate-300 hover:text-white hover:border-navy-600'
-                }`}
+                className={`border font-bold px-3.5 py-2 rounded-lg text-xs transition-all shadow-md active:scale-95 flex items-center gap-1.5 whitespace-nowrap ${isGlobalSearch && searchTerm.trim()
+                  ? 'bg-violet-500 border-violet-400 text-white shadow-[0_0_12px_rgba(139,92,246,0.4)]'
+                  : 'bg-navy-900 border-navy-700 text-slate-300 hover:text-white hover:border-navy-600'
+                  }`}
                 title="Buscar en todo el historial completo de la base de datos (ignora filtro de fecha)"
               >
                 <span>🌐 Buscar en todo</span>
@@ -515,11 +525,10 @@ export default function Dashboard({
                     <button
                       key={i}
                       onClick={() => onPageChange(i)}
-                      className={`px-2.5 py-1 rounded text-xs font-bold transition-all ${
-                        page === i
-                          ? 'bg-cyan-500/20 border border-cyan-500/40 text-cyan-300'
-                          : 'text-slate-400 hover:text-slate-200'
-                      }`}
+                      className={`px-2.5 py-1 rounded text-xs font-bold transition-all ${page === i
+                        ? 'bg-cyan-500/20 border border-cyan-500/40 text-cyan-300'
+                        : 'text-slate-400 hover:text-slate-200'
+                        }`}
                     >
                       {i}
                     </button>
@@ -553,7 +562,7 @@ export default function Dashboard({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm animate-fade-in text-left">
           <div className="glass-panel w-full max-w-md p-6 rounded-xl border border-navy-800 space-y-4 shadow-2xl bg-navy-900/95">
             <h3 className="text-sm font-black text-slate-100 tracking-wide border-b border-navy-800 pb-2 uppercase">
-              Registrar Nuevo Taladro
+              Crear Nuevo Taladro
             </h3>
 
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -657,7 +666,7 @@ export default function Dashboard({
                   type="submit"
                   className="bg-cyan-500/10 border border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/20 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
                 >
-                  Guardar Taladro
+                  Crear Taladro
                 </button>
               </div>
             </form>

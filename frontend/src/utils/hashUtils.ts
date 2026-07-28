@@ -45,7 +45,7 @@ function toStr(val: any, fallback = ''): string {
  * Normaliza tipos (string/number) estrictamente para que "1.5" (de input HTML)
  * y 1.5 (de API JSON) generen exactamente la misma estructura de Hash.
  */
-function extractPersistible(taladro: any): object {
+export function extractPersistible(taladro: any): any {
   return {
     name: toStr(taladro.name).toUpperCase(),
     proyecto: toStr(taladro.proyecto),

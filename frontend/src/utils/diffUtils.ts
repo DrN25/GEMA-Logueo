@@ -8,6 +8,8 @@
  * - Cambios en datos generales del Collar
  */
 
+import { extractPersistible } from './hashUtils';
+
 export interface ModuleDiff {
   added: number;
   deleted: number;
@@ -123,6 +125,10 @@ export function computeTaladroDiff(before: any, after: any): TaladroDiffSummary 
     }
   }
 
+  // Normalizar ambos objetos a su estructura estricta persistible
+  const normBefore = extractPersistible(before);
+  const normAfter = extractPersistible(after);
+
   // 1. Auditoría del Collar y Datos Generales
   const collarChanges: CollarChange[] = [];
   const collarFieldsMap: Record<string, string> = {
@@ -141,8 +147,8 @@ export function computeTaladroDiff(before: any, after: any): TaladroDiffSummary 
   };
 
   for (const [key, label] of Object.entries(collarFieldsMap)) {
-    const vBefore = fmt(before[key]);
-    const vAfter = fmt(after[key]);
+    const vBefore = fmt(normBefore[key]);
+    const vAfter = fmt(normAfter[key]);
     if (vBefore !== vAfter) {
       collarChanges.push({ label, from: vBefore, to: vAfter });
     }
@@ -150,8 +156,8 @@ export function computeTaladroDiff(before: any, after: any): TaladroDiffSummary 
 
   // 2. Auditoría de Corridas LGG
   const corridasDiff = compareArrays(
-    before.corridas || [],
-    after.corridas || [],
+    normBefore.corridas || [],
+    normAfter.corridas || [],
     'corrida',
     [
       'de', 'a', 'rec_m', 'rqd_m', 'lrf_m', 'frf', 'lito1', 'lito2', 'lito3',
@@ -163,8 +169,8 @@ export function computeTaladroDiff(before: any, after: any): TaladroDiffSummary 
 
   // 3. Auditoría de Discontinuidades Estructurales (EST)
   const discsDiff = compareArrays(
-    before.discontinuidades || [],
-    after.discontinuidades || [],
+    normBefore.discontinuidades || [],
+    normAfter.discontinuidades || [],
     'id',
     [
       'profundidad', 'tipo_estructura', 'alfa', 'beta', 'forma', 'rugosidad', 'jrc10',
@@ -175,8 +181,8 @@ export function computeTaladroDiff(before: any, after: any): TaladroDiffSummary 
 
   // 4. Auditoría de Ensayos PLT
   const pltsDiff = compareArrays(
-    before.ensayos_plt || [],
-    after.ensayos_plt || [],
+    normBefore.ensayos_plt || [],
+    normAfter.ensayos_plt || [],
     'nro_muestra',
     [
       'from_m', 'to_m', 'nro_caja', 'd_mm', 'p_instr_kn', 'tipo_rotura_code',
@@ -186,8 +192,8 @@ export function computeTaladroDiff(before: any, after: any): TaladroDiffSummary 
 
   // 5. Auditoría de Surveys
   const surveysDiff = compareArrays(
-    before.surveys || [],
-    after.surveys || [],
+    normBefore.surveys || [],
+    normAfter.surveys || [],
     'depth',
     ['dip', 'azimuth']
   );

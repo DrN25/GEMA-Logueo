@@ -24,6 +24,7 @@ import BulkAuditor from './features/auditor/BulkAuditor';
 
 import { validateCollarAndSurvey, validateRowQAQC, validateStructuralQAQC, validatePltQAQC, type ValidationAlert } from './utils/qaqcValidator';
 import { resolveLithologyCascade } from './utils/catalogData';
+import { calculateRowRmr } from './utils/formulaEngine';
 import { computeTaladroHash } from './utils/hashUtils';
 import { computeTaladroDiff, computeAllTaladrosDiff, type TaladroDiffSummary } from './utils/diffUtils';
 
@@ -383,28 +384,33 @@ export default function App() {
   const filteredTaladros = useMemo(() => {
     let list = [...taladros];
 
-    // 1. Filtrado por rango de fechas
+    // Helper para extraer YYYY-MM-DD
+    const getFechaStr = (f?: string) => f ? f.split('T')[0] : '';
     const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+
+    // 1. Filtrado por rango de fechas (Hoy, Ayer, Esta Semana, Este Mes, Este Año, Todo)
     if (!isGlobalSearch) {
       if (activeDateRange === 'hoy') {
-        const todayStr = now.toISOString().split('T')[0];
-        list = list.filter(t => t.fecha_registro === todayStr);
+        list = list.filter(t => getFechaStr(t.fecha_registro) === todayStr);
       } else if (activeDateRange === 'ayer') {
         const yesterday = new Date(now);
         yesterday.setDate(yesterday.getDate() - 1);
         const yestStr = yesterday.toISOString().split('T')[0];
-        list = list.filter(t => t.fecha_registro === yestStr);
+        list = list.filter(t => getFechaStr(t.fecha_registro) === yestStr);
       } else if (activeDateRange === 'semana') {
         const weekAgo = new Date(now);
         weekAgo.setDate(weekAgo.getDate() - 7);
-        list = list.filter(t => new Date(t.fecha_registro) >= weekAgo);
+        const weekStartStr = weekAgo.toISOString().split('T')[0];
+        list = list.filter(t => getFechaStr(t.fecha_registro) >= weekStartStr);
       } else if (activeDateRange === 'mes') {
         const monthAgo = new Date(now);
         monthAgo.setMonth(monthAgo.getMonth() - 1);
-        list = list.filter(t => new Date(t.fecha_registro) >= monthAgo);
+        const monthStartStr = monthAgo.toISOString().split('T')[0];
+        list = list.filter(t => getFechaStr(t.fecha_registro) >= monthStartStr);
       } else if (activeDateRange === 'ano') {
-        const yearStart = new Date(now.getFullYear(), 0, 1);
-        list = list.filter(t => new Date(t.fecha_registro) >= yearStart);
+        const yearStartStr = `${now.getFullYear()}-01-01`;
+        list = list.filter(t => getFechaStr(t.fecha_registro) >= yearStartStr);
       }
     }
 
@@ -420,6 +426,88 @@ export default function App() {
 
     return list;
   }, [taladros, activeDateRange, searchTerm, isGlobalSearch]);
+
+  // ─── CÁLCULO DINÁMICO DE KPIS PARA EL DASHBOARD ───
+  const computedDashboardKpis = useMemo(() => {
+    const list = filteredTaladros;
+    const total_taladros = list.length;
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    let perf_total_m = 0;
+    let perf_total_hoy = 0;
+    let totalWeightedRmr = 0;
+    let totalRmrMeters = 0;
+    let totalWeightedRqd = 0;
+    let totalRqdMeters = 0;
+    let geologo_mas_reciente = '';
+
+    list.forEach((tSummary) => {
+      let tObj: Taladro | null = null;
+      if (activeTaladro && activeTaladro.name === tSummary.name) {
+        tObj = activeTaladro;
+      } else {
+        const cached = localStorage.getItem(`geolog_taladro_${tSummary.name}`);
+        if (cached) {
+          try {
+            tObj = JSON.parse(cached);
+          } catch (e) {}
+        }
+      }
+
+      if (!geologo_mas_reciente && tSummary.geologo) {
+        geologo_mas_reciente = tSummary.geologo;
+      }
+
+      let taladroMeters = 0;
+
+      if (tObj && tObj.corridas && tObj.corridas.length > 0) {
+        tObj.corridas.forEach((c) => {
+          const de = parseFloat(String(c.de || 0));
+          const a = parseFloat(String(c.a || 0));
+          const perf = Math.max(0, a - de);
+          taladroMeters += perf;
+
+          const rqd_m = parseFloat(String(c.rqd_m || 0));
+          if (perf > 0) {
+            const rqd_pct = Math.min(100, Math.max(0, (rqd_m / perf) * 100));
+            totalWeightedRqd += rqd_pct * perf;
+            totalRqdMeters += perf;
+
+            const rmrRes = calculateRowRmr(c, tObj?.nivel_freatico || 97.0);
+            if (rmrRes && !rmrRes.error && typeof rmrRes.rmr_89 === 'number') {
+              totalWeightedRmr += rmrRes.rmr_89 * perf;
+              totalRmrMeters += perf;
+            }
+          }
+        });
+      } else if (tSummary.perf_total && tSummary.perf_total > 0) {
+        taladroMeters = tSummary.perf_total;
+      } else if (tObj && tObj.collar_eoh && tObj.collar_eoh > 0) {
+        taladroMeters = tObj.collar_eoh;
+      } else if (tSummary.corridas_count && tSummary.corridas_count > 0) {
+        taladroMeters = tSummary.corridas_count * 1.5;
+      }
+
+      perf_total_m += taladroMeters;
+
+      const fStr = tSummary.fecha_registro ? tSummary.fecha_registro.split('T')[0] : '';
+      if (fStr === todayStr) {
+        perf_total_hoy += taladroMeters;
+      }
+    });
+
+    const rmr_promedio = totalRmrMeters > 0 ? totalWeightedRmr / totalRmrMeters : 0;
+    const rqd_promedio = totalRqdMeters > 0 ? totalWeightedRqd / totalRqdMeters : 0;
+
+    return {
+      total_taladros,
+      perf_total_m,
+      perf_total_hoy,
+      rmr_promedio: parseFloat(rmr_promedio.toFixed(1)),
+      rqd_promedio: parseFloat(rqd_promedio.toFixed(1)),
+      geologo_mas_reciente: geologo_mas_reciente || (activeTaladro?.geologo || 'RD/RB')
+    };
+  }, [filteredTaladros, activeTaladro]);
 
   const totalFilteredTaladros = filteredTaladros.length;
   const totalDashboardPages = Math.max(1, Math.ceil(totalFilteredTaladros / pageSize));
@@ -549,23 +637,30 @@ export default function App() {
 
         // Verificar si existe un borrador con cambios pendientes en localStorage
         let taladroToActivate = data;
-        const cachedDraftStr = localStorage.getItem(`geolog_taladro_${name}`);
-        if (cachedDraftStr) {
-          try {
-            const cachedDraft = JSON.parse(cachedDraftStr);
-            if (!cachedDraft.ensayos_plt) cachedDraft.ensayos_plt = [];
-            // Si el borrador local difiere de la BD, preservar el borrador local
-            if (computeTaladroHash(cachedDraft) !== dbHash) {
-              taladroToActivate = cachedDraft;
+        let isUnsaved = false;
+        try {
+          const unsavedList: string[] = JSON.parse(localStorage.getItem('geolog_unsaved_taladros') || '[]');
+          if (unsavedList.includes(name)) {
+            const cachedDraftStr = localStorage.getItem(`geolog_taladro_${name}`);
+            if (cachedDraftStr) {
+              const cachedDraft = JSON.parse(cachedDraftStr);
+              if (!cachedDraft.ensayos_plt) cachedDraft.ensayos_plt = [];
+              if (computeTaladroHash(cachedDraft) !== dbHash) {
+                taladroToActivate = cachedDraft;
+                isUnsaved = true;
+              }
             }
-          } catch (err) {
-            console.warn("Error leyendo borrador de localStorage:", err);
+          } else {
+            // Si el taladro no tiene modificaciones pendientes, resguardar la copia limpia de BD
+            localStorage.setItem(`geolog_taladro_${name}`, JSON.stringify(data));
           }
+        } catch (err) {
+          console.warn("Error leyendo borrador de localStorage:", err);
         }
 
         setActiveTaladro(taladroToActivate);
         setOriginalName(data.name);
-        setSyncStatus(computeTaladroHash(taladroToActivate) === dbHash ? 'synced' : 'unsaved');
+        setSyncStatus(isUnsaved ? 'unsaved' : 'synced');
         if (shouldSwitchView) {
           setCurrentView('collar');
         }
@@ -1482,7 +1577,7 @@ export default function App() {
             <div className="flex-1 flex flex-col min-h-0 overflow-y-auto">
               <MainDashboard
                 taladros={paginatedTaladros}
-                kpis={dashboardKpis}
+                kpis={computedDashboardKpis}
                 page={page}
                 pageSize={pageSize}
                 totalFiltered={totalFilteredTaladros}
