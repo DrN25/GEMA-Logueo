@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Plus,
   Search,
@@ -15,7 +15,12 @@ import {
   X,
   ChevronDown,
   Activity,
-  Layers
+  Layers,
+  Info,
+  CheckCircle2,
+  AlertTriangle,
+  Globe,
+  RotateCcw
 } from 'lucide-react';
 
 export interface TaladroSummary {
@@ -60,6 +65,11 @@ interface DashboardProps {
   onDeleteTaladro: (name: string) => void;
 }
 
+export const formatCampanaLabel = (str: string): string => {
+  if (!str) return '';
+  return str.replace(/^CAMPAÑA\s*/i, '').replace(/^CAMPAÑA_/i, '').trim();
+};
+
 export default function Dashboard({
   taladros,
   kpis,
@@ -78,8 +88,9 @@ export default function Dashboard({
   onFilterChange,
   onSelectTaladro,
   onCreateTaladro,
-  onDeleteTaladro
-}: DashboardProps) {
+  onDeleteTaladro,
+  availableCampanas = ["Campaña 2020", "Campaña 2021", "Campaña 2022", "Campaña 2023", "Campaña 2024", "Campaña 2025", "Campaña 2026"]
+}: DashboardProps & { availableCampanas?: string[] }) {
   const [showModal, setShowModal] = useState(false);
   const [localSearch, setLocalSearch] = useState(searchTerm);
 
@@ -94,19 +105,47 @@ export default function Dashboard({
   const [geologo, setGeologo] = useState('RD/RB');
   const [diametro, setDiametro] = useState('HQ3');
   const [inclinacion, setInclinacion] = useState(-60.0);
-  const [campana, setCampana] = useState('2026');
+  const [campana, setCampana] = useState(availableCampanas[0] || '2026');
   const [turno, setTurno] = useState('D');
 
-  // Filtros avanzados locales
-  const [advProyecto, setAdvProyecto] = useState('');
-  const [advGeologo, setAdvGeologo] = useState('');
-  const [advDiametro, setAdvDiametro] = useState('');
+  // Filtros avanzados locales (borrador en inputs)
+  const [advProyectoInput, setAdvProyectoInput] = useState('');
+  const [advGeologoInput, setAdvGeologoInput] = useState('');
+  const [advDiametroInput, setAdvDiametroInput] = useState('');
+
+  // Filtros avanzados aplicados (solo se activan al hacer clic en "Aplicar Filtros")
+  const [appliedAdvProyecto, setAppliedAdvProyecto] = useState('');
+  const [appliedAdvGeologo, setAppliedAdvGeologo] = useState('');
+  const [appliedAdvDiametro, setAppliedAdvDiametro] = useState('');
+
+  // Filtrado local en cliente por campos avanzados aplicados
+  const filteredTaladrosList = useMemo(() => {
+    let list = [...taladros];
+    if (appliedAdvProyecto.trim()) {
+      const q = appliedAdvProyecto.trim().toLowerCase();
+      list = list.filter(t => t.proyecto && t.proyecto.toLowerCase().includes(q));
+    }
+    if (appliedAdvGeologo.trim()) {
+      const q = appliedAdvGeologo.trim().toLowerCase();
+      list = list.filter(t => t.geologo && t.geologo.toLowerCase().includes(q));
+    }
+    if (appliedAdvDiametro.trim()) {
+      const q = appliedAdvDiametro.trim().toLowerCase();
+      list = list.filter(t => t.diametro && t.diametro.toLowerCase().includes(q));
+    }
+    return list;
+  }, [taladros, appliedAdvProyecto, appliedAdvGeologo, appliedAdvDiametro]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    const cleanName = name.trim().toUpperCase();
+    if (!cleanName) return;
+    if (taladros.some(t => t.name.toUpperCase() === cleanName)) {
+      alert(`⚠️ El código de taladro '${cleanName}' ya existe en el proyecto. Ingrese un código único.`);
+      return;
+    }
     onCreateTaladro({
-      name: name.trim().toUpperCase(),
+      name: cleanName,
       proyecto,
       geologo,
       diametro,
@@ -210,8 +249,15 @@ export default function Dashboard({
             <input
               type="text"
               placeholder="Proyecto A, B..."
-              value={advProyecto}
-              onChange={(e) => setAdvProyecto(e.target.value)}
+              value={advProyectoInput}
+              onChange={(e) => setAdvProyectoInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setAppliedAdvProyecto(advProyectoInput);
+                  setAppliedAdvGeologo(advGeologoInput);
+                  setAppliedAdvDiametro(advDiametroInput);
+                }
+              }}
               className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500"
             />
           </div>
@@ -220,8 +266,15 @@ export default function Dashboard({
             <input
               type="text"
               placeholder="RD/RB, CBA..."
-              value={advGeologo}
-              onChange={(e) => setAdvGeologo(e.target.value)}
+              value={advGeologoInput}
+              onChange={(e) => setAdvGeologoInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setAppliedAdvProyecto(advProyectoInput);
+                  setAppliedAdvGeologo(advGeologoInput);
+                  setAppliedAdvDiametro(advDiametroInput);
+                }
+              }}
               className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500"
             />
           </div>
@@ -230,18 +283,48 @@ export default function Dashboard({
             <input
               type="text"
               placeholder="HQ3, NQ3..."
-              value={advDiametro}
-              onChange={(e) => setAdvDiametro(e.target.value)}
+              value={advDiametroInput}
+              onChange={(e) => setAdvDiametroInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setAppliedAdvProyecto(advProyectoInput);
+                  setAppliedAdvGeologo(advGeologoInput);
+                  setAppliedAdvDiametro(advDiametroInput);
+                }
+              }}
               className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500"
             />
           </div>
           <div className="flex items-end gap-2">
             <button
-              onClick={() => onSearchSubmit(advProyecto || advGeologo || advDiametro || localSearch, isGlobalSearch)}
-              className="w-full bg-cyan-500/10 border border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/20 px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95"
+              onClick={() => {
+                setAppliedAdvProyecto(advProyectoInput);
+                setAppliedAdvGeologo(advGeologoInput);
+                setAppliedAdvDiametro(advDiametroInput);
+              }}
+              className="w-full bg-cyan-500/10 border border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/20 px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+              title="Aplicar filtros avanzados a la lista"
             >
-              Aplicar Filtros
+              <Filter size={13} />
+              <span>Aplicar Filtros</span>
             </button>
+            {(advProyectoInput || advGeologoInput || advDiametroInput || appliedAdvProyecto || appliedAdvGeologo || appliedAdvDiametro) && (
+              <button
+                onClick={() => {
+                  setAdvProyectoInput('');
+                  setAdvGeologoInput('');
+                  setAdvDiametroInput('');
+                  setAppliedAdvProyecto('');
+                  setAppliedAdvGeologo('');
+                  setAppliedAdvDiametro('');
+                }}
+                className="bg-navy-900 border border-navy-800 text-slate-300 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap"
+                title="Limpiar campos de filtros avanzados"
+              >
+                <RotateCcw size={12} />
+                <span>Limpiar</span>
+              </button>
+            )}
           </div>
         </div>
       </details>
@@ -317,7 +400,7 @@ export default function Dashboard({
       <div className="glass-panel p-5 rounded-xl border border-navy-800 bg-navy-950/15 shadow-xl space-y-4">
         {/* Search Controls Bar */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 max-w-2xl w-full">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 max-w-3xl w-full">
             <div className="relative flex-1">
               <Search size={14} className="absolute left-3 top-3.5 text-slate-500" />
               <input
@@ -330,7 +413,7 @@ export default function Dashboard({
                     onSearchSubmit(localSearch, isGlobalSearch);
                   }
                 }}
-                className="w-full bg-navy-950/80 border border-navy-800 rounded-lg pl-9 pr-8 py-2.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                className="w-full bg-navy-950/80 border border-navy-800 rounded-lg pl-9 pr-8 py-2.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500 font-medium"
               />
               {localSearch && (
                 <button
@@ -349,32 +432,39 @@ export default function Dashboard({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => onSearchSubmit(localSearch, false)}
-                className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-3.5 py-2 rounded-lg text-xs transition-all shadow-md active:scale-95 flex items-center gap-1.5 whitespace-nowrap"
+                className="bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/20 hover:border-cyan-400/60 font-bold px-3.5 py-2.5 rounded-lg text-xs transition-all shadow-[0_0_10px_rgba(6,182,212,0.1)] active:scale-95 flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
                 title={`Buscar dentro del rango activo (${filterLabel})`}
               >
-                <Search size={13} />
+                <Search size={13} className="text-cyan-400" />
                 <span>Buscar en {filterLabel}</span>
               </button>
 
               <button
                 onClick={() => onSearchSubmit(localSearch, true)}
-                className={`border font-bold px-3.5 py-2 rounded-lg text-xs transition-all shadow-md active:scale-95 flex items-center gap-1.5 whitespace-nowrap ${isGlobalSearch && searchTerm.trim()
-                  ? 'bg-violet-500 border-violet-400 text-white shadow-[0_0_12px_rgba(139,92,246,0.4)]'
-                  : 'bg-navy-900 border-navy-700 text-slate-300 hover:text-white hover:border-navy-600'
-                  }`}
+                className={`border font-bold px-3.5 py-2.5 rounded-lg text-xs transition-all active:scale-95 flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                  isGlobalSearch && searchTerm.trim()
+                    ? 'bg-violet-500/15 border-violet-500/40 text-violet-300 shadow-[0_0_12px_rgba(139,92,246,0.2)]'
+                    : 'bg-navy-900/80 border-navy-700/80 text-slate-300 hover:bg-navy-850 hover:border-cyan-500/40 hover:text-cyan-300'
+                }`}
                 title="Buscar en todo el historial completo de la base de datos (ignora filtro de fecha)"
               >
-                <span>🌐 Buscar en todo</span>
+                <Globe size={13} className={isGlobalSearch && searchTerm.trim() ? "text-violet-400 animate-pulse" : "text-slate-400"} />
+                <span>Buscar en todo el historial</span>
               </button>
             </div>
           </div>
 
+          {/* Indicador de Búsqueda por Nombre / Código */}
           {searchTerm.trim() && (
-            <div className="flex items-center justify-between gap-3 bg-cyan-500/10 border border-cyan-500/30 rounded-lg px-3.5 py-2 text-xs text-cyan-300 animate-fade-in">
+            <div className="flex items-center justify-between gap-3 bg-cyan-500/10 border border-cyan-500/30 rounded-xl px-4 py-2 text-xs text-cyan-300 animate-fade-in shadow-md">
               <div className="flex items-center gap-2 font-medium">
-                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                {isGlobalSearch ? (
+                  <Globe size={15} className="text-violet-400 shrink-0 animate-pulse" />
+                ) : (
+                  <Calendar size={15} className="text-cyan-400 shrink-0" />
+                )}
                 <span>
-                  {isGlobalSearch ? '🌐 Todo el historial' : `📅 En ${filterLabel}`}: Buscando <strong className="text-white">"{searchTerm}"</strong>
+                  {isGlobalSearch ? 'Historial completo' : `En ${filterLabel}`}: Buscando <strong className="text-white font-bold">"{searchTerm}"</strong>
                 </span>
               </div>
               <button
@@ -382,9 +472,38 @@ export default function Dashboard({
                   setLocalSearch('');
                   onClearSearch();
                 }}
-                className="text-[11px] font-bold text-cyan-400 hover:text-cyan-200 underline cursor-pointer ml-3 whitespace-nowrap"
+                className="flex items-center gap-1.5 bg-navy-950 border border-slate-700/80 text-slate-100 hover:bg-slate-900 hover:border-cyan-400 hover:text-cyan-300 font-bold px-3 py-1.5 rounded-lg text-[11px] transition-all shadow-md active:scale-95 shrink-0 ml-2 cursor-pointer"
+                title="Limpiar únicamente la búsqueda por código"
               >
-                Limpiar búsqueda
+                <X size={13} className="text-slate-400 group-hover:text-cyan-400" />
+                <span>Limpiar búsqueda</span>
+              </button>
+            </div>
+          )}
+
+          {/* Indicador de Filtros Avanzados Aplicados */}
+          {(appliedAdvProyecto || appliedAdvGeologo || appliedAdvDiametro) && (
+            <div className="flex items-center justify-between gap-3 bg-indigo-500/10 border border-indigo-500/30 rounded-xl px-4 py-2 text-xs text-indigo-300 animate-fade-in shadow-md">
+              <div className="flex items-center gap-2 font-medium">
+                <Filter size={15} className="text-indigo-400 shrink-0" />
+                <span>
+                  Filtros activos: <strong className="text-white font-bold">{[appliedAdvProyecto && `Proyecto: ${appliedAdvProyecto}`, appliedAdvGeologo && `Geólogo: ${appliedAdvGeologo}`, appliedAdvDiametro && `Diámetro: ${appliedAdvDiametro}`].filter(Boolean).join(' · ')}</strong>
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  setAdvProyectoInput('');
+                  setAdvGeologoInput('');
+                  setAdvDiametroInput('');
+                  setAppliedAdvProyecto('');
+                  setAppliedAdvGeologo('');
+                  setAppliedAdvDiametro('');
+                }}
+                className="flex items-center gap-1.5 bg-navy-950 border border-indigo-700/80 text-slate-100 hover:bg-slate-900 hover:border-indigo-400 hover:text-indigo-300 font-bold px-3 py-1.5 rounded-lg text-[11px] transition-all shadow-md active:scale-95 shrink-0 ml-2 cursor-pointer"
+                title="Limpiar únicamente los filtros avanzados"
+              >
+                <RotateCcw size={12} className="text-slate-400" />
+                <span>Limpiar filtros</span>
               </button>
             </div>
           )}
@@ -416,7 +535,7 @@ export default function Dashboard({
                   ))}
                 </tr>
               ))}
-              {!loading && taladros.map(t => (
+              {!loading && filteredTaladrosList.map(t => (
                 <tr
                   key={t.name}
                   onClick={() => onSelectTaladro(t.name)}
@@ -561,21 +680,59 @@ export default function Dashboard({
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm animate-fade-in text-left">
           <div className="glass-panel w-full max-w-md p-6 rounded-xl border border-navy-800 space-y-4 shadow-2xl bg-navy-900/95">
-            <h3 className="text-sm font-black text-slate-100 tracking-wide border-b border-navy-800 pb-2 uppercase">
-              Crear Nuevo Taladro
-            </h3>
+            <div className="flex justify-between items-center border-b border-navy-800 pb-3">
+              <h3 className="text-sm font-black text-slate-100 tracking-wide uppercase">
+                Crear Nuevo Sondaje
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowModal(false)}
+                className="text-slate-400 hover:text-slate-200 transition-colors p-1 rounded-lg hover:bg-navy-800"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="flex gap-2.5 p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-xs text-cyan-300 items-center">
+              <Info size={16} className="shrink-0 text-cyan-400" />
+              <span>El código ingresado debe ser único para cada sondaje.</span>
+            </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Código del Taladro</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="ej. FEGT25-001"
-                  value={name}
-                  onChange={(e) => setName(e.target.value.toUpperCase())}
-                  className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-cyan-500 font-bold tracking-wider"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    placeholder="ej. FEGT25-001"
+                    value={name}
+                    onChange={(e) => setName(e.target.value.toUpperCase())}
+                    className={`w-full bg-navy-950 border rounded-lg px-3 py-2 text-slate-100 text-xs focus:outline-none font-bold tracking-wider ${name.trim() && taladros.some(t => t.name.toUpperCase() === name.trim().toUpperCase())
+                        ? 'border-rose-500/80 text-rose-300 focus:ring-1 focus:ring-rose-500'
+                        : name.trim()
+                          ? 'border-emerald-500/80 text-emerald-300 focus:ring-1 focus:ring-emerald-500'
+                          : 'border-navy-800 focus:ring-cyan-500'
+                      }`}
+                  />
+                  {name.trim() && taladros.some(t => t.name.toUpperCase() === name.trim().toUpperCase()) ? (
+                    <AlertTriangle size={16} className="absolute right-3 top-2.5 text-rose-500 animate-pulse" />
+                  ) : name.trim() ? (
+                    <CheckCircle2 size={16} className="absolute right-3 top-2.5 text-emerald-500" />
+                  ) : null}
+                </div>
+                {name.trim() && taladros.some(t => t.name.toUpperCase() === name.trim().toUpperCase()) && (
+                  <p className="text-[10px] font-bold text-rose-400 mt-1 flex items-center gap-1">
+                    <AlertTriangle size={12} />
+                    <span>El código '{name.trim().toUpperCase()}' ya existe en el proyecto.</span>
+                  </p>
+                )}
+                {name.trim() && !taladros.some(t => t.name.toUpperCase() === name.trim().toUpperCase()) && (
+                  <p className="text-[10px] font-bold text-emerald-400 mt-1 flex items-center gap-1">
+                    <CheckCircle2 size={12} />
+                    <span>Código único disponible para creación.</span>
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -633,13 +790,15 @@ export default function Dashboard({
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Campaña</label>
-                  <input
-                    type="text"
-                    required
+                  <select
                     value={campana}
                     onChange={(e) => setCampana(e.target.value)}
-                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-cyan-500 font-semibold"
-                  />
+                    className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-2 text-slate-300 text-xs focus:outline-none focus:ring-1 focus:ring-cyan-500 font-semibold"
+                  >
+                    {availableCampanas.map((c) => (
+                      <option key={c} value={c}>{formatCampanaLabel(c)}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Turno</label>
@@ -664,7 +823,11 @@ export default function Dashboard({
                 </button>
                 <button
                   type="submit"
-                  className="bg-cyan-500/10 border border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/20 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
+                  disabled={!name.trim() || taladros.some(t => t.name.toUpperCase() === name.trim().toUpperCase())}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 ${name.trim() && !taladros.some(t => t.name.toUpperCase() === name.trim().toUpperCase())
+                      ? 'bg-cyan-500/10 border border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/20 cursor-pointer'
+                      : 'bg-navy-900 border border-navy-800 text-slate-600 cursor-not-allowed opacity-50'
+                    }`}
                 >
                   Crear Taladro
                 </button>

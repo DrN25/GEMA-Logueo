@@ -106,6 +106,12 @@ def get_catalogs(db: Session = Depends(get_db)):
         except Exception as e:
             print("Error loading FactorK_PLT for catalogs:", e)
 
+        # 13. Campañas Registradas (dbo.Campañas)
+        campanas_db = db.query(models.Campaña).order_by(models.Campaña.NombreCampaña).all()
+        campanas_list = [c.NombreCampaña.strip() for c in campanas_db if c.NombreCampaña]
+        if not campanas_list:
+            campanas_list = ["Campaña 2020", "Campaña 2021", "Campaña 2022", "Campaña 2023", "Campaña 2024", "Campaña 2025", "Campaña 2026"]
+
         return {
             "resistencia": resistencia,
             "estructuras": estructuras,
@@ -118,7 +124,8 @@ def get_catalogs(db: Session = Depends(get_db)):
             "tipo_roturas": tipo_roturas,
             "direccion_roturas": direccion_roturas,
             "tabla_litologia": tabla_litologia,
-            "turnos": turnos_list
+            "turnos": turnos_list,
+            "campanas": campanas_list
         }
 
     except Exception as e:
@@ -160,5 +167,22 @@ def get_catalogs(db: Session = Depends(get_db)):
                 {"id": 1, "code": "D", "name": "Día / Day Shift"},
                 {"id": 2, "code": "N", "name": "Noche / Night Shift"}
             ],
+            "campanas": ["Campaña 2020", "Campaña 2021", "Campaña 2022", "Campaña 2023", "Campaña 2024", "Campaña 2025", "Campaña 2026"],
             "error_db": str(e)
         }
+
+@router.get("/campanas")
+def get_campanas(db: Session = Depends(get_db)):
+    """
+    Endpoint especializado para obtener únicamente los nombres de campañas registradas 
+    en la tabla dbo.Campañas de SQL Server.
+    """
+    try:
+        campanas_db = db.query(models.Campaña).order_by(models.Campaña.NombreCampaña).all()
+        result = [c.NombreCampaña.strip() for c in campanas_db if c.NombreCampaña]
+        if not result:
+            return ["Campaña 2020", "Campaña 2021", "Campaña 2022", "Campaña 2023", "Campaña 2024", "Campaña 2025", "Campaña 2026"]
+        return result
+    except Exception as e:
+        print("[!] Error al consultar campañas en SQL Server:", e)
+        return ["Campaña 2020", "Campaña 2021", "Campaña 2022", "Campaña 2023", "Campaña 2024", "Campaña 2025", "Campaña 2026"]

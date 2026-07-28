@@ -69,27 +69,31 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
         total_sondajes = db.query(models.Sondaje).count()
 
         # Perforación acumulada total y perforación de HOY
-        perf_total = db.query(
+        perf_total_raw = db.query(
             func.sum(models.LogueoGeotecnicoGeneral.IntervaloA - models.LogueoGeotecnicoGeneral.IntervaloDe)
-        ).scalar() or 0.0
+        ).scalar()
+        perf_total = float(perf_total_raw) if perf_total_raw is not None else 0.0
 
         today_start = datetime.combine(date.today(), datetime.min.time())
         today_end = datetime.combine(date.today(), datetime.max.time())
         
-        perf_hoy = db.query(
+        perf_hoy_raw = db.query(
             func.sum(models.LogueoGeotecnicoGeneral.IntervaloA - models.LogueoGeotecnicoGeneral.IntervaloDe)
         ).filter(
             models.LogueoGeotecnicoGeneral.FechaRegistro >= today_start,
             models.LogueoGeotecnicoGeneral.FechaRegistro <= today_end
-        ).scalar() or 0.0
+        ).scalar()
+        perf_hoy = float(perf_hoy_raw) if perf_hoy_raw is not None else 0.0
 
         # RMR89 Promedio
-        rmr_avg = db.query(func.avg(models.ValidacionRMR.RMR89_Total)).scalar() or 0.0
+        rmr_avg_raw = db.query(func.avg(models.ValidacionRMR.RMR89_Total)).scalar()
+        rmr_avg = float(rmr_avg_raw) if rmr_avg_raw is not None else 0.0
 
         # RQD % Promedio: Suma(Fragmentos>=10cm) / Suma(Avance) * 100
         rqd_avg = 0.0
-        tot_rqd_m = db.query(func.sum(models.LogueoGeotecnicoGeneral.SumaFragmentos10cm)).scalar() or 0.0
-        if perf_total > 0:
+        tot_rqd_m_raw = db.query(func.sum(models.LogueoGeotecnicoGeneral.SumaFragmentos10cm)).scalar()
+        tot_rqd_m = float(tot_rqd_m_raw) if tot_rqd_m_raw is not None else 0.0
+        if perf_total > 0.0:
             rqd_avg = min(100.0, max(0.0, (tot_rqd_m / perf_total) * 100.0))
 
         # Geólogo / Mapeador más reciente
@@ -98,10 +102,10 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
 
         return {
             "total_taladros": total_sondajes,
-            "perf_total_m": round(float(perf_total), 2),
-            "perf_total_hoy": round(float(perf_hoy), 2),
-            "rmr_promedio": round(float(rmr_avg), 1),
-            "rqd_promedio": round(float(rqd_avg), 1),
+            "perf_total_m": round(perf_total, 2),
+            "perf_total_hoy": round(perf_hoy, 2),
+            "rmr_promedio": round(rmr_avg, 1),
+            "rqd_promedio": round(rqd_avg, 1),
             "geologo_mas_reciente": last_geologo
         }
     except Exception as e:

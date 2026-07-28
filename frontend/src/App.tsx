@@ -205,6 +205,29 @@ export default function App() {
   const [showCatalogsModal, setShowCatalogsModal] = useState<boolean>(false);
   const [showFormulasModal, setShowFormulasModal] = useState<boolean>(false);
 
+  // Catálogo de Campañas dinámico desde la BD
+  const [availableCampanas, setAvailableCampanas] = useState<string[]>([
+    "Campaña 2020", "Campaña 2021", "Campaña 2022", "Campaña 2023", "Campaña 2024", "Campaña 2025", "Campaña 2026"
+  ]);
+
+  useEffect(() => {
+    fetchCampanas();
+  }, []);
+
+  const fetchCampanas = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/catalogs/campanas`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setAvailableCampanas(data);
+        }
+      }
+    } catch (e) {
+      console.warn("Could not fetch campanas catalog from backend:", e);
+    }
+  };
+
   // Estados del Dashboard: KPIs, paginación, filtros de fecha y búsqueda por botón
   const [dashboardKpis, setDashboardKpis] = useState<any>(null);
   const [dashboardLoading, setDashboardLoading] = useState<boolean>(false);
@@ -777,6 +800,13 @@ export default function App() {
     const oldName = activeTaladro.name;
     const trimmedNewName = newName.trim().toUpperCase();
     if (!trimmedNewName || oldName === trimmedNewName) return;
+
+    // VALIDACIÓN DE UNICIDAD: Verificar que el nuevo nombre no pertenezca a otro sondaje
+    const isDuplicate = taladros.some(t => t.name.toUpperCase() === trimmedNewName && t.name.toUpperCase() !== oldName.toUpperCase());
+    if (isDuplicate) {
+      alert(`⚠️ El código de taladro '${trimmedNewName}' ya pertenece a otro sondaje registrado en el proyecto. No se permiten nombres duplicados.`);
+      return;
+    }
 
     // Siempre usar activeTaladro como base (es el estado más reciente en RAM)
     const updatedTal = { ...activeTaladro, name: trimmedNewName };
@@ -1597,6 +1627,7 @@ export default function App() {
                 onSelectTaladro={handleSelectTaladro}
                 onCreateTaladro={handleCreateTaladro}
                 onDeleteTaladro={handleDeleteTaladro}
+                availableCampanas={availableCampanas}
               />
             </div>
           )}
@@ -1612,6 +1643,8 @@ export default function App() {
                   alerts={activeAlerts}
                   onCollarChange={handleCollarChange}
                   onSurveysChange={handleSurveysChange}
+                  existingTaladrosNames={taladros.map(t => t.name)}
+                  availableCampanas={availableCampanas}
                 />
               </div>
 

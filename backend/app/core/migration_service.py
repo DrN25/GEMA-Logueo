@@ -124,12 +124,7 @@ class GemaMigrationEngine:
 
         resolved_turno_id = self.resolve_turno(data.get("turno", "D"))
         if not sondaje:
-            # GEMA requiere un ID inicial no-incremental para Sondajes si viene de Excel
-            max_id = self.db.query(models.Sondaje.SondajeID).order_by(models.Sondaje.SondajeID.desc()).first()
-            next_id = (max_id[0] + 1) if max_id else 1
-            
             sondaje = models.Sondaje(
-                SondajeID=next_id,
                 CodigoSondaje=sondaje_code,
                 CampañaID=camp_id,
                 DiametroPerfora=data.get("diametro", "HQ"),

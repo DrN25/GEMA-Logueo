@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Plus, Trash2, CheckCircle2, MapPin, Database, AlertTriangle, Upload } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Plus, Trash2, CheckCircle2, MapPin, Database, AlertTriangle, Upload, Edit2, Lock, X, Info } from 'lucide-react';
 import ExcelImportModal from '../../components/common/ExcelImportModal';
 import type { ValidationAlert } from '../../utils/qaqcValidator';
 
@@ -38,6 +38,8 @@ interface CollarSurveyFormProps {
   alerts: ValidationAlert[];
   onCollarChange: (collar: Collar) => void;
   onSurveysChange: (surveys: Survey[]) => void;
+  existingTaladrosNames?: string[];
+  availableCampanas?: string[];
 }
 
 export default function CollarSurveyForm({
@@ -45,7 +47,9 @@ export default function CollarSurveyForm({
   surveys,
   alerts,
   onCollarChange,
-  onSurveysChange
+  onSurveysChange,
+  existingTaladrosNames = [],
+  availableCampanas = ["Campaña 2020", "Campaña 2021", "Campaña 2022", "Campaña 2023", "Campaña 2024", "Campaña 2025", "Campaña 2026"]
 }: CollarSurveyFormProps) {
 
   // --- Objetos de Respaldo Seguros ---
@@ -75,23 +79,37 @@ export default function CollarSurveyForm({
   const safeSurveys = surveys || [];
   const safeAlerts = alerts || [];
 
-  // --- Name Edit Safe State ---
+  // --- Modal de Renombrado & Validaciones ---
+  const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
   const [tempName, setTempName] = useState(safeCollar.name || '');
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [renameNotification, setRenameNotification] = useState<{ oldName: string; newName: string } | null>(null);
 
   useEffect(() => {
     setTempName(safeCollar.name || '');
   }, [safeCollar.name]);
 
-  const handleNameBlur = () => {
-    const trimmed = tempName.trim().toUpperCase();
-    if (!trimmed) {
-      setTempName(safeCollar.name || '');
-      return;
-    }
-    if (trimmed !== safeCollar.name) {
-      onCollarChange({ ...safeCollar, name: trimmed });
-    }
+  const cleanTempName = tempName.trim().toUpperCase();
+  const currentCode = (safeCollar.name || '').trim().toUpperCase();
+
+  const isDuplicateName = useMemo(() => {
+    if (!cleanTempName || cleanTempName === currentCode) return false;
+    return existingTaladrosNames.some(
+      n => n.trim().toUpperCase() === cleanTempName && n.trim().toUpperCase() !== currentCode
+    );
+  }, [cleanTempName, currentCode, existingTaladrosNames]);
+
+  const isEmptyName = !cleanTempName;
+  const isNameChanged = cleanTempName !== currentCode;
+  const isValidNewName = isNameChanged && !isDuplicateName && !isEmptyName;
+
+  const handleApplyRename = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!isValidNewName) return;
+    const oldCode = safeCollar.name;
+    onCollarChange({ ...safeCollar, name: cleanTempName });
+    setIsRenameModalOpen(false);
+    setRenameNotification({ oldName: oldCode, newName: cleanTempName });
   };
 
   const handleNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -240,12 +258,12 @@ export default function CollarSurveyForm({
   const getInputStyle = (fieldId: string) => {
     const parentAlert = safeAlerts.find(a => a.field === fieldId);
     if (!parentAlert) {
-      return 'border-navy-700 focus:border-blue-500 focus:ring-blue-500/20';
+      return 'border-navy-800 bg-navy-950/80 hover:border-navy-700 focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 text-slate-100';
     }
     if (parentAlert.type === 'CRITICAL') {
-      return 'border-red-500 text-red-700 dark:text-red-200 focus:border-red-500 focus:ring-red-500/20 bg-red-500/5';
+      return 'border-rose-500/80 text-rose-300 focus:border-rose-500 focus:ring-1 focus:ring-rose-500/20 bg-rose-500/10';
     }
-    return 'border-amber-500 text-amber-700 dark:text-amber-200 focus:border-amber-500 focus:ring-amber-500/20 bg-amber-500/5';
+    return 'border-amber-500/80 text-amber-300 focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 bg-amber-500/10';
   };
 
   // Verifica si alguna lectura actual excede el EOH para la barra de advertencia
@@ -272,38 +290,80 @@ export default function CollarSurveyForm({
         </div>
       </div>
 
+      {renameNotification && (
+        <div className="flex items-center justify-between p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs shadow-md animate-fade-in">
+          <div className="flex items-center gap-3">
+            <Info size={18} className="text-cyan-400 shrink-0" />
+            <div>
+              <p className="font-bold text-slate-100">
+                Sondaje renombrado localmente: <span className="line-through text-slate-400">{renameNotification.oldName}</span> &rarr; <span className="text-cyan-300 font-black">{renameNotification.newName}</span>
+              </p>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                El cambio se encuentra resguardado en la memoria de la aplicación. Para actualizar la base de datos SQL Server, recuerde presionar <strong>"Guardar Cambios"</strong> en la barra superior.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setRenameNotification(null)}
+            className="text-slate-400 hover:text-slate-200 p-1 rounded-lg hover:bg-navy-800 transition-colors"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
       {/* Identificación del Taladro */}
       <div className="glass-panel p-5 rounded-xl border border-navy-800 grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
         {/* Código del Taladro */}
         <div className="space-y-1.5">
           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">
-            Código de Taladro (Enter para renombrar)
+            Código de Taladro
           </label>
-          <div className="relative">
-            <input
-              id="input-sondaje-name"
-              type="text"
-              value={tempName}
-              onChange={(e) => setTempName(e.target.value.toUpperCase())}
-              onBlur={handleNameBlur}
-              onKeyDown={handleNameKeyDown}
-              className="w-full bg-navy-900 border border-navy-700 rounded-lg px-4 py-2 text-slate-100 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 tracking-wider text-sm"
-            />
-            {tempName.length > 3 && (
-              <CheckCircle2 size={18} className="absolute right-3 top-2.5 text-emerald-500" />
-            )}
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <input
+                id="input-sondaje-name"
+                type="text"
+                readOnly
+                value={safeCollar.name}
+                className="w-full bg-navy-950/80 border border-navy-800 rounded-lg pl-9 pr-4 py-2 text-cyan-300 font-black tracking-wider text-sm cursor-not-allowed select-all shadow-inner"
+              />
+              <Lock size={15} className="absolute left-3 top-2.5 text-cyan-500/60" />
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setTempName(safeCollar.name || '');
+                setIsRenameModalOpen(true);
+              }}
+              className="flex items-center gap-1.5 bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 px-3 py-2 rounded-lg text-xs font-bold transition-all active:scale-95 shadow-sm whitespace-nowrap"
+              title="Renombrar código de taladro"
+            >
+              <Edit2 size={13} />
+              <span>Editar</span>
+            </button>
           </div>
         </div>
 
         {/* Campaña */}
         <div className="space-y-1.5">
           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Campaña</label>
-          <input
-            type="text"
+          <select
             value={safeCollar.campana || ''}
             onChange={(e) => onCollarChange({ ...safeCollar, campana: e.target.value })}
-            className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-semibold"
-          />
+            className="w-full bg-navy-950/80 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 font-semibold cursor-pointer hover:border-navy-700 transition-all"
+          >
+            {safeCollar.campana && !availableCampanas.includes(safeCollar.campana) && (
+              <option value={safeCollar.campana}>
+                {safeCollar.campana.replace(/^CAMPAÑA\s*/i, '').replace(/^CAMPAÑA_/i, '').trim()}
+              </option>
+            )}
+            {availableCampanas.map((c) => (
+              <option key={c} value={c}>
+                {c.replace(/^CAMPAÑA\s*/i, '').replace(/^CAMPAÑA_/i, '').trim()}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Turno */}
@@ -312,7 +372,7 @@ export default function CollarSurveyForm({
           <select
             value={safeCollar.turno || 'D'}
             onChange={(e) => onCollarChange({ ...safeCollar, turno: e.target.value })}
-            className="w-full bg-navy-900 border border-navy-700 rounded-lg px-2 py-2 text-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-semibold"
+            className="w-full bg-navy-950/80 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 font-semibold cursor-pointer hover:border-navy-700 transition-all"
           >
             <option value="D">Día</option>
             <option value="N">Noche</option>
@@ -400,7 +460,7 @@ export default function CollarSurveyForm({
                 value={safeCollar.comentarios_proyectado || ''}
                 onChange={(e) => onCollarChange({ ...safeCollar, comentarios_proyectado: e.target.value })}
                 rows={2}
-                className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-normal"
+                className="w-full bg-navy-950/80 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 placeholder-slate-600 font-medium hover:border-navy-700 transition-all"
                 placeholder="Notas o comentarios sobre la perforación proyectada..."
               />
             </div>
@@ -492,7 +552,7 @@ export default function CollarSurveyForm({
                 value={safeCollar.comentarios || ''}
                 onChange={(e) => onCollarChange({ ...safeCollar, comentarios: e.target.value })}
                 rows={2}
-                className="w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-1.5 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-normal"
+                className="w-full bg-navy-950/80 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 placeholder-slate-600 font-medium hover:border-navy-700 transition-all"
                 placeholder="Notas o comentarios sobre la perforación oficial final..."
               />
             </div>
@@ -622,7 +682,7 @@ export default function CollarSurveyForm({
                     <td className="py-3 px-3 text-center">
                       <button
                         onClick={() => deleteSurveyRow(index)}
-                        className="p-1.5 rounded-lg border border-red-200 dark:border-red-500/20 bg-red-50 dark:bg-red-500/5 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/15 hover:text-red-700 dark:hover:text-red-300 transition-all duration-200 shadow-sm active:scale-90 flex items-center justify-center mx-auto"
+                        className="p-1.5 rounded-lg border border-rose-500/20 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 hover:text-rose-300 hover:border-rose-500/40 transition-all duration-200 shadow-sm active:scale-90 flex items-center justify-center mx-auto cursor-pointer"
                         title="Eliminar lectura"
                       >
                         <Trash2 size={14} />
@@ -653,6 +713,100 @@ export default function CollarSurveyForm({
           onSurveysChange(importedRows);
         }}
       />
+
+      {/* Modal de Renombrado Seguro */}
+      {isRenameModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm animate-fade-in text-left">
+          <div className="glass-panel w-full max-w-md p-6 rounded-xl border border-navy-800 space-y-4 shadow-2xl bg-navy-900/95">
+            <div className="flex justify-between items-center border-b border-navy-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Edit2 size={16} className="text-cyan-400" />
+                <h3 className="text-sm font-black text-slate-100 tracking-wide uppercase">
+                  Renombrar Código de Sondaje
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsRenameModalOpen(false)}
+                className="text-slate-400 hover:text-slate-200 transition-colors p-1 rounded-lg hover:bg-navy-800"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleApplyRename} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                  Código Actual: <span className="text-slate-200 font-bold">{safeCollar.name}</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    autoFocus
+                    placeholder="ej. FEGT25-002"
+                    value={tempName}
+                    onChange={(e) => setTempName(e.target.value.toUpperCase())}
+                    className={`w-full bg-navy-950 border rounded-lg px-4 py-2 text-slate-100 text-xs focus:outline-none font-bold tracking-wider ${
+                      isDuplicateName || isEmptyName
+                        ? 'border-rose-500/80 text-rose-300 focus:ring-1 focus:ring-rose-500'
+                        : isNameChanged
+                        ? 'border-emerald-500/80 text-emerald-300 focus:ring-1 focus:ring-emerald-500'
+                        : 'border-navy-800 focus:ring-cyan-500'
+                    }`}
+                  />
+                  {isDuplicateName || isEmptyName ? (
+                    <AlertTriangle size={16} className="absolute right-3 top-2.5 text-rose-500 animate-pulse" />
+                  ) : isNameChanged ? (
+                    <CheckCircle2 size={16} className="absolute right-3 top-2.5 text-emerald-500" />
+                  ) : (
+                    <CheckCircle2 size={16} className="absolute right-3 top-2.5 text-slate-600" />
+                  )}
+                </div>
+
+                {isDuplicateName && (
+                  <p className="text-[10px] font-bold text-rose-400 mt-1 flex items-center gap-1">
+                    <AlertTriangle size={12} />
+                    <span>El código '{cleanTempName}' ya pertenece a otro sondaje en el proyecto.</span>
+                  </p>
+                )}
+                {isEmptyName && (
+                  <p className="text-[10px] font-bold text-rose-400 mt-1 flex items-center gap-1">
+                    <AlertTriangle size={12} />
+                    <span>El código de taladro no puede estar vacío.</span>
+                  </p>
+                )}
+                {isNameChanged && !isDuplicateName && !isEmptyName && (
+                  <p className="text-[10px] font-bold text-emerald-400 mt-1 flex items-center gap-1">
+                    <CheckCircle2 size={12} />
+                    <span>Código único disponible para renombrar.</span>
+                  </p>
+                )}
+              </div>
+
+              <div className="flex gap-2 justify-end pt-3 border-t border-navy-800">
+                <button
+                  type="button"
+                  onClick={() => setIsRenameModalOpen(false)}
+                  className="bg-navy-900 border border-navy-800 hover:bg-navy-850 text-slate-400 px-4 py-2 rounded-lg text-xs font-semibold transition-all active:scale-95"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={!isValidNewName}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 ${
+                    isValidNewName
+                      ? 'bg-cyan-500/10 border border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/20 cursor-pointer'
+                      : 'bg-navy-900 border border-navy-800 text-slate-600 cursor-not-allowed opacity-50'
+                  }`}
+                >
+                  Aplicar Renombrado
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -8,7 +8,6 @@ import BaseEditableGrid, { type GridColumn } from '../../components/common/BaseE
 import { useLggState, type CorridaEnriquecida, type Corrida } from './useLggState';
 import { getLggColumns } from './lggColumns';
 import LggExportModal from './components/LggExportModal';
-import { CreateTaladroModal, RenameTaladroModal } from './components/CollarModals';
 import GeotechModuleLayout from '../../components/layout/GeotechModuleLayout';
 
 interface LggViewProps {
@@ -263,20 +262,6 @@ export default function LggView({
         activeTaladroGeologo={activeTaladroGeologo}
         activeTaladroFecha={activeTaladroFecha}
         darkMode={darkMode}
-      />
-
-      <CreateTaladroModal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        onCreate={handleCreateSubmit}
-        defaultGeologo={lastRowGeologo()}
-      />
-
-      <RenameTaladroModal
-        isOpen={isRenameModalOpen}
-        onClose={() => setIsRenameModalOpen(false)}
-        activeTaladroName={activeTaladroName}
-        onRename={handleRenameSubmit}
       />
 
       <ExcelImportModal
