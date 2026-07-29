@@ -112,16 +112,7 @@ export default function CollarSurveyForm({
     setRenameNotification({ oldName: oldCode, newName: cleanTempName });
   };
 
-  const handleNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      e.currentTarget.blur();
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      setTempName(safeCollar.name || '');
-      e.currentTarget.blur();
-    }
-  };
+
 
   // --- Funciones de Conversión de Vacíos para Surveys (Manejo de -1) ---
   const toInputValue = (val: number | null | undefined): string => {
@@ -258,7 +249,7 @@ export default function CollarSurveyForm({
   const getInputStyle = (fieldId: string) => {
     const parentAlert = safeAlerts.find(a => a.field === fieldId);
     if (!parentAlert) {
-      return 'border-navy-800 bg-navy-950/80 hover:border-navy-700 focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 text-slate-100';
+      return 'border-navy-800 bg-navy-950/80 focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 text-slate-100';
     }
     if (parentAlert.type === 'CRITICAL') {
       return 'border-rose-500/80 text-rose-300 focus:border-rose-500 focus:ring-1 focus:ring-rose-500/20 bg-rose-500/10';
@@ -351,15 +342,15 @@ export default function CollarSurveyForm({
           <select
             value={safeCollar.campana || ''}
             onChange={(e) => onCollarChange({ ...safeCollar, campana: e.target.value })}
-            className="w-full bg-navy-950/80 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 font-semibold cursor-pointer hover:border-navy-700 transition-all"
+            className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 font-semibold cursor-pointer  transition-all"
           >
             {safeCollar.campana && !availableCampanas.includes(safeCollar.campana) && (
-              <option value={safeCollar.campana}>
+              <option value={safeCollar.campana} className="bg-navy-950 text-slate-200 py-1.5">
                 {safeCollar.campana.replace(/^CAMPAÑA\s*/i, '').replace(/^CAMPAÑA_/i, '').trim()}
               </option>
             )}
             {availableCampanas.map((c) => (
-              <option key={c} value={c}>
+              <option key={c} value={c} className="bg-navy-950 text-slate-200 py-1.5">
                 {c.replace(/^CAMPAÑA\s*/i, '').replace(/^CAMPAÑA_/i, '').trim()}
               </option>
             ))}
@@ -372,10 +363,10 @@ export default function CollarSurveyForm({
           <select
             value={safeCollar.turno || 'D'}
             onChange={(e) => onCollarChange({ ...safeCollar, turno: e.target.value })}
-            className="w-full bg-navy-950/80 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 font-semibold cursor-pointer hover:border-navy-700 transition-all"
+            className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 font-semibold cursor-pointer  transition-all"
           >
-            <option value="D">Día</option>
-            <option value="N">Noche</option>
+            <option value="D" className="bg-navy-950 text-slate-200 py-1.5">Día</option>
+            <option value="N" className="bg-navy-950 text-slate-200 py-1.5">Noche</option>
           </select>
         </div>
       </div>
@@ -460,7 +451,7 @@ export default function CollarSurveyForm({
                 value={safeCollar.comentarios_proyectado || ''}
                 onChange={(e) => onCollarChange({ ...safeCollar, comentarios_proyectado: e.target.value })}
                 rows={2}
-                className="w-full bg-navy-950/80 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 placeholder-slate-600 font-medium hover:border-navy-700 transition-all"
+                className="w-full bg-navy-950/80 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 placeholder-slate-600 font-medium  transition-all"
                 placeholder="Notas o comentarios sobre la perforación proyectada..."
               />
             </div>
@@ -552,7 +543,7 @@ export default function CollarSurveyForm({
                 value={safeCollar.comentarios || ''}
                 onChange={(e) => onCollarChange({ ...safeCollar, comentarios: e.target.value })}
                 rows={2}
-                className="w-full bg-navy-950/80 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 placeholder-slate-600 font-medium hover:border-navy-700 transition-all"
+                className="w-full bg-navy-950/80 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 placeholder-slate-600 font-medium  transition-all"
                 placeholder="Notas o comentarios sobre la perforación oficial final..."
               />
             </div>
@@ -575,14 +566,14 @@ export default function CollarSurveyForm({
           <div className="flex gap-2">
             <button
               onClick={() => setIsImportModalOpen(true)}
-              className="flex items-center gap-1.5 bg-navy-900 hover:bg-navy-850 text-slate-300 dark:text-slate-300 border border-navy-800 px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95"
+              className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 active:scale-95 text-emerald-400 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer"
             >
               <Upload size={14} className="text-emerald-400" />
               <span>Importar Excel</span>
             </button>
             <button
               onClick={addSurveyRow}
-              className="flex items-center gap-1.5 bg-cyan-50 dark:bg-cyan-500/10 border border-cyan-200 dark:border-cyan-500/30 hover:bg-cyan-100 dark:hover:bg-cyan-500/20 text-cyan-800 dark:text-cyan-400 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
+              className="flex items-center gap-1.5 bg-cyan-500/10 border border-cyan-500/30 hover:bg-cyan-500/20 text-cyan-400 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 cursor-pointer"
             >
               <Plus size={14} />
               <span>Agregar lectura</span>
@@ -600,31 +591,36 @@ export default function CollarSurveyForm({
           </div>
         )}
 
-        <div className="overflow-x-auto">
+        {/* Tabla de Survey Equilibrada de Ancho Completo sin huecos negros vacíos */}
+        <div className="overflow-x-auto w-full">
           <table className="w-full text-left border-collapse text-sm">
             <thead>
-              <tr className="text-xs text-slate-500 font-bold uppercase tracking-wider border-b border-navy-800">
-                <th className="py-2.5 px-3">
-                  Profundidad <span className="normal-case">(m)</span>
+              <tr className="text-xs text-slate-400 font-bold uppercase tracking-wider border-b border-navy-800 bg-navy-900/40 h-10">
+                <th className="py-2.5 px-6 w-[30%]">
+                  Profundidad <span className="normal-case text-slate-500">(m)</span>
                 </th>
-                <th className="py-2.5 px-3">Dip / Inclinación (0-90°)</th>
-                <th className="py-2.5 px-3">Azimut UTM (0-360°)</th>
-                <th className="py-2.5 px-3 text-center">Acción</th>
+                <th className="py-2.5 px-6 w-[32%]">
+                  Dip / Inclinación <span className="normal-case text-slate-500">(0-90°)</span>
+                </th>
+                <th className="py-2.5 px-6 w-[32%]">
+                  Azimut UTM <span className="normal-case text-slate-500">(0-360°)</span>
+                </th>
+                <th className="py-2.5 px-4 w-[6%] text-center">Acción</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-navy-900/50">
               {safeSurveys.map((survey, index) => {
                 return (
-                  <tr key={index} className="border-b border-navy-900/60 hover:bg-navy-900/15">
+                  <tr key={index} className="border-b border-navy-900/60 hover:bg-navy-900/20 transition-colors h-12">
 
                     {/* Celda: Profundidad */}
-                    <td className="py-3 px-3">
+                    <td className="py-2 px-6">
                       <input
                         id={`survey-depth-${index}`}
                         type="number"
                         value={toInputValue(survey.depth)}
                         onChange={(e) => handleSurveyChangeNoClamping(index, 'depth', fromInputValue(e.target.value))}
-                        onBlur={() => handleSurveyBlur(index, 'depth')} // <-- Clampa a los rangos permitidos al salir de la celda
+                        onBlur={() => handleSurveyBlur(index, 'depth')}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
                             e.preventDefault();
@@ -632,20 +628,20 @@ export default function CollarSurveyForm({
                           }
                         }}
                         onWheel={(e) => e.currentTarget.blur()}
-                        className={`w-32 bg-navy-900 border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 ${getInputStyle(`survey-depth-${index}`)}`}
-                        placeholder="Vacío"
+                        className={`w-full max-w-xs bg-navy-950/80 border rounded-lg px-3.5 py-2 text-xs font-semibold focus:outline-none ${getInputStyle(`survey-depth-${index}`)}`}
+                        placeholder="0.0 m"
                       />
                     </td>
 
                     {/* Celda: Dip */}
-                    <td className="py-3 px-3">
+                    <td className="py-2 px-6">
                       <input
                         id={`survey-dip-${index}`}
                         type="number"
                         step="0.1"
                         value={toInputValue(survey.dip)}
                         onChange={(e) => handleSurveyChangeNoClamping(index, 'dip', fromInputValue(e.target.value))}
-                        onBlur={() => handleSurveyBlur(index, 'dip')} // <-- Clampa a los rangos permitidos al salir de la celda
+                        onBlur={() => handleSurveyBlur(index, 'dip')}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
                             e.preventDefault();
@@ -653,19 +649,19 @@ export default function CollarSurveyForm({
                           }
                         }}
                         onWheel={(e) => e.currentTarget.blur()}
-                        className={`w-32 bg-navy-900 border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 ${getInputStyle(`survey-dip-${index}`)}`}
-                        placeholder="Vacío"
+                        className={`w-full max-w-xs bg-navy-950/80 border rounded-lg px-3.5 py-2 text-xs font-semibold focus:outline-none ${getInputStyle(`survey-dip-${index}`)}`}
+                        placeholder="0.0°"
                       />
                     </td>
 
                     {/* Celda: Azimut */}
-                    <td className="py-3 px-3">
+                    <td className="py-2 px-6">
                       <input
                         type="number"
                         step="0.1"
                         value={toInputValue(survey.azimuth)}
                         onChange={(e) => handleSurveyChangeNoClamping(index, 'azimuth', fromInputValue(e.target.value))}
-                        onBlur={() => handleSurveyBlur(index, 'azimuth')} // <-- Clampa a los rangos permitidos al salir de la celda
+                        onBlur={() => handleSurveyBlur(index, 'azimuth')}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
                             e.preventDefault();
@@ -673,13 +669,13 @@ export default function CollarSurveyForm({
                           }
                         }}
                         onWheel={(e) => e.currentTarget.blur()}
-                        className={`w-32 bg-navy-900 border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 ${getInputStyle(`survey-azimuth-${index}`)}`}
-                        placeholder="Vacío"
+                        className={`w-full max-w-xs bg-navy-950/80 border rounded-lg px-3.5 py-2 text-xs font-semibold focus:outline-none ${getInputStyle(`survey-azimuth-${index}`)}`}
+                        placeholder="0.0°"
                       />
                     </td>
 
                     {/* Celda: Acción */}
-                    <td className="py-3 px-3 text-center">
+                    <td className="py-2 px-4 text-center">
                       <button
                         onClick={() => deleteSurveyRow(index)}
                         className="p-1.5 rounded-lg border border-rose-500/20 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 hover:text-rose-300 hover:border-rose-500/40 transition-all duration-200 shadow-sm active:scale-90 flex items-center justify-center mx-auto cursor-pointer"
@@ -746,13 +742,12 @@ export default function CollarSurveyForm({
                     placeholder="ej. FEGT25-002"
                     value={tempName}
                     onChange={(e) => setTempName(e.target.value.toUpperCase())}
-                    className={`w-full bg-navy-950 border rounded-lg px-4 py-2 text-slate-100 text-xs focus:outline-none font-bold tracking-wider ${
-                      isDuplicateName || isEmptyName
+                    className={`w-full bg-navy-950 border rounded-lg px-4 py-2 text-slate-100 text-xs focus:outline-none font-bold tracking-wider ${isDuplicateName || isEmptyName
                         ? 'border-rose-500/80 text-rose-300 focus:ring-1 focus:ring-rose-500'
                         : isNameChanged
-                        ? 'border-emerald-500/80 text-emerald-300 focus:ring-1 focus:ring-emerald-500'
-                        : 'border-navy-800 focus:ring-cyan-500'
-                    }`}
+                          ? 'border-emerald-500/80 text-emerald-300 focus:ring-1 focus:ring-emerald-500'
+                          : 'border-navy-800 focus:ring-cyan-500'
+                      }`}
                   />
                   {isDuplicateName || isEmptyName ? (
                     <AlertTriangle size={16} className="absolute right-3 top-2.5 text-rose-500 animate-pulse" />
@@ -794,11 +789,10 @@ export default function CollarSurveyForm({
                 <button
                   type="submit"
                   disabled={!isValidNewName}
-                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 ${
-                    isValidNewName
+                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 ${isValidNewName
                       ? 'bg-cyan-500/10 border border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/20 cursor-pointer'
                       : 'bg-navy-900 border border-navy-800 text-slate-600 cursor-not-allowed opacity-50'
-                  }`}
+                    }`}
                 >
                   Aplicar Renombrado
                 </button>

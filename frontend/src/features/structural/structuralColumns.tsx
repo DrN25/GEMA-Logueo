@@ -126,7 +126,7 @@ export function getStructuralColumns({
     {
       key: 'taladro' as any,
       label: 'Taladro',
-      width: 'w-28',
+      width: 'w-24',
       type: 'readonly',
       isSticky: true,
       stickyLeft: 64,
@@ -135,14 +135,14 @@ export function getStructuralColumns({
     {
       key: 'de' as any,
       label: 'de: (m)',
-      width: 'w-20',
+      width: 'w-16',
       type: 'readonly',
       isSticky: true,
-      stickyLeft: 176,
+      stickyLeft: 160,
       renderCell: (row) => (
         <FormulaTooltipTrigger formulaId="struct_de_a_heredada" params={{ corrida: row.disc.corrida, de: row.disc.de, a: row.disc.a }} position="bottom">
           <div className="text-center text-slate-400 py-1.5 font-mono">
-            {row.disc.de > 0 ? row.disc.de.toFixed(2) : '0.00'}
+            {typeof row.disc.de === 'number' ? row.disc.de.toFixed(2) : (parseFloat(String(row.disc.de || 0)) || 0).toFixed(2)}
           </div>
         </FormulaTooltipTrigger>
       )
@@ -150,32 +150,33 @@ export function getStructuralColumns({
     {
       key: 'a' as any,
       label: 'a: (m)',
-      width: 'w-20',
+      width: 'w-16',
       type: 'readonly',
       isSticky: true,
-      stickyLeft: 256,
+      stickyLeft: 224,
       renderCell: (row) => (
         <FormulaTooltipTrigger formulaId="struct_de_a_heredada" params={{ corrida: row.disc.corrida, de: row.disc.de, a: row.disc.a }} position="bottom">
           <div className="text-center text-slate-400 py-1.5 font-mono">
-            {row.disc.a > 0 ? row.disc.a.toFixed(2) : '0.00'}
+            {typeof row.disc.a === 'number' ? row.disc.a.toFixed(2) : (parseFloat(String(row.disc.a || 0)) || 0).toFixed(2)}
           </div>
         </FormulaTooltipTrigger>
       )
     },
     {
       key: 'profundidad' as any,
-      label: 'Profundidad',
-      width: 'w-28',
+      label: 'Prof.',
+      width: 'w-16',
       type: 'number',
       isSticky: true,
-      stickyLeft: 336,
+      stickyLeft: 288,
       renderCell: (row, _index, isSelected) => {
         const isOrphan = row.disc.corrida === 0;
+        const profNum = typeof row.disc.profundidad === 'number' ? row.disc.profundidad : (parseFloat(String(row.disc.profundidad || 0)) || 0);
         if (!isSelected) {
           return (
             <div className="flex items-center justify-center gap-1.5 w-full py-1.5 text-center">
               <span className="text-slate-200 block text-center truncate font-bold select-all">
-                {row.disc.profundidad.toFixed(2)}
+                {profNum.toFixed(2)}
               </span>
               {isOrphan && (
                 <span title="Profundidad huérfana: No corresponde a ningún tramo de corrida en LGG">
@@ -258,7 +259,7 @@ export function getStructuralColumns({
     {
       key: 'tipo_estructura' as any,
       label: 'Tipo Estructura',
-      width: 'w-36',
+      width: 'w-20',
       type: 'select',
       headerBgClass: 'text-purple-300',
       renderCell: (row, _idx, isSelected) => {
@@ -289,7 +290,7 @@ export function getStructuralColumns({
     {
       key: 'alfa' as any,
       label: 'Alfa (°)',
-      width: 'w-24',
+      width: 'w-16',
       type: 'number',
       headerBgClass: 'text-purple-300',
       renderCell: (row, _idx, isSelected) => {
@@ -318,7 +319,7 @@ export function getStructuralColumns({
     {
       key: 'beta' as any,
       label: 'Beta (°)',
-      width: 'w-24',
+      width: 'w-16',
       type: 'number',
       headerBgClass: 'text-purple-300',
       renderCell: (row, _idx, isSelected) => {
@@ -347,7 +348,7 @@ export function getStructuralColumns({
     {
       key: 'forma' as any,
       label: 'Forma',
-      width: 'w-44',
+      width: 'w-32',
       type: 'select',
       headerBgClass: 'text-indigo-300',
       renderCell: (row, _idx, isSelected) => {

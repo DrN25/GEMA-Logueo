@@ -37,7 +37,9 @@ function toNum(val: any, fallback = 0): number {
 
 function toStr(val: any, fallback = ''): string {
   if (val === null || val === undefined) return fallback;
-  return String(val).trim();
+  const trimmed = String(val).trim();
+  if (trimmed === '' || trimmed === '-1') return fallback;
+  return trimmed;
 }
 
 /**

@@ -19,11 +19,13 @@ interface LggViewProps {
   waterTableM: number;
   darkMode?: boolean;
   activeTaladroName: string;
+  existingTaladrosNames?: string[];
   activeTaladroGeologo?: string;
   activeTaladroFecha?: string;
   sidebarCollapsed?: boolean;
   onFocusField?: (fieldId: string) => void;
   onImportExcel?: (importedRows: Corrida[], createNewWithName?: string) => void;
+  onImportBatchExcel?: (batchTaladros: { name: string; rows: Corrida[]; isNew: boolean }[]) => void;
   onCreateTaladro?: (newTaladro: any) => void;
   onRenameTaladro?: (newName: string) => void;
   syncStatus?: string;
@@ -54,13 +56,15 @@ export default function LggView({
   waterTableM,
   darkMode = true,
   activeTaladroName,
+  existingTaladrosNames = [],
   activeTaladroGeologo = "RD/RB",
   activeTaladroFecha,
   sidebarCollapsed = false,
   onFocusField: _onFocusField,
   onImportExcel,
-  onCreateTaladro,
-  onRenameTaladro,
+  onImportBatchExcel,
+  onCreateTaladro: _onCreateTaladro,
+  onRenameTaladro: _onRenameTaladro,
   syncStatus: _syncStatus,
   defaultTurno = 'D'
 }: LggViewProps) {
@@ -115,16 +119,6 @@ export default function LggView({
   }, [darkMode, lastRowGeologo, lastRowFecha, lastRowTaladroName, stableHandleCellChange, stableDeleteRow, stableInsertRow]);
 
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
-
-  const handleRenameSubmit = (newName: string) => {
-    if (onRenameTaladro) onRenameTaladro(newName);
-  };
-
-  const handleCreateSubmit = (taladroData: any) => {
-    if (onCreateTaladro) onCreateTaladro(taladroData);
-  };
 
   // Renderizado dinámico de la estructura de filtros
   const filterPanelContent = (
@@ -268,9 +262,12 @@ export default function LggView({
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
         activeTaladroName={activeTaladroName}
+        existingTaladrosNames={existingTaladrosNames}
         importType="LGG"
-        onImport={(importedRows, createNewWithName) => {
-          if (onImportExcel) {
+        onImport={(importedRows, createNewWithName, batchTaladros) => {
+          if (batchTaladros && batchTaladros.length > 0 && onImportBatchExcel) {
+            onImportBatchExcel(batchTaladros);
+          } else if (onImportExcel) {
             onImportExcel(importedRows, createNewWithName);
           } else {
             onCorridasChange(importedRows);

@@ -103,6 +103,8 @@ interface Collar {
   inclinacion: number;
   campana: string;
   fecha_registro: string;
+  nivel_freatico?: number;
+  collar_eoh?: number;
   // Proyectado
   collar_este_proyectado?: number;
   collar_norte_proyectado?: number;
@@ -171,6 +173,7 @@ interface TaladroSummary {
   fecha_registro: string;
   corridas_count: number;
   surveys_count: number;
+  perf_total?: number;
 }
 
 const API_BASE = import.meta.env.VITE_API_BASE || "";
@@ -354,21 +357,33 @@ export default function App() {
   // Modal de confirmación para descartar cambios
   const [showDiscardModal, setShowDiscardModal] = useState<boolean>(false);
 
-  // Helper para mantener la lista real de taladros con cambios pendientes en localStorage
+  // Contador reactivo de taladros con cambios pendientes
+  const [unsavedTaladrosCount, setUnsavedTaladrosCount] = useState<number>(() => {
+    try {
+      const list = JSON.parse(localStorage.getItem('geolog_unsaved_taladros') || '[]');
+      return Array.isArray(list) ? list.length : 0;
+    } catch (e) {
+      return 0;
+    }
+  });
+
+  // Helper para mantener la lista real de taladros con cambios pendientes en localStorage y React state
   const updateUnsavedTracker = useCallback((name: string, isUnsaved: boolean) => {
     try {
       const list: string[] = JSON.parse(localStorage.getItem('geolog_unsaved_taladros') || '[]');
+      let newList = list;
       if (isUnsaved) {
         if (!list.includes(name)) {
-          list.push(name);
-          localStorage.setItem('geolog_unsaved_taladros', JSON.stringify(list));
+          newList = [...list, name];
+          localStorage.setItem('geolog_unsaved_taladros', JSON.stringify(newList));
         }
       } else {
         if (list.includes(name)) {
-          const filtered = list.filter(n => n !== name);
-          localStorage.setItem('geolog_unsaved_taladros', JSON.stringify(filtered));
+          newList = list.filter(n => n !== name);
+          localStorage.setItem('geolog_unsaved_taladros', JSON.stringify(newList));
         }
       }
+      setUnsavedTaladrosCount(newList.length);
     } catch (e) {}
   }, []);
 
@@ -452,6 +467,7 @@ export default function App() {
 
   // ─── CÁLCULO DINÁMICO DE KPIS PARA EL DASHBOARD ───
   const computedDashboardKpis = useMemo(() => {
+    if (dashboardKpis) return dashboardKpis;
     const list = filteredTaladros;
     const total_taladros = list.length;
     const todayStr = new Date().toISOString().split('T')[0];
@@ -586,6 +602,7 @@ export default function App() {
   }, [taladros, activeTaladro]);
 
   const fetchTaladros = async () => {
+    setDashboardLoading(true);
     try {
       const res = await fetch(`${API_BASE}/api/taladros`);
       if (res.ok) {
@@ -621,6 +638,8 @@ export default function App() {
         setTaladros(mockSummary);
         localStorage.setItem('geolog_taladros_summaries', JSON.stringify(mockSummary));
       }
+    } finally {
+      setDashboardLoading(false);
     }
   };
 
@@ -673,12 +692,17 @@ export default function App() {
                 isUnsaved = true;
               }
             }
-          } else {
-            // Si el taladro no tiene modificaciones pendientes, resguardar la copia limpia de BD
-            localStorage.setItem(`geolog_taladro_${name}`, JSON.stringify(data));
           }
         } catch (err) {
           console.warn("Error leyendo borrador de localStorage:", err);
+        }
+
+        if (!isUnsaved) {
+          // Si el taladro no tiene modificaciones pendientes, resguardar la copia limpia de BD y desmarcar en tracker
+          localStorage.setItem(`geolog_taladro_${name}`, JSON.stringify(data));
+          updateUnsavedTracker(name, false);
+        } else {
+          updateUnsavedTracker(name, true);
         }
 
         setActiveTaladro(taladroToActivate);
@@ -715,11 +739,29 @@ export default function App() {
           });
         }
 
+        // Buscar si existe un snapshot limpio previo guardado de BD
+        let dbSnapshot = null;
+        let dbHash = null;
+        try {
+          const cachedSnapStr = localStorage.getItem(`geolog_snapshot_data_${name}`);
+          if (cachedSnapStr) {
+            dbSnapshot = JSON.parse(cachedSnapStr);
+            dbHash = computeTaladroHash(dbSnapshot);
+          }
+        } catch (err) {}
+
+        if (!dbSnapshot) {
+          dbSnapshot = JSON.parse(JSON.stringify(parsed));
+          dbHash = computeTaladroHash(parsed);
+        }
+
+        const isUnsaved = computeTaladroHash(parsed) !== dbHash;
+        setDbSnapshotData(dbSnapshot);
+        setDbSnapshotHash(dbHash);
         setActiveTaladro(parsed);
         setOriginalName(parsed.name);
-        setDbSnapshotData(JSON.parse(JSON.stringify(parsed)));
-        setDbSnapshotHash(computeTaladroHash(parsed));
-        setSyncStatus('synced');
+        setSyncStatus(isUnsaved ? 'unsaved' : 'synced');
+        updateUnsavedTracker(name, isUnsaved);
       } else {
         const defaultTal: Taladro = {
           name,
@@ -862,6 +904,68 @@ export default function App() {
       handleCreateTaladro(newTal, 'lgg');
     } else {
       handleCorridasChange(importedRows);
+    }
+  };
+
+  const handleImportBatchExcel = (batchTaladros: { name: string; rows: Corrida[]; isNew: boolean }[]) => {
+    if (!batchTaladros || batchTaladros.length === 0) return;
+
+    let updatedSummaries = [...taladros];
+    let lastCreatedOrActiveName = activeTaladro?.name;
+
+    batchTaladros.forEach(item => {
+      const trimmedName = item.name.trim().toUpperCase();
+      if (!trimmedName) return;
+
+      if (item.isNew) {
+        const newTal: Taladro = {
+          name: trimmedName,
+          proyecto: activeTaladro?.proyecto || "Proyecto A",
+          geologo: activeTaladro?.geologo || "RD/RB",
+          diametro: activeTaladro?.diametro || "HQ3",
+          inclinacion: activeTaladro?.inclinacion || -60.0,
+          campana: activeTaladro?.campana || "2026",
+          fecha_registro: new Date().toISOString().split('T')[0],
+          collar_este_proyectado: 0.0,
+          collar_norte_proyectado: 0.0,
+          collar_cota_proyectado: 0.0,
+          prof_final_eoh_proyectada: 0.0,
+          comentarios_proyectado: '',
+          collar_este: 0.0,
+          collar_norte: 0.0,
+          collar_cota: 0.0,
+          prof_final_eoh: 0.0,
+          comentarios: '',
+          turno: activeTaladro?.turno || "D",
+          surveys: [],
+          corridas: item.rows,
+          discontinuidades: [],
+          ensayos_plt: []
+        };
+        localStorage.setItem(`geolog_taladro_${trimmedName}`, JSON.stringify(newTal));
+        const newSummary: TaladroSummary = {
+          name: trimmedName,
+          proyecto: newTal.proyecto,
+          geologo: newTal.geologo,
+          diametro: newTal.diametro,
+          inclinacion: newTal.inclinacion,
+          fecha_registro: newTal.fecha_registro,
+          corridas_count: newTal.corridas.length,
+          surveys_count: 0
+        };
+        updatedSummaries = [...updatedSummaries.filter(t => t.name !== trimmedName), newSummary];
+        lastCreatedOrActiveName = trimmedName;
+      } else {
+        // Actualiza las corridas del taladro activo actual
+        handleCorridasChange(item.rows);
+      }
+    });
+
+    setTaladros(updatedSummaries);
+    localStorage.setItem('geolog_taladros_summaries', JSON.stringify(updatedSummaries));
+
+    if (lastCreatedOrActiveName && lastCreatedOrActiveName !== activeTaladro?.name) {
+      handleSelectTaladro(lastCreatedOrActiveName, false);
     }
   };
 
@@ -1262,6 +1366,7 @@ export default function App() {
       }
       keysToRemove.forEach(k => localStorage.removeItem(k));
       localStorage.removeItem('geolog_unsaved_taladros');
+      setUnsavedTaladrosCount(0);
 
       // 2. Revertir el taladro activo si existe en BD
       if (dbSnapshotData) {
@@ -1314,6 +1419,40 @@ export default function App() {
   // Esto reemplaza el sistema anterior de setSyncStatus('unsaved') manual
   // en cada handler. Ahora los handlers solo actualizan el estado y el
   // dirty detection es automático y centralizado.
+
+  // ─── SINCRONIZACIÓN AUTOMÁTICA DE SNAPSHOT AL CAMBIAR DE TALADRO ─────────
+  useEffect(() => {
+    if (!activeTaladro) {
+      if (dbSnapshotData !== null) setDbSnapshotData(null);
+      if (dbSnapshotHash !== null) setDbSnapshotHash(null);
+      return;
+    }
+
+    if (!dbSnapshotData || dbSnapshotData.name.toUpperCase() !== activeTaladro.name.toUpperCase()) {
+      const cachedStr = localStorage.getItem(`geolog_snapshot_data_${activeTaladro.name}`);
+      if (cachedStr) {
+        try {
+          const parsed = JSON.parse(cachedStr);
+          setDbSnapshotData(parsed);
+          setDbSnapshotHash(computeTaladroHash(parsed));
+          return;
+        } catch (e) {}
+      }
+
+      const isExistingInProject = taladros.some(t => t.name.toUpperCase() === activeTaladro.name.toUpperCase());
+      if (isExistingInProject) {
+        const snap = JSON.parse(JSON.stringify(activeTaladro));
+        const hash = computeTaladroHash(snap);
+        setDbSnapshotData(snap);
+        setDbSnapshotHash(hash);
+        localStorage.setItem(`geolog_snapshot_data_${activeTaladro.name}`, JSON.stringify(snap));
+        localStorage.setItem(`geolog_snapshot_hash_${activeTaladro.name}`, String(hash));
+      } else {
+        setDbSnapshotData(null);
+        setDbSnapshotHash(null);
+      }
+    }
+  }, [activeTaladro, dbSnapshotData, taladros]);
 
   useEffect(() => {
     if (!activeTaladro) {
@@ -1584,14 +1723,7 @@ export default function App() {
           currentView={currentView}
           syncStatus={syncStatus}
           syncMessage={syncMessage}
-          unsavedCount={(() => {
-            try {
-              const list = JSON.parse(localStorage.getItem('geolog_unsaved_taladros') || '[]');
-              return Array.isArray(list) ? list.length : 0;
-            } catch (e) {
-              return 0;
-            }
-          })()}
+          unsavedCount={unsavedTaladrosCount}
           handleSaveActive={() => setShowSaveConfirmModal(true)}
           onDiscardClick={() => setShowDiscardModal(true)}
           setActiveTaladro={setActiveTaladro}
@@ -1659,6 +1791,7 @@ export default function App() {
                   waterTableM={97.0}
                   darkMode={darkMode}
                   activeTaladroName={activeTaladro.name}
+                  existingTaladrosNames={taladros.map(t => t.name)}
                   activeTaladroGeologo={activeTaladro.geologo}
                   activeTaladroFecha={activeTaladro.fecha_registro}
                   sidebarCollapsed={sidebarCollapsed}
@@ -1666,6 +1799,7 @@ export default function App() {
                   onCreateTaladro={(newTal) => handleCreateTaladro(newTal, 'lgg')}
                   onRenameTaladro={handleRenameTaladro}
                   onImportExcel={handleImportExcel}
+                  onImportBatchExcel={handleImportBatchExcel}
                   syncStatus={syncStatus}
                   defaultTurno={activeTaladro.turno}
                 />

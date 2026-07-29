@@ -15,7 +15,6 @@ import {
   X,
   ChevronDown,
   Activity,
-  Layers,
   Info,
   CheckCircle2,
   AlertTriangle,
@@ -767,11 +766,11 @@ export default function Dashboard({
                     onChange={(e) => setDiametro(e.target.value)}
                     className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-2 text-slate-300 text-xs focus:outline-none focus:ring-1 focus:ring-cyan-500 font-semibold"
                   >
-                    <option value="HQ3">HQ3</option>
-                    <option value="NQ3">NQ3</option>
-                    <option value="PQ3">PQ3</option>
-                    <option value="HQ">HQ</option>
-                    <option value="NQ">NQ</option>
+                    <option value="HQ3" className="bg-navy-950 text-slate-200">HQ3</option>
+                    <option value="NQ3" className="bg-navy-950 text-slate-200">NQ3</option>
+                    <option value="PQ3" className="bg-navy-950 text-slate-200">PQ3</option>
+                    <option value="HQ" className="bg-navy-950 text-slate-200">HQ</option>
+                    <option value="NQ" className="bg-navy-950 text-slate-200">NQ</option>
                   </select>
                 </div>
                 <div className="space-y-1">
@@ -796,7 +795,7 @@ export default function Dashboard({
                     className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-2 text-slate-300 text-xs focus:outline-none focus:ring-1 focus:ring-cyan-500 font-semibold"
                   >
                     {availableCampanas.map((c) => (
-                      <option key={c} value={c}>{formatCampanaLabel(c)}</option>
+                      <option key={c} value={c} className="bg-navy-950 text-slate-200">{formatCampanaLabel(c)}</option>
                     ))}
                   </select>
                 </div>
@@ -807,8 +806,8 @@ export default function Dashboard({
                     onChange={(e) => setTurno(e.target.value)}
                     className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2 py-2 text-slate-300 text-xs focus:outline-none focus:ring-1 focus:ring-cyan-500 font-semibold"
                   >
-                    <option value="D">Día</option>
-                    <option value="N">Noche</option>
+                    <option value="D" className="bg-navy-950 text-slate-200">Día</option>
+                    <option value="N" className="bg-navy-950 text-slate-200">Noche</option>
                   </select>
                 </div>
               </div>

@@ -1,15 +1,18 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import {
   X,
   FileSpreadsheet,
   Upload,
   Check,
+  CheckCircle2,
   AlertTriangle,
   Info,
   Filter,
   ArrowRight,
-  RefreshCw
+  RefreshCw,
+  Layers,
+  Sparkles
 } from 'lucide-react';
 import {
   EXPECTED_FIELDS,
@@ -48,18 +51,26 @@ function InfoBanner({ title, description }: InfoBannerProps) {
   );
 }
 
+export interface BatchImportItem {
+  name: string;
+  rows: any[];
+  isNew: boolean;
+}
+
 interface ExcelImportModalProps {
   isOpen: boolean;
   onClose: () => void;
   activeTaladroName: string;
+  existingTaladrosNames?: string[];
   importType?: 'LGG' | 'STRUCT' | 'PLT' | 'SURVEY';
-  onImport: (importedRows: any[], createNewWithName?: string) => void;
+  onImport: (importedRows: any[], createNewWithName?: string, batchTaladros?: BatchImportItem[]) => void;
 }
 
 export default function ExcelImportModal({
   isOpen,
   onClose,
   activeTaladroName,
+  existingTaladrosNames = [],
   importType = 'LGG',
   onImport
 }: ExcelImportModalProps) {
@@ -101,12 +112,27 @@ export default function ExcelImportModal({
   const [excelTaladroFilter, setExcelTaladroFilter] = useState<string>('');
   const [importDestination, setImportDestination] = useState<'active' | 'new'>('active');
 
-  // Double confirmation overlay
+  // Selección Múltiple de Taladros en Excel: excelName -> { selected: boolean, targetName: string }
+  const [selectedTaladrosMap, setSelectedTaladrosMap] = useState<Record<string, { selected: boolean; targetName: string }>>({});
+
+  // Double confirmation & Success overlays
   const [showWarningOverlay, setShowWarningOverlay] = useState(false);
   const [warningTitle, setWarningTitle] = useState('Revisión de Importación');
   const [missingFieldsToWarn, setMissingFieldsToWarn] = useState<string[]>([]);
   const [isPerformanceWarnActive, setIsPerformanceWarnActive] = useState(false);
   const [pendingRows, setPendingRows] = useState<any[]>([]);
+
+  // Confirmation step & Final Success Modal states
+  const [showConfirmOverlay, setShowConfirmOverlay] = useState(false);
+  const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
+  const [pendingBatchTaladros, setPendingBatchTaladros] = useState<BatchImportItem[] | null>(null);
+  const [pendingSingleRows, setPendingSingleRows] = useState<any[]>([]);
+  const [pendingCreateNewWithName, setPendingCreateNewWithName] = useState<string | undefined>(undefined);
+  const [importSummaryDetails, setImportSummaryDetails] = useState<{
+    taladrosCount: number;
+    rowsCount: number;
+    details: { excelName?: string; targetName: string; rows: number; isNew: boolean }[];
+  } | null>(null);
 
   const parseYearAndNumber = (name: string) => {
     const clean = name.toUpperCase().trim();
@@ -157,11 +183,6 @@ export default function ExcelImportModal({
 
     return p1.year === p2.year && p1.holeNumber === p2.holeNumber;
   };
-
-  const isImportBlocked =
-    (currentImportType === 'STRUCT' || currentImportType === 'PLT' || currentImportType === 'SURVEY') &&
-    excelTaladroFilter.trim() !== '' &&
-    !isTaladroMatch(excelTaladroFilter, activeTaladroName);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -247,6 +268,17 @@ export default function ExcelImportModal({
     const sum = processExcelDataGeneric(dataGrid, detectedHeaderIdx, suggested, expectedFields, requiredRowCheckKeys);
     setSummary(sum);
 
+    // 5. Inicializar mapa de selección multi-taladro
+    const initialMap: Record<string, { selected: boolean; targetName: string }> = {};
+    sum.uniqueTaladros.forEach(tName => {
+      const isMatchActive = isTaladroMatch(tName, activeTaladroName);
+      initialMap[tName] = {
+        selected: true,
+        targetName: isMatchActive ? activeTaladroName : tName.trim().toUpperCase()
+      };
+    });
+    setSelectedTaladrosMap(initialMap);
+
     // Suggest matching drillhole by name if possible
     const bestTaladroMatch = sum.uniqueTaladros.find(t =>
       t.toLowerCase().includes(activeTaladroName.toLowerCase()) ||
@@ -290,6 +322,46 @@ export default function ExcelImportModal({
     return String(Math.round((num + Number.EPSILON) * factor) / factor);
   };
 
+  const getTaladroValidationStatus = useCallback((_excelName: string, targetName: string) => {
+    const cleanTarget = targetName.trim().toUpperCase();
+    if (!cleanTarget) {
+      return { isError: true, text: 'Nombre requerido', bg: 'bg-red-500/10 border-red-500/30 text-red-400' };
+    }
+
+    if (cleanTarget === activeTaladroName.toUpperCase()) {
+      return { isError: false, text: 'Taladro Activo (Actualiza corridas)', bg: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' };
+    }
+
+    const existsInDb = (existingTaladrosNames || []).some(n => n.toUpperCase() === cleanTarget);
+    if (existsInDb) {
+      return { isError: true, text: 'Existe en BD (Debes renombrarlo)', bg: 'bg-red-500/10 border-red-500/30 text-red-400' };
+    }
+
+    // Check duplicate among selected items
+    const selectedTargets = Object.entries(selectedTaladrosMap)
+      .filter(([_, v]) => v.selected)
+      .map(([_, v]) => v.targetName.trim().toUpperCase());
+    const countInSelection = selectedTargets.filter(t => t === cleanTarget).length;
+    if (countInSelection > 1) {
+      return { isError: true, text: 'Nombre duplicado en selección', bg: 'bg-amber-500/10 border-amber-500/30 text-amber-400' };
+    }
+
+    return { isError: false, text: 'Listo para crear e importar', bg: 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400' };
+  }, [activeTaladroName, existingTaladrosNames, selectedTaladrosMap]);
+
+  const isImportBlocked = useMemo(() => {
+    if (currentImportType === 'LGG' && summary) {
+      const selectedEntries = Object.entries(selectedTaladrosMap).filter(([_, v]) => v.selected);
+      if (selectedEntries.length === 0) return true;
+      return selectedEntries.some(([excelName, cfg]) => getTaladroValidationStatus(excelName, cfg.targetName).isError);
+    }
+    return (
+      (currentImportType === 'STRUCT' || currentImportType === 'PLT' || currentImportType === 'SURVEY') &&
+      excelTaladroFilter.trim() !== '' &&
+      !isTaladroMatch(excelTaladroFilter, activeTaladroName)
+    );
+  }, [currentImportType, summary, selectedTaladrosMap, activeTaladroName, existingTaladrosNames, excelTaladroFilter, getTaladroValidationStatus]);
+
   // Parse preview rows based on current mappings
   const getPreviewRows = () => {
     if (!summary || !excelTaladroFilter) return [];
@@ -297,12 +369,194 @@ export default function ExcelImportModal({
     return filteredRawRows.slice(0, 5);
   };
 
+  const processExcelRowsToCorridas = (rawRows: any[]): any[] => {
+    const findCatalogKey = (val: any, catalog: Record<string, any>, fallback: string): string => {
+      const cleaned = String(val || '').trim();
+      if (!cleaned || cleaned === '-1' || cleaned.toUpperCase() === 'NONE') return fallback;
+      if (catalog === STRENGTH_CATALOG) {
+        const norm = normalizeStrength(cleaned);
+        if (norm !== '-1') return norm;
+      }
+      const matched = Object.keys(catalog).find(k => k.toLowerCase() === cleaned.toLowerCase());
+      return matched || fallback;
+    };
+
+    const findOption = (val: any, options: string[], fallback: string): string => {
+      const cleaned = String(val || '').trim();
+      if (!cleaned || cleaned === '-1' || cleaned.toUpperCase() === 'NONE') return fallback;
+      const matched = options.find(o => o.toLowerCase() === cleaned.toLowerCase());
+      return matched || fallback;
+    };
+
+    const parseRound = (val: any, fallback: number = 0, decimals: number = 2): number => {
+      if (val === undefined || val === null || val === '') return fallback;
+      const num = parseFloat(val);
+      if (isNaN(num)) return fallback;
+      if (num === -1) return -1;
+      const factor = Math.pow(10, decimals);
+      return Math.round((num + Number.EPSILON) * factor) / factor;
+    };
+
+    return rawRows.map((r, index) => {
+      const de = parseRound(r.de, 0);
+      const a = parseRound(r.a, 0);
+      const rec = parseRound(r.rec_m, 0);
+      const rqd = parseRound(r.rqd_m, 0);
+      const lrf = parseRound(r.lrf_m, 0);
+      const small = parseRound(r.small_frag_m, 0);
+
+      const fn = parseInt(r.frac_nat) || 0;
+      const f30 = parseInt(r.frac_buz30) || 0;
+      const f60 = parseInt(r.frac_buz60) || 0;
+      const f90 = parseInt(r.frac_buz90) || 0;
+
+      const rawLito1 = findCatalogKey(r.lito1, LITHOLOGY_CATALOG, 'LMT');
+      const rawLito2 = findCatalogKey(r.lito2, LITHOLOGY_CATALOG, '-1');
+      const rawLito3 = findCatalogKey(r.lito3, LITHOLOGY_CATALOG, '-1');
+
+      const resCascade = resolveLithologyCascade(
+        rawLito1,
+        rawLito2 === "-1" ? "-" : rawLito2,
+        rawLito3 === "-1" ? "-" : rawLito3,
+        'lito1',
+        rawLito1
+      );
+      const lito1 = resCascade.lito1;
+      const lito2 = resCascade.lito2 === "-" ? "-1" : resCascade.lito2;
+      const lito3 = resCascade.lito3 === "-" ? "-1" : resCascade.lito3;
+      const resist = findCatalogKey(r.resistencia, STRENGTH_CATALOG, '-1');
+      const orient = findOption(r.orientacion, ["N", "S", "X"], 'X');
+      const est1 = findCatalogKey(r.tipo_est1, STRUCTURE_CATALOG, '-1');
+      const est2 = findCatalogKey(r.tipo_est2, STRUCTURE_CATALOG, '-1');
+      const weathering = findOption(r.intemperismo, ["UWF", "SWD", "MWM", "HWA", "CWC", "RS", "-1"], '-1');
+      const rel1 = findCatalogKey(r.relleno1, RELLENO_CATALOG, '-1');
+      const rel2 = findCatalogKey(r.relleno2, RELLENO_CATALOG, '-1');
+
+      const abertura = parseRound(r.abertura, 0);
+      const rugosidad = parseInt(r.rugosidad) || 1;
+      const jrc = parseInt(r.jrc10) || 10;
+      const espesor = parseRound(r.espesor, 0);
+      const agua = findCatalogKey(r.agua_obs, GROUNDWATER_CATALOG, 'CDC');
+
+      const rawTurno = String(r.turno || '').trim().toUpperCase();
+      const turno = (rawTurno === 'DIA' || rawTurno === 'D' || rawTurno === 'DAY') ? 'D' : (rawTurno === 'NOCHE' || rawTurno === 'N' || rawTurno === 'NIGHT') ? 'N' : 'D';
+
+      const comentarios = String(r.comentarios || '').trim();
+
+      return {
+        corrida: index + 1,
+        de,
+        a,
+        rec_m: rec,
+        rqd_m: rqd,
+        lrf_m: lrf,
+        small_frag_m: small,
+        lito1,
+        lito2,
+        lito3,
+        resistencia: resist,
+        orientacion: orient,
+        offset: parseRound(r.offset, 0),
+        tipo_est1: est1,
+        tipo_est2: est2,
+        frac_nat: fn,
+        frac_buz30: f30,
+        frac_buz60: f60,
+        frac_buz90: f90,
+        abertura,
+        rugosidad,
+        jrc10: jrc,
+        intemperismo: weathering,
+        relleno1: rel1,
+        relleno2: rel2,
+        espesor,
+        agua_obs: agua,
+        turno,
+        comentarios: (comentarios === 'None' || comentarios === 'null') ? '' : comentarios
+      };
+    });
+  };
+
   const getFilteredRowsToImport = (): any[] => {
     if (!summary || !excelTaladroFilter) return [];
     return summary.rowsByTaladro[excelTaladroFilter] || [];
   };
 
+  const prepareAndOpenConfirmation = (batchTaladros?: BatchImportItem[], singleRows?: any[]) => {
+    if (batchTaladros && batchTaladros.length > 0) {
+      setPendingBatchTaladros(batchTaladros);
+      setPendingSingleRows([]);
+      setPendingCreateNewWithName(undefined);
+      setImportSummaryDetails({
+        taladrosCount: batchTaladros.length,
+        rowsCount: batchTaladros.reduce((sum, item) => sum + item.rows.length, 0),
+        details: batchTaladros.map(item => ({
+          excelName: item.name,
+          targetName: item.name,
+          rows: item.rows.length,
+          isNew: item.isNew
+        }))
+      });
+    } else if (singleRows && singleRows.length > 0) {
+      setPendingBatchTaladros(null);
+      setPendingSingleRows(singleRows);
+      const createNewWithName = importDestination === 'new' ? excelTaladroFilter : undefined;
+      const targetName = importDestination === 'new' ? excelTaladroFilter : activeTaladroName;
+      setPendingCreateNewWithName(createNewWithName);
+      setImportSummaryDetails({
+        taladrosCount: 1,
+        rowsCount: singleRows.length,
+        details: [{
+          excelName: excelTaladroFilter,
+          targetName,
+          rows: singleRows.length,
+          isNew: importDestination === 'new'
+        }]
+      });
+    }
+    setShowWarningOverlay(false);
+    setShowConfirmOverlay(true);
+  };
+
+  const executeFinalImport = () => {
+    if (pendingBatchTaladros && pendingBatchTaladros.length > 0) {
+      onImport([], undefined, pendingBatchTaladros);
+    } else if (pendingSingleRows && pendingSingleRows.length > 0) {
+      executeImport(pendingSingleRows, pendingCreateNewWithName);
+    }
+    setShowConfirmOverlay(false);
+    setShowSuccessOverlay(true);
+  };
+
   const handleConfirmImport = () => {
+    if (currentImportType === 'LGG' && summary) {
+      const selectedEntries = Object.entries(selectedTaladrosMap).filter(([_, v]) => v.selected);
+      if (selectedEntries.length === 0) {
+        alert("Selecciona al menos un taladro para importar.");
+        return;
+      }
+
+      const hasErrors = selectedEntries.some(([excelName, cfg]) => getTaladroValidationStatus(excelName, cfg.targetName).isError);
+      if (hasErrors) {
+        alert("Existen taladros seleccionados con errores de nombre o duplicidad. Corrígelos antes de confirmar.");
+        return;
+      }
+
+      const batchTaladros: BatchImportItem[] = selectedEntries.map(([excelName, cfg]) => {
+        const rawRowsForThisTal = summary.rowsByTaladro[excelName] || [];
+        const processedRows = processExcelRowsToCorridas(rawRowsForThisTal);
+        const finalTargetName = cfg.targetName.trim().toUpperCase();
+        return {
+          name: finalTargetName,
+          rows: processedRows,
+          isNew: finalTargetName !== activeTaladroName.toUpperCase()
+        };
+      });
+
+      prepareAndOpenConfirmation(batchTaladros);
+      return;
+    }
+
     const rowsToImport = getFilteredRowsToImport();
 
     if (rowsToImport.length === 0) {
@@ -368,11 +622,11 @@ export default function ExcelImportModal({
       setPendingRows(rowsToImport);
       setShowWarningOverlay(true);
     } else {
-      executeImport(rowsToImport);
+      prepareAndOpenConfirmation(undefined, rowsToImport);
     }
   };
 
-  const executeImport = (rows: any[]) => {
+  const executeImport = (rows: any[], targetCreateNewWithName?: string) => {
     // Case-insensitive catalog matchers
     const findCatalogKey = (val: any, catalog: Record<string, any>, fallback: string): string => {
       const cleaned = String(val || '').trim();
@@ -657,8 +911,7 @@ export default function ExcelImportModal({
       };
     });
 
-    onImport(standardRows, importDestination === 'new' ? excelTaladroFilter : undefined);
-    onClose();
+    onImport(standardRows, targetCreateNewWithName !== undefined ? targetCreateNewWithName : (importDestination === 'new' ? excelTaladroFilter : undefined));
   };
 
   const resetState = () => {
@@ -672,6 +925,12 @@ export default function ExcelImportModal({
     setExcelTaladroFilter('');
     setImportDestination('active');
     setShowWarningOverlay(false);
+    setShowConfirmOverlay(false);
+    setShowSuccessOverlay(false);
+    setPendingBatchTaladros(null);
+    setPendingSingleRows([]);
+    setPendingCreateNewWithName(undefined);
+    setImportSummaryDetails(null);
   };
 
   return (
@@ -812,104 +1071,151 @@ export default function ExcelImportModal({
             <div className="space-y-4">
               <div className="flex items-center gap-2 text-slate-300 font-black uppercase tracking-wider text-xs border-b border-navy-800/40 pb-1.5">
                 <Filter size={14} className="text-emerald-400" />
-                <span>1. Filtro de Extracción Previo (Mapeo por Taladro)</span>
+                <span>1. Selección y Mapeo de Taladros a Importar</span>
               </div>
 
-              <InfoBanner
-                title="Filtro por Taladro / Sondaje"
-                description={<>Se detectaron un total de <span className="text-slate-200 font-bold">{summary.totalRows} filas válidas</span> con datos en la hoja de cálculo. Selecciona el taladro del Excel que deseas extraer para filtrar e importar únicamente la información que corresponde al taladro activo en el sistema.</>}
-              />
+              {currentImportType === 'LGG' ? (
+                <div className="space-y-4">
+                  <InfoBanner
+                    title="Selección Múltiple de Taladros y Validación de Duplicados"
+                    description={<>Se detectaron <span className="text-slate-200 font-bold">{summary.uniqueTaladros.length} taladros</span> en el archivo Excel ({summary.totalRows} filas). Puedes seleccionar varios taladros para importarlos juntos. Si un nombre ya existe en la base de datos, <strong>debes cambiarle el nombre</strong> en la casilla editable para poder importarlo.</>}
+                  />
 
-              <div className="p-4 bg-navy-950/20 border border-navy-800/40 rounded-xl space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Select Taladro from Excel */}
-                  <div className="space-y-2">
-                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-                      Seleccionar Taladro del Excel a extraer:
-                    </label>
-                    <select
-                      value={excelTaladroFilter}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setExcelTaladroFilter(val);
-                        setImportDestination(isTaladroMatch(val, activeTaladroName) ? 'active' : 'new');
-                      }}
-                      className="w-full bg-navy-900 border border-navy-800 hover:border-navy-700 rounded-lg px-3 py-2 text-slate-200 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500 font-semibold"
-                    >
-                      <option value="">-- SELECCIONAR --</option>
-                      {summary.uniqueTaladros.map(t => (
-                        <option key={t} value={t}>
-                          {t} ({summary.rowsByTaladro[t]?.length || 0} registros)
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Matching Info */}
-                  <div className="bg-navy-900/40 border border-navy-850 rounded-lg p-3.5 flex flex-col justify-center">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-400 font-medium">Taladro Activo:</span>
-                      <span className="font-bold text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">{activeTaladroName}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-xs mt-2 pt-2 border-t border-navy-850/60">
-                      <span className="text-slate-400 font-medium">Registros a importar al grid:</span>
-                      <span className="font-black text-emerald-400">
-                        {excelTaladroFilter ? summary.rowsByTaladro[excelTaladroFilter]?.length || 0 : 0} filas
+                  <div className="border border-navy-800 rounded-xl bg-navy-950/40 overflow-hidden">
+                    <div className="p-3 bg-navy-900/60 border-b border-navy-800 flex justify-between items-center text-xs">
+                      <label className="flex items-center gap-2 font-bold text-slate-200 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={summary.uniqueTaladros.every(t => selectedTaladrosMap[t]?.selected)}
+                          onChange={(e) => {
+                            const isChecked = e.target.checked;
+                            const newMap = { ...selectedTaladrosMap };
+                            summary.uniqueTaladros.forEach(t => {
+                              if (newMap[t]) newMap[t].selected = isChecked;
+                            });
+                            setSelectedTaladrosMap(newMap);
+                          }}
+                          className="rounded border-navy-700 bg-navy-950 text-emerald-500 focus:ring-emerald-500/20 w-4 h-4"
+                        />
+                        <span>Seleccionar Todos ({summary.uniqueTaladros.length} taladros)</span>
+                      </label>
+                      <span className="text-slate-400 text-[11px]">
+                        Taladro Activo: <strong className="text-cyan-400">{activeTaladroName}</strong>
                       </span>
+                    </div>
+
+                    <div className="max-h-[220px] overflow-y-auto divide-y divide-navy-900/60 text-xs">
+                      {summary.uniqueTaladros.map(excelName => {
+                        const config = selectedTaladrosMap[excelName] || { selected: true, targetName: excelName };
+                        const status = getTaladroValidationStatus(excelName, config.targetName);
+                        const rowCount = summary.rowsByTaladro[excelName]?.length || 0;
+
+                        return (
+                          <div key={excelName} className={`p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${config.selected ? 'bg-navy-900/20' : 'opacity-60 bg-navy-950/30'}`}>
+                            <div className="flex items-center gap-3 min-w-0">
+                              <input
+                                type="checkbox"
+                                checked={config.selected}
+                                onChange={(e) => {
+                                  setSelectedTaladrosMap({
+                                    ...selectedTaladrosMap,
+                                    [excelName]: { ...config, selected: e.target.checked }
+                                  });
+                                }}
+                                className="rounded border-navy-700 bg-navy-950 text-emerald-500 focus:ring-emerald-500/20 w-4 h-4 cursor-pointer shrink-0"
+                              />
+                              <div className="min-w-0">
+                                <span className="font-bold text-slate-200 block truncate">{excelName}</span>
+                                <span className="text-[10px] text-slate-500 font-semibold">{rowCount} corridas en Excel</span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 w-full sm:w-auto">
+                              <div className="flex items-center gap-1.5 flex-1 sm:w-56">
+                                <span className="text-[10px] text-slate-400 font-bold uppercase shrink-0">BD:</span>
+                                <input
+                                  type="text"
+                                  value={config.targetName}
+                                  onChange={(e) => {
+                                    const val = e.target.value.toUpperCase();
+                                    setSelectedTaladrosMap({
+                                      ...selectedTaladrosMap,
+                                      [excelName]: { ...config, targetName: val }
+                                    });
+                                  }}
+                                  disabled={!config.selected}
+                                  placeholder="Código del taladro..."
+                                  className={`w-full bg-navy-950 border rounded-lg px-2.5 py-1 text-xs font-bold focus:outline-none ${status.isError ? 'border-rose-500/80 text-rose-300' : 'border-navy-800 text-slate-100 focus:border-cyan-500'}`}
+                                />
+                              </div>
+
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase border shrink-0 ${status.bg}`}>
+                                {status.text}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
-
-                {excelTaladroFilter && !isTaladroMatch(excelTaladroFilter, activeTaladroName) && (currentImportType === 'STRUCT' || currentImportType === 'PLT' || currentImportType === 'SURVEY') ? (
-                  <div className="mt-4 p-4 rounded-xl border border-red-500/30 bg-red-500/10 space-y-3 shadow-lg">
-                    <div className="flex items-center gap-2 text-red-400 text-sm font-bold uppercase tracking-wider">
-                      <AlertTriangle size={16} />
-                      <span>Error de Consistencia: Taladro No Coincide</span>
-                    </div>
-                    <p className="text-sm text-slate-200 leading-relaxed font-medium font-sans">
-                      El taladro seleccionado del Excel (<span className="font-bold text-red-400">{excelTaladroFilter}</span>) es diferente al taladro activo actual (<span className="font-bold text-cyan-400">{activeTaladroName}</span>).
-                    </p>
-                    <p className="text-xs text-slate-400 leading-relaxed font-sans">
-                      Para Logueo Estructural, Ensayos PLT y Surveys, está prohibido importar registros a un taladro diferente al activo para prevenir inconsistencias espaciales o datos huérfanos. Por favor, selecciona el taladro correcto en tu archivo Excel o cambia de taladro en el sistema.
-                    </p>
-                  </div>
-                ) : excelTaladroFilter && !isTaladroMatch(excelTaladroFilter, activeTaladroName) && (
-                  <div className="mt-4 p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 space-y-3 shadow-lg">
-                    <div className="flex items-center gap-2 text-amber-400 text-sm font-bold uppercase tracking-wider">
-                      <AlertTriangle size={16} />
-                      <span>Conflicto de Nombres de Taladro</span>
-                    </div>
-                    <p className="text-sm text-slate-200 leading-relaxed font-medium">
-                      El taladro seleccionado del Excel (<span className="font-bold text-amber-400">{excelTaladroFilter}</span>) es diferente al taladro activo actual (<span className="font-bold text-cyan-400">{activeTaladroName}</span>). ¿Cómo deseas importar esta información?
-                    </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 font-sans">
-                      <button
-                        type="button"
-                        onClick={() => setImportDestination('active')}
-                        className={`flex flex-col items-start p-3.5 rounded-xl border text-left transition-all cursor-pointer ${importDestination === 'active'
-                          ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.15)]'
-                          : 'bg-navy-950/60 border-navy-800 hover:border-navy-700 text-slate-300 hover:text-slate-200'
-                          }`}
+              ) : (
+                <div className="p-4 bg-navy-950/20 border border-navy-800/40 rounded-xl space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Select Taladro from Excel */}
+                    <div className="space-y-2">
+                      <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                        Seleccionar Taladro del Excel a extraer:
+                      </label>
+                      <select
+                        value={excelTaladroFilter}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setExcelTaladroFilter(val);
+                          setImportDestination(isTaladroMatch(val, activeTaladroName) ? 'active' : 'new');
+                        }}
+                        className="w-full bg-navy-900 border border-navy-800 hover:border-navy-700 rounded-lg px-3 py-2 text-slate-200 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500 font-semibold"
                       >
-                        <span className="text-sm font-black tracking-wide">Importar en taladro activo</span>
-                        <span className="text-xs opacity-90 mt-1">Se cargarán los datos en '{activeTaladroName}'</span>
-                      </button>
+                        <option value="">-- SELECCIONAR --</option>
+                        {summary.uniqueTaladros.map(t => (
+                          <option key={t} value={t}>
+                            {t} ({summary.rowsByTaladro[t]?.length || 0} registros)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-                      <button
-                        type="button"
-                        onClick={() => setImportDestination('new')}
-                        className={`flex flex-col items-start p-3.5 rounded-xl border text-left transition-all cursor-pointer ${importDestination === 'new'
-                          ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 shadow-[0_0_12px_rgba(6,182,212,0.15)]'
-                          : 'bg-navy-950/60 border-navy-800 hover:border-navy-700 text-slate-300 hover:text-slate-200'
-                          }`}
-                      >
-                        <span className="text-sm font-black tracking-wide">Crear nuevo taladro</span>
-                        <span className="text-xs opacity-90 mt-1">Se creará e importará en '{excelTaladroFilter}'</span>
-                      </button>
+                    {/* Matching Info */}
+                    <div className="bg-navy-900/40 border border-navy-850 rounded-lg p-3.5 flex flex-col justify-center">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-400 font-medium">Taladro Activo:</span>
+                        <span className="font-bold text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">{activeTaladroName}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs mt-2 pt-2 border-t border-navy-850/60">
+                        <span className="text-slate-400 font-medium">Registros a importar al grid:</span>
+                        <span className="font-black text-emerald-400">
+                          {excelTaladroFilter ? summary.rowsByTaladro[excelTaladroFilter]?.length || 0 : 0} filas
+                        </span>
+                      </div>
                     </div>
                   </div>
-                )}
-              </div>
+
+                  {excelTaladroFilter && !isTaladroMatch(excelTaladroFilter, activeTaladroName) && (
+                    <div className="mt-4 p-4 rounded-xl border border-red-500/30 bg-red-500/10 space-y-3 shadow-lg">
+                      <div className="flex items-center gap-2 text-red-400 text-sm font-bold uppercase tracking-wider">
+                        <AlertTriangle size={16} />
+                        <span>Error de Consistencia: Taladro No Coincide</span>
+                      </div>
+                      <p className="text-sm text-slate-200 leading-relaxed font-medium font-sans">
+                        El taladro seleccionado del Excel (<span className="font-bold text-red-400">{excelTaladroFilter}</span>) es diferente al taladro activo actual (<span className="font-bold text-cyan-400">{activeTaladroName}</span>).
+                      </p>
+                      <p className="text-xs text-slate-400 leading-relaxed font-sans">
+                        Para Logueo Estructural, Ensayos PLT y Surveys, está prohibido importar registros a un taladro diferente al activo para prevenir inconsistencias espaciales o datos huérfanos. Por favor, selecciona el taladro correcto en tu archivo Excel o cambia de taladro en el sistema.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -1115,11 +1421,17 @@ export default function ExcelImportModal({
 
         {/* Footer controls */}
         <div className="flex justify-between items-center px-6 py-4 bg-navy-950/80 border-t border-navy-800/80">
-          <div className="text-xs text-slate-500">
-            {file && summary && excelTaladroFilter && (
-              <span>
-                Se importarán <span className="font-bold text-emerald-400">{getFilteredRowsToImport().length}</span> de <span className="font-bold text-slate-400">{summary.totalRows}</span> registros válidos.
-              </span>
+          <div className="text-xs text-slate-400">
+            {file && summary && (
+              currentImportType === 'LGG' ? (
+                <span>
+                  Se importarán <strong className="text-emerald-400 font-extrabold">{Object.values(selectedTaladrosMap).filter(v => v.selected).length} taladros seleccionados</strong> ({Object.entries(selectedTaladrosMap).filter(([_, v]) => v.selected).reduce((sum, [k]) => sum + (summary.rowsByTaladro[k]?.length || 0), 0)} corridas en total).
+                </span>
+              ) : (
+                <span>
+                  Se importarán <span className="font-bold text-emerald-400">{getFilteredRowsToImport().length}</span> de <span className="font-bold text-slate-400">{summary.totalRows}</span> registros válidos.
+                </span>
+              )
             )}
           </div>
           <div className="flex gap-3">
@@ -1236,14 +1548,128 @@ export default function ExcelImportModal({
                 </button>
                 <button
                   onClick={() => {
-                    executeImport(pendingRows);
+                    prepareAndOpenConfirmation(undefined, pendingRows);
                   }}
                   className="flex-1 bg-cyan-500 hover:bg-cyan-400 text-navy-950 py-2.5 rounded-lg text-xs font-bold transition-all active:scale-95 shadow-md shadow-cyan-500/15"
                 >
-                  Confirmar Importación
+                  Continuar a Resumen
                 </button>
               </div>
 
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Confirmación e Información Pre-Importación */}
+        {showConfirmOverlay && importSummaryDetails && (
+          <div className="absolute inset-0 bg-navy-950/90 z-50 flex items-center justify-center p-6 backdrop-blur-sm animate-fade-in">
+            <div className="glass-panel w-full max-w-xl border border-navy-800 rounded-2xl p-6 space-y-6 text-center shadow-2xl relative bg-navy-900/95 flex flex-col max-h-[85vh] overflow-hidden">
+              <div className="space-y-2 shrink-0">
+                <div className="w-12 h-12 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center mx-auto shadow-lg shadow-cyan-500/10">
+                  <Layers size={24} />
+                </div>
+                <h4 className="text-base font-black text-slate-100 uppercase tracking-wider">
+                  Confirmar Importación de Datos
+                </h4>
+                <p className="text-xs text-slate-400">
+                  Revisa el desglose de información que se inyectará en la base de datos.
+                </p>
+              </div>
+
+              {/* Highlights grid */}
+              <div className="grid grid-cols-2 gap-3 shrink-0">
+                <div className="bg-navy-950/60 border border-navy-800 p-3 rounded-xl text-center">
+                  <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Taladros a Procesar</span>
+                  <span className="text-lg font-black text-cyan-400">{importSummaryDetails.taladrosCount}</span>
+                </div>
+                <div className="bg-navy-950/60 border border-navy-800 p-3 rounded-xl text-center">
+                  <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Total Registros / Corridas</span>
+                  <span className="text-lg font-black text-emerald-400">{importSummaryDetails.rowsCount}</span>
+                </div>
+              </div>
+
+              {/* Drillhole Detail List */}
+              <div className="flex-1 overflow-y-auto border border-navy-800 rounded-xl bg-navy-950/40 text-xs text-left">
+                <div className="p-2.5 bg-navy-900/80 border-b border-navy-800 font-bold text-slate-300 flex justify-between">
+                  <span>Detalle por Sondaje</span>
+                  <span>Acción / Registros</span>
+                </div>
+                <div className="divide-y divide-navy-900/60">
+                  {importSummaryDetails.details.map((item, idx) => (
+                    <div key={idx} className="p-3 flex items-center justify-between gap-3">
+                      <div className="flex flex-col">
+                        <span className="font-bold text-slate-200">{item.targetName}</span>
+                        {item.excelName && item.excelName !== item.targetName && (
+                          <span className="text-[10px] text-slate-400">Orig: {item.excelName}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${item.isNew ? 'bg-cyan-500/10 border border-cyan-500/30 text-cyan-400' : 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'}`}>
+                          {item.isNew ? 'Nuevo Sondaje' : 'Actualiza Activo'}
+                        </span>
+                        <span className="font-extrabold text-slate-300">{item.rows} filas</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex gap-3 pt-2 shrink-0 border-t border-navy-800/40">
+                <button
+                  onClick={() => setShowConfirmOverlay(false)}
+                  className="flex-1 bg-navy-950 hover:bg-navy-900 border border-navy-800 text-slate-300 py-2.5 rounded-lg text-xs font-bold transition-all active:scale-95"
+                >
+                  Cancelar / Revisar Mapeo
+                </button>
+                <button
+                  onClick={executeFinalImport}
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-lg text-xs font-bold transition-all active:scale-95 shadow-md shadow-emerald-600/20 flex items-center justify-center gap-1.5"
+                >
+                  <Check size={16} />
+                  <span>Sí, Importar Datos</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Final de Éxito de Importación */}
+        {showSuccessOverlay && importSummaryDetails && (
+          <div className="absolute inset-0 bg-navy-950/95 z-50 flex items-center justify-center p-6 backdrop-blur-sm animate-fade-in">
+            <div className="glass-panel w-full max-w-md border border-emerald-500/30 rounded-2xl p-6 space-y-6 text-center shadow-2xl relative bg-navy-900/95 flex flex-col">
+              <div className="space-y-3">
+                <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center mx-auto shadow-xl shadow-emerald-500/20 animate-bounce">
+                  <CheckCircle2 size={36} />
+                </div>
+                <h3 className="text-lg font-black text-white uppercase tracking-wider">
+                  ¡Importación Completada!
+                </h3>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Se han validado e inyectado exitosamente <strong className="text-emerald-400 font-bold">{importSummaryDetails.taladrosCount} taladro(s)</strong> con un total de <strong className="text-emerald-400 font-bold">{importSummaryDetails.rowsCount} registro(s)</strong>.
+                </p>
+              </div>
+
+              <div className="bg-navy-950/60 border border-navy-800 rounded-xl p-3 max-h-40 overflow-y-auto divide-y divide-navy-900/50 text-left text-xs">
+                {importSummaryDetails.details.map((item, idx) => (
+                  <div key={idx} className="py-2 flex items-center justify-between">
+                    <span className="font-bold text-slate-200">{item.targetName}</span>
+                    <span className="text-[11px] text-emerald-400 font-extrabold">{item.rows} registros ✔</span>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                onClick={() => {
+                  setShowSuccessOverlay(false);
+                  resetState();
+                  onClose();
+                }}
+                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all active:scale-95 shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2"
+              >
+                <Sparkles size={16} />
+                <span>Finalizar y Ver Registros</span>
+              </button>
             </div>
           </div>
         )}

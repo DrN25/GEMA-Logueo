@@ -79,7 +79,12 @@ export function computeTaladroDiff(before: any, after: any): TaladroDiffSummary 
     };
   }
 
-  // Si no hay snapshot 'before', intentar cargar la copia de respaldo de BD desde localStorage
+  // Garantizar que 'before' pertenezca al mismo taladro que 'after'
+  if (before && after?.name && before?.name && before.name.toUpperCase() !== after.name.toUpperCase()) {
+    before = null;
+  }
+
+  // Si no hay snapshot 'before' (o pertenecía a otro taladro), intentar cargar la copia de respaldo de BD para `after.name` desde localStorage
   if (!before && after?.name) {
     try {
       const cachedSnapshot = localStorage.getItem(`geolog_snapshot_data_${after.name}`);
@@ -276,14 +281,10 @@ export function computeAllTaladrosDiff(
     }
   });
 
-  const finalNames = unsavedNames.length > 0
-    ? unsavedNames
-    : (activeTaladro?.name ? [activeTaladro.name] : []);
-
   return {
-    unsavedTaladrosCount: finalNames.length,
-    unsavedTaladrosNames: finalNames,
-    totalFieldsChanged: totalFields > 0 ? totalFields : 1,
+    unsavedTaladrosCount: unsavedNames.length,
+    unsavedTaladrosNames: unsavedNames,
+    totalFieldsChanged: totalFields,
     totalRowsAdded: totalAdded,
     totalRowsDeleted: totalDeleted,
   };

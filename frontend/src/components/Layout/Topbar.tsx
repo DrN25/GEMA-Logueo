@@ -18,7 +18,6 @@ interface TopbarProps {
 export default function Topbar({
   sidebarCollapsed,
   setSidebarCollapsed,
-  activeTaladro,
   currentView,
   syncStatus,
   syncMessage,
