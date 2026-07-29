@@ -369,7 +369,8 @@ export default function RmrGrid({
     list.push(
       {
         key: 's_76', label: '[76] Res.', width: 'w-16', type: 'readonly',
-        headerBgClass: 'bg-cyan-950/20 text-cyan-300 font-bold',
+        headerBgClass: 'bg-amber-500/20 text-amber-300 font-bold border-b border-amber-500/30',
+        cellClassName: 'bg-amber-500/5 text-amber-200',
         renderCell: (row) => (
           <FormulaTooltipTrigger formulaId="rmr_strength" params={{ code: row.resistencia, val: row.s_76 }} position="bottom">
             <div className="text-center py-1.5">{row.s_76}</div>
@@ -378,7 +379,8 @@ export default function RmrGrid({
       },
       {
         key: 'rqd_76', label: '[76] RQD', width: 'w-16', type: 'readonly',
-        headerBgClass: 'bg-cyan-950/20 text-cyan-300 font-bold',
+        headerBgClass: 'bg-amber-500/20 text-amber-300 font-bold border-b border-amber-500/30',
+        cellClassName: 'bg-amber-500/5 text-amber-200',
         renderCell: (row) => (
           <FormulaTooltipTrigger formulaId="rmr_rqd" params={{ rqd: row.rqd_pct, val: row.rqd_76 }} position="bottom">
             <div className="text-center py-1.5">{row.rqd_76}</div>
@@ -387,7 +389,8 @@ export default function RmrGrid({
       },
       {
         key: 'sp_76', label: '[76] Espac.', width: 'w-16', type: 'readonly',
-        headerBgClass: 'bg-cyan-950/20 text-cyan-300 font-bold',
+        headerBgClass: 'bg-amber-500/20 text-amber-300 font-bold border-b border-amber-500/30',
+        cellClassName: 'bg-amber-500/5 text-amber-200',
         renderCell: (row) => (
           <FormulaTooltipTrigger formulaId="rmr_spacing_76" params={{ spacing: row.spacing_mm, val: row.sp_76 }} position="bottom">
             <div className="text-center py-1.5">{row.sp_76}</div>
@@ -396,7 +399,8 @@ export default function RmrGrid({
       },
       {
         key: 'ab_76', label: '[76] Abert.', width: 'w-16', type: 'readonly',
-        headerBgClass: 'bg-cyan-950/20 text-cyan-300 font-bold',
+        headerBgClass: 'bg-amber-500/20 text-amber-300 font-bold border-b border-amber-500/30',
+        cellClassName: 'bg-amber-500/5 text-amber-200',
         renderCell: (row) => (
           <FormulaTooltipTrigger formulaId="rmr_aperture_76" params={{ aperture: row.abertura, val: row.ab_76 }} position="bottom">
             <div className="text-center py-1.5">{row.ab_76}</div>
@@ -405,7 +409,8 @@ export default function RmrGrid({
       },
       {
         key: 'rg_76', label: '[76] Rug.', width: 'w-16', type: 'readonly',
-        headerBgClass: 'bg-cyan-950/20 text-cyan-300 font-bold',
+        headerBgClass: 'bg-amber-500/20 text-amber-300 font-bold border-b border-amber-500/30',
+        cellClassName: 'bg-amber-500/5 text-amber-200',
         renderCell: (row) => (
           <FormulaTooltipTrigger formulaId="rmr_roughness_76" params={{ roughness: row.rugosidad, val: row.rg_76 }} position="bottom">
             <div className="text-center py-1.5">{row.rg_76}</div>
@@ -414,7 +419,8 @@ export default function RmrGrid({
       },
       {
         key: 'fl_76', label: '[76] Rell.', width: 'w-16', type: 'readonly',
-        headerBgClass: 'bg-cyan-950/20 text-cyan-300 font-bold',
+        headerBgClass: 'bg-amber-500/20 text-amber-300 font-bold border-b border-amber-500/30',
+        cellClassName: 'bg-amber-500/5 text-amber-200',
         renderCell: (row) => (
           <FormulaTooltipTrigger formulaId="rmr_filling_76" params={{ code: row.relleno1, thickness: row.espesor, val: row.fl_76 }} position="bottom">
             <div className="text-center py-1.5">{row.fl_76}</div>
@@ -423,7 +429,8 @@ export default function RmrGrid({
       },
       {
         key: 'wt_76', label: '[76] Intemp.', width: 'w-16', type: 'readonly',
-        headerBgClass: 'bg-cyan-950/20 text-cyan-300 font-bold',
+        headerBgClass: 'bg-amber-500/20 text-amber-300 font-bold border-b border-amber-500/30',
+        cellClassName: 'bg-amber-500/5 text-amber-200',
         renderCell: (row) => (
           <FormulaTooltipTrigger formulaId="rmr_weathering_76" params={{ code: row.intemperismo, val: row.wt_76 }} position="bottom">
             <div className="text-center py-1.5">{row.wt_76}</div>
@@ -432,7 +439,8 @@ export default function RmrGrid({
       },
       {
         key: 'p_76', label: '[76] Pers.', width: 'w-16', type: 'readonly',
-        headerBgClass: 'bg-cyan-950/20 text-cyan-300 font-bold',
+        headerBgClass: 'bg-amber-500/20 text-amber-300 font-bold border-b border-amber-500/30',
+        cellClassName: 'bg-amber-500/5 text-amber-200',
         renderCell: (row) => (
           <FormulaTooltipTrigger formulaId="rmr_persistence_76" params={{ ab: row.ab_76, rg: row.rg_76, fl: row.fl_76, wt: row.wt_76, val: row.p_76 }} position="bottom">
             <div className="text-center py-1.5">{row.p_76}</div>
@@ -441,16 +449,18 @@ export default function RmrGrid({
       },
       {
         key: 'j_76', label: '[76] Juntas', width: 'w-18', type: 'readonly',
-        headerBgClass: 'bg-cyan-950/20 text-cyan-400 font-bold',
+        headerBgClass: 'bg-amber-500/20 text-amber-300 font-bold border-b border-amber-500/30',
+        cellClassName: 'bg-amber-500/5 font-bold text-amber-300',
         renderCell: (row) => (
           <FormulaTooltipTrigger formulaId="rmr_joints_76" params={{ ab: row.ab_76, rg: row.rg_76, fl: row.fl_76, wt: row.wt_76, pe: row.p_76, val: row.j_76 }} position="bottom">
-            <div className="text-center font-bold text-cyan-400 py-1.5">{row.j_76}</div>
+            <div className="text-center font-bold text-amber-300 py-1.5">{row.j_76}</div>
           </FormulaTooltipTrigger>
         )
       },
       {
         key: 'w_76', label: '[76] Agua', width: 'w-16', type: 'readonly',
-        headerBgClass: 'bg-cyan-950/20 text-cyan-300 font-bold',
+        headerBgClass: 'bg-amber-500/20 text-amber-300 font-bold border-b border-amber-500/30',
+        cellClassName: 'bg-amber-500/5 text-amber-200',
         renderCell: (row) => (
           <FormulaTooltipTrigger formulaId="rmr_water" params={{ depth: row.a, wt: 97, code: row.agua_obs, val76: row.w_76, val89: row.w_89 }} position="bottom">
             <div className="text-center py-1.5">{row.w_76}</div>
@@ -462,7 +472,8 @@ export default function RmrGrid({
         label: "RMR'76",
         width: 'w-20',
         type: 'readonly',
-        headerBgClass: 'bg-cyan-950/30 text-cyan-400 font-black',
+        headerBgClass: 'bg-amber-500/20 text-amber-300 font-extrabold border-b border-amber-500/30',
+        cellClassName: 'bg-amber-500/5',
         renderCell: (row) => {
           const score = row.rmr_76;
           if (score === 'ERR') {
@@ -488,7 +499,8 @@ export default function RmrGrid({
         label: 'Calidad 76',
         width: 'w-24',
         type: 'readonly',
-        headerBgClass: 'bg-cyan-950/30 text-cyan-400 font-bold',
+        headerBgClass: 'bg-amber-500/20 text-amber-300 font-extrabold border-b border-amber-500/30',
+        cellClassName: 'bg-amber-500/5',
         renderCell: (row) => (
           <FormulaTooltipTrigger formulaId="rmr_class" params={{ rmr: row.rmr_76 === 'ERR' ? 0 : row.rmr_76, val: row.class_76 }} position="top">
             <div className="flex justify-center items-center h-full w-full py-0.5">
@@ -505,7 +517,8 @@ export default function RmrGrid({
     list.push(
       {
         key: 's_89', label: '[89] Res.', width: 'w-16', type: 'readonly',
-        headerBgClass: 'bg-emerald-950/20 text-emerald-300 font-bold',
+        headerBgClass: 'bg-fuchsia-500/20 text-fuchsia-300 font-bold border-b border-fuchsia-500/30',
+        cellClassName: 'bg-fuchsia-500/5 text-fuchsia-200',
         renderCell: (row) => (
           <FormulaTooltipTrigger formulaId="rmr_strength" params={{ code: row.resistencia, val: row.s_89 }} position="bottom">
             <div className="text-center py-1.5">{row.s_89}</div>
@@ -514,7 +527,8 @@ export default function RmrGrid({
       },
       {
         key: 'rqd_89', label: '[89] RQD', width: 'w-16', type: 'readonly',
-        headerBgClass: 'bg-emerald-950/20 text-emerald-300 font-bold',
+        headerBgClass: 'bg-fuchsia-500/20 text-fuchsia-300 font-bold border-b border-fuchsia-500/30',
+        cellClassName: 'bg-fuchsia-500/5 text-fuchsia-200',
         renderCell: (row) => (
           <FormulaTooltipTrigger formulaId="rmr_rqd" params={{ rqd: row.rqd_pct, val: row.rqd_89 }} position="bottom">
             <div className="text-center py-1.5">{row.rqd_89}</div>
@@ -523,7 +537,8 @@ export default function RmrGrid({
       },
       {
         key: 'sp_89', label: '[89] Espac.', width: 'w-16', type: 'readonly',
-        headerBgClass: 'bg-emerald-950/20 text-emerald-300 font-bold',
+        headerBgClass: 'bg-fuchsia-500/20 text-fuchsia-300 font-bold border-b border-fuchsia-500/30',
+        cellClassName: 'bg-fuchsia-500/5 text-fuchsia-200',
         renderCell: (row) => (
           <FormulaTooltipTrigger formulaId="rmr_spacing_89" params={{ spacing: row.spacing_mm, val: row.sp_89 }} position="bottom">
             <div className="text-center py-1.5">{row.sp_89}</div>
@@ -532,7 +547,8 @@ export default function RmrGrid({
       },
       {
         key: 'ab_89', label: '[89] Abert.', width: 'w-16', type: 'readonly',
-        headerBgClass: 'bg-emerald-950/20 text-emerald-300 font-bold',
+        headerBgClass: 'bg-fuchsia-500/20 text-fuchsia-300 font-bold border-b border-fuchsia-500/30',
+        cellClassName: 'bg-fuchsia-500/5 text-fuchsia-200',
         renderCell: (row) => (
           <FormulaTooltipTrigger formulaId="rmr_aperture_89" params={{ aperture: row.abertura, val: row.ab_89 }} position="bottom">
             <div className="text-center py-1.5">{row.ab_89}</div>
@@ -541,7 +557,8 @@ export default function RmrGrid({
       },
       {
         key: 'rg_89', label: '[89] Rug.', width: 'w-16', type: 'readonly',
-        headerBgClass: 'bg-emerald-950/20 text-emerald-300 font-bold',
+        headerBgClass: 'bg-fuchsia-500/20 text-fuchsia-300 font-bold border-b border-fuchsia-500/30',
+        cellClassName: 'bg-fuchsia-500/5 text-fuchsia-200',
         renderCell: (row) => (
           <FormulaTooltipTrigger formulaId="rmr_roughness_89" params={{ roughness: row.rugosidad, val: row.rg_89 }} position="bottom">
             <div className="text-center py-1.5">{row.rg_89}</div>
@@ -550,7 +567,8 @@ export default function RmrGrid({
       },
       {
         key: 'fl_89', label: '[89] Rell.', width: 'w-16', type: 'readonly',
-        headerBgClass: 'bg-emerald-950/20 text-emerald-300 font-bold',
+        headerBgClass: 'bg-fuchsia-500/20 text-fuchsia-300 font-bold border-b border-fuchsia-500/30',
+        cellClassName: 'bg-fuchsia-500/5 text-fuchsia-200',
         renderCell: (row) => (
           <FormulaTooltipTrigger formulaId="rmr_filling_89" params={{ code: row.relleno1, thickness: row.espesor, val: row.fl_89 }} position="bottom">
             <div className="text-center py-1.5">{row.fl_89}</div>
@@ -559,7 +577,8 @@ export default function RmrGrid({
       },
       {
         key: 'wt_89', label: '[89] Intemp.', width: 'w-16', type: 'readonly',
-        headerBgClass: 'bg-emerald-950/20 text-emerald-300 font-bold',
+        headerBgClass: 'bg-fuchsia-500/20 text-fuchsia-300 font-bold border-b border-fuchsia-500/30',
+        cellClassName: 'bg-fuchsia-500/5 text-fuchsia-200',
         renderCell: (row) => (
           <FormulaTooltipTrigger formulaId="rmr_weathering_89" params={{ code: row.intemperismo, val: row.wt_89 }} position="bottom">
             <div className="text-center py-1.5">{row.wt_89}</div>
@@ -568,7 +587,8 @@ export default function RmrGrid({
       },
       {
         key: 'p_89', label: '[89] Pers.', width: 'w-16', type: 'readonly',
-        headerBgClass: 'bg-emerald-950/20 text-emerald-300 font-bold',
+        headerBgClass: 'bg-fuchsia-500/20 text-fuchsia-300 font-bold border-b border-fuchsia-500/30',
+        cellClassName: 'bg-fuchsia-500/5 text-fuchsia-200',
         renderCell: (row) => (
           <FormulaTooltipTrigger formulaId="rmr_persistence_89" params={{ ab: row.ab_89, rg: row.rg_89, fl: row.fl_89, wt: row.wt_89, val: row.p_89 }} position="bottom">
             <div className="text-center py-1.5">{row.p_89}</div>
@@ -577,16 +597,18 @@ export default function RmrGrid({
       },
       {
         key: 'j_89', label: '[89] Juntas', width: 'w-18', type: 'readonly',
-        headerBgClass: 'bg-emerald-950/20 text-emerald-400 font-bold',
+        headerBgClass: 'bg-fuchsia-500/20 text-fuchsia-300 font-bold border-b border-fuchsia-500/30',
+        cellClassName: 'bg-fuchsia-500/5 font-bold text-fuchsia-300',
         renderCell: (row) => (
           <FormulaTooltipTrigger formulaId="rmr_joints_89" params={{ ab: row.ab_89, rg: row.rg_89, fl: row.fl_89, wt: row.wt_89, pe: row.p_89, val: row.j_89 }} position="bottom">
-            <div className="text-center font-bold text-emerald-400 py-1.5">{row.j_89}</div>
+            <div className="text-center font-bold text-fuchsia-300 py-1.5">{row.j_89}</div>
           </FormulaTooltipTrigger>
         )
       },
       {
         key: 'w_89', label: '[89] Agua', width: 'w-16', type: 'readonly',
-        headerBgClass: 'bg-emerald-950/20 text-emerald-300 font-bold',
+        headerBgClass: 'bg-fuchsia-500/20 text-fuchsia-300 font-bold border-b border-fuchsia-500/30',
+        cellClassName: 'bg-fuchsia-500/5 text-fuchsia-200',
         renderCell: (row) => (
           <FormulaTooltipTrigger formulaId="rmr_water" params={{ depth: row.a, wt: 97, code: row.agua_obs, val76: row.w_76, val89: row.w_89 }} position="bottom">
             <div className="text-center py-1.5">{row.w_89}</div>
@@ -598,7 +620,8 @@ export default function RmrGrid({
         label: "RMR'89",
         width: 'w-24',
         type: 'readonly',
-        headerBgClass: 'bg-emerald-950/30 text-emerald-400 font-black',
+        headerBgClass: 'bg-fuchsia-500/20 text-fuchsia-300 font-extrabold border-b border-fuchsia-500/30',
+        cellClassName: 'bg-fuchsia-500/5',
         renderCell: (row) => {
           const score = row.rmr_89;
           if (score === 'ERR') {
@@ -624,7 +647,8 @@ export default function RmrGrid({
         label: 'Calidad 89',
         width: 'w-28',
         type: 'readonly',
-        headerBgClass: 'bg-emerald-950/30 text-emerald-400 font-bold',
+        headerBgClass: 'bg-fuchsia-500/20 text-fuchsia-300 font-extrabold border-b border-fuchsia-500/30',
+        cellClassName: 'bg-fuchsia-500/5',
         renderCell: (row) => (
           <FormulaTooltipTrigger formulaId="rmr_class" params={{ rmr: row.rmr_89 === 'ERR' ? 0 : row.rmr_89, val: row.class_89 }} position="top">
             <div className="flex justify-center items-center h-full w-full py-0.5">

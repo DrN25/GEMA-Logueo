@@ -754,7 +754,8 @@ export function getLggColumns({
       type: 'readonly',
       isStickyRight: true,
       stickyRight: 144,
-      headerBgClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300',
+      headerBgClass: 'bg-amber-500/20 text-amber-300 font-bold border-b border-amber-500/30',
+      cellClassName: 'bg-amber-500/5',
       renderCell: (row) => {
         const score = row.rmr76Score;
         if (score === 'ERR') {
@@ -765,7 +766,7 @@ export function getLggColumns({
         return (
           <FormulaTooltipTrigger formulaId="rmr_total_76" params={scores} position="top">
             <div className="flex justify-center items-center py-1.5">
-              <span className={`px-2.5 py-0.5 rounded text-xs font-black border ${score >= 81 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border-emerald-500/20' : score >= 61 ? 'bg-blue-500/10 text-blue-600 dark:text-cyan-400 border-blue-500/20' : score >= 41 ? 'bg-amber-500/10 text-amber-600 dark:text-amber-300 border-amber-500/20' : 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20'}`}>
+              <span className={`px-2.5 py-0.5 rounded text-xs font-black border ${score >= 81 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : score >= 61 ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20' : score >= 41 ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>
                 {score}
               </span>
             </div>
@@ -780,7 +781,8 @@ export function getLggColumns({
       type: 'readonly',
       isStickyRight: true,
       stickyRight: 80,
-      headerBgClass: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-300',
+      headerBgClass: 'bg-fuchsia-500/20 text-fuchsia-300 font-bold border-b border-fuchsia-500/30',
+      cellClassName: 'bg-fuchsia-500/5',
       renderCell: (row) => {
         const score = row.rmr89Score;
         if (score === 'ERR') {
@@ -791,7 +793,7 @@ export function getLggColumns({
         return (
           <FormulaTooltipTrigger formulaId="rmr_total_89" params={scores} position="top">
             <div className="flex justify-center items-center py-1.5">
-              <span className={`px-2.5 py-0.5 rounded text-xs font-black border ${score >= 81 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border-emerald-500/20' : score >= 61 ? 'bg-blue-500/10 text-blue-600 dark:text-cyan-400 border-blue-500/20' : score >= 41 ? 'bg-amber-500/10 text-amber-600 dark:text-amber-300 border-amber-500/20' : 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20'}`}>
+              <span className={`px-2.5 py-0.5 rounded text-xs font-black border ${score >= 81 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : score >= 61 ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20' : score >= 41 ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>
                 {score}
               </span>
             </div>

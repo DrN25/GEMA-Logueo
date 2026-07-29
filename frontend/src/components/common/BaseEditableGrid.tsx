@@ -59,7 +59,8 @@ function getCellTdStyle(
   isSelected: boolean,
   rowAlerts: ValidationAlert[],
   alertRowIndex: number,
-  idPrefix: string
+  idPrefix: string,
+  cellClassName?: string
 ): React.CSSProperties {
   let alert: ValidationAlert | undefined;
 
@@ -81,8 +82,7 @@ function getCellTdStyle(
   let borderShadow = 'inset -1px 0 0 0 rgba(255, 255, 255, 0.04), inset 0 -1px 0 0 rgba(255, 255, 255, 0.04)';
 
   const stickyStyle: React.CSSProperties = {};
-  let background: string | undefined;
-
+  
   if (isSticky) {
     borderShadow = 'inset -1px 0 0 0 rgba(255, 255, 255, 0.08), inset 0 -1px 0 0 rgba(255, 255, 255, 0.04), 1px 0 0 0 rgba(255, 255, 255, 0.08)';
     Object.assign(stickyStyle, { position: 'sticky', left: stickyLeft ?? 0, zIndex: 10 });
@@ -92,13 +92,23 @@ function getCellTdStyle(
   }
 
   let baseBg = isStickyAny ? 'rgb(var(--navy-950))' : undefined;
+
+  if (cellClassName && isStickyAny) {
+    if (cellClassName.includes('bg-amber') || cellClassName.includes('bg-yellow')) {
+      baseBg = 'linear-gradient(rgba(245, 158, 11, 0.06), rgba(245, 158, 11, 0.06)), rgb(var(--navy-950))';
+    } else if (cellClassName.includes('bg-fuchsia') || cellClassName.includes('bg-purple')) {
+      baseBg = 'linear-gradient(rgba(217, 70, 239, 0.06), rgba(217, 70, 239, 0.06)), rgb(var(--navy-950))';
+    }
+  }
+
   if (isSelected) {
-    baseBg = isStickyAny
-      ? 'linear-gradient(rgba(6, 182, 212, 0.08), rgba(6, 182, 212, 0.08)), rgb(var(--navy-950))'
+    baseBg = baseBg
+      ? `linear-gradient(rgba(6, 182, 212, 0.12), rgba(6, 182, 212, 0.12)), ${baseBg}`
       : 'rgba(6, 182, 212, 0.08)';
   }
 
   const style: React.CSSProperties = { ...stickyStyle };
+  let background: string | undefined;
 
   if (alert) {
     const isCritical = alert.type === 'CRITICAL';
@@ -118,18 +128,22 @@ function getCellTdStyle(
 }
 
 function getHeaderStyle<T>(col: GridColumn<T>): React.CSSProperties {
-  let borderShadows = 'inset -1px 0 0 0 rgb(var(--navy-800)), inset 0 -1px 0 0 rgb(var(--navy-800)), 0 1px 0 0 rgb(var(--navy-800))';
-  const stickyStyle: React.CSSProperties = {};
+  const isStickyAny = !!col.isSticky || !!col.isStickyRight || col.key === 'accion';
+  const borderShadow = 'inset -1px 0 0 0 rgba(255, 255, 255, 0.08), inset 0 -1px 0 0 rgba(255, 255, 255, 0.08)';
+
+  const style: React.CSSProperties = { boxShadow: borderShadow };
 
   if (col.isSticky) {
-    borderShadows = 'inset -1px 0 0 0 rgb(var(--navy-800)), inset 0 -1px 0 0 rgb(var(--navy-800)), 1px 0 0 0 rgb(var(--navy-800)), 0 1px 0 0 rgb(var(--navy-800))';
-    Object.assign(stickyStyle, { position: 'sticky', left: col.stickyLeft ?? 0, zIndex: 30 });
+    Object.assign(style, { position: 'sticky', left: col.stickyLeft ?? 0, zIndex: 30 });
   } else if (col.isStickyRight || col.key === 'accion') {
-    borderShadows = 'inset 1px 0 0 0 rgb(var(--navy-800)), inset 0 -1px 0 0 rgb(var(--navy-800)), -1px 0 0 0 rgb(var(--navy-800)), 0 1px 0 0 rgb(var(--navy-800))';
-    Object.assign(stickyStyle, { position: 'sticky', right: col.stickyRight ?? 0, zIndex: 30 });
+    Object.assign(style, { position: 'sticky', right: col.stickyRight ?? 0, zIndex: 30 });
   }
 
-  return { background: 'rgb(var(--navy-900))', boxShadow: borderShadows, ...stickyStyle };
+  if (isStickyAny && !col.headerBgClass) {
+    style.backgroundColor = 'rgb(var(--navy-900))';
+  }
+
+  return style;
 }
 
 interface GridRowProps<T> {
@@ -290,12 +304,13 @@ function GridRowInner<T>({
           colKeyStr,
           !!col.isSticky, col.stickyLeft,
           !!col.isStickyRight, col.stickyRight,
-          isSelected, rowAlerts, alertRowIndex, idPrefix
+          isSelected, rowAlerts, alertRowIndex, idPrefix,
+          col.cellClassName
         );
 
         if (col.renderCell) {
           return (
-            <td key={colKeyStr} className={`${isStickyAny ? 'bg-navy-950' : ''} ${col.cellClassName || ''}`} style={cellStyle}>
+            <td key={colKeyStr} className={`relative ${col.cellClassName || ''}`} style={cellStyle}>
               {col.renderCell(row, rowIndex, isSelected)}
             </td>
           );
@@ -305,7 +320,7 @@ function GridRowInner<T>({
           <td
             key={colKeyStr}
             id={`${idPrefix}-td-${alertRowIndex}-${colKeyStr}`}
-            className={`${isStickyAny ? 'bg-navy-950 text-center' : 'px-1'} ${col.cellClassName || ''}`}
+            className={`relative ${isStickyAny ? 'text-center' : 'px-1'} ${col.cellClassName || ''}`}
             style={cellStyle}
             onClick={() => {
               if (colIdx !== -1) {

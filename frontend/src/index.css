@@ -204,3 +204,21 @@ input[type=number] {
   color: #059669 !important;
 }
 
+.th-rmr-76 {
+  background-color: #241c08 !important;
+  color: #facc15 !important;
+}
+.light .th-rmr-76 {
+  background-color: #fefce8 !important;
+  color: #ca8a04 !important;
+}
+
+.th-rmr-89 {
+  background-color: #260e22 !important;
+  color: #f0abfc !important;
+}
+.light .th-rmr-89 {
+  background-color: #fdf4ff !important;
+  color: #c026d3 !important;
+}
+

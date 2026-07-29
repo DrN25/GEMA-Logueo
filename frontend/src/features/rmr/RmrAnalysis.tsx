@@ -154,20 +154,20 @@ export default function RmrAnalysis({
 
           {/* Tarjetas KPIs dinámicas */}
           <div className="grid grid-cols-3 gap-2">
-            <div className="glass-panel p-2.5 rounded-xl border border-emerald-500/25 bg-emerald-500/5 flex flex-col justify-between shadow-md">
+            <div className="glass-panel p-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 flex flex-col justify-between shadow-md">
               <div>
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">RMR '89 Medio</span>
-                <span className="text-base font-extrabold text-emerald-400 block tracking-tight mt-0.5">{avgRmr89}</span>
+                <span className="text-[9px] font-black text-amber-400 uppercase tracking-widest block">RMR '76 Medio</span>
+                <span className="text-base font-extrabold text-amber-300 block tracking-tight mt-0.5">{avgRmr76}</span>
               </div>
-              <span className="text-[9px] text-slate-500 font-bold block truncate max-w-[100px]">{getRockClass(parseFloat(avgRmr89))}</span>
+              <span className="text-[9px] text-amber-400/80 font-bold block truncate max-w-[100px]">{getRockClass(parseFloat(avgRmr76))}</span>
             </div>
 
-            <div className="glass-panel p-2.5 rounded-xl border border-cyan-500/25 bg-cyan-500/5 flex flex-col justify-between shadow-md">
+            <div className="glass-panel p-2.5 rounded-xl border border-fuchsia-500/30 bg-fuchsia-500/10 flex flex-col justify-between shadow-md">
               <div>
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">RMR '76 Medio</span>
-                <span className="text-base font-extrabold text-cyan-400 block tracking-tight mt-0.5">{avgRmr76}</span>
+                <span className="text-[9px] font-black text-fuchsia-400 uppercase tracking-widest block">RMR '89 Medio</span>
+                <span className="text-base font-extrabold text-fuchsia-300 block tracking-tight mt-0.5">{avgRmr89}</span>
               </div>
-              <span className="text-[9px] text-slate-500 font-bold block truncate max-w-[100px]">{getRockClass(parseFloat(avgRmr76))}</span>
+              <span className="text-[9px] text-fuchsia-400/80 font-bold block truncate max-w-[100px]">{getRockClass(parseFloat(avgRmr89))}</span>
             </div>
 
             <div className="glass-panel p-2.5 rounded-xl border border-purple-500/25 bg-purple-500/5 flex flex-col justify-between shadow-md">

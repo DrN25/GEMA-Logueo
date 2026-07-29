@@ -304,9 +304,9 @@ export default function CollarSurveyForm({
       )}
 
       {/* Identificación del Taladro */}
-      <div className="glass-panel p-5 rounded-xl border border-navy-800 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 items-end">
+      <div className="glass-panel p-5 rounded-xl border border-navy-800 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 items-end">
         {/* Código del Taladro */}
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 lg:col-span-2">
           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">
             Código de Taladro
           </label>
@@ -317,9 +317,9 @@ export default function CollarSurveyForm({
                 type="text"
                 readOnly
                 value={safeCollar.name}
-                className="w-full bg-navy-950/80 border border-navy-800 rounded-lg pl-9 pr-4 py-2 text-cyan-300 font-black tracking-wider text-sm cursor-not-allowed select-all shadow-inner"
+                className="w-full bg-navy-950/90 border border-navy-800 rounded-lg pl-9 pr-4 py-2 text-cyan-300 font-black tracking-wider text-base cursor-not-allowed select-all shadow-inner"
               />
-              <Lock size={15} className="absolute left-3 top-2.5 text-cyan-500/60" />
+              <Lock size={16} className="absolute left-3 top-2.5 text-cyan-500/60" />
             </div>
             <button
               type="button"
@@ -327,7 +327,7 @@ export default function CollarSurveyForm({
                 setTempName(safeCollar.name || '');
                 setIsRenameModalOpen(true);
               }}
-              className="flex items-center gap-1.5 bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 px-3 py-2 rounded-lg text-xs font-bold transition-all active:scale-95 shadow-sm whitespace-nowrap"
+              className="flex items-center gap-1.5 bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 px-3.5 py-2 rounded-lg text-xs font-bold transition-all active:scale-95 shadow-sm whitespace-nowrap"
               title="Renombrar código de taladro"
             >
               <Edit2 size={13} />
