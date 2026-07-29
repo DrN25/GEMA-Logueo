@@ -216,8 +216,7 @@ export default function StructuralView({
         activeTaladroName={activeTaladroName}
         geologo={geologo}
         onAddRow={addDiscontinuidadRow}
-        onCloneRow={selectedRowIndex !== null ? () => insertDiscontinuidadRow(selectedRowIndex) : undefined}
-        isCloneDisabled={selectedRowIndex === null}
+        addBtnLabel="Agregar estructura"
         recordCount={filteredDiscontinuidades.length}
         recordLabel={filteredDiscontinuidades.length === 1 ? 'estruc.' : 'estrucs.'}
         sidebarCollapsed={sidebarCollapsed}

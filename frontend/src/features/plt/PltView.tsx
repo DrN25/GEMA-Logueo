@@ -74,14 +74,17 @@ export default function PltView({
     handleCellChange,
     addRow,
     deleteRow,
+    duplicateRow,
     handleExportExcel
   } = usePltState({ ensayos_plt, onEnsayosPltChange, corridas, collar, selectedRowIndex, onSelectRow });
 
   // --- PATRÓN DE CALLBACKS ESTABLES CON REF ---
   const cellChangeRef = useRef(handleCellChange);
   const deleteRowRef = useRef(deleteRow);
+  const duplicateRowRef = useRef(duplicateRow);
   cellChangeRef.current = handleCellChange;
   deleteRowRef.current = deleteRow;
+  duplicateRowRef.current = duplicateRow;
 
   const stableHandleCellChange = useCallback(
     (idx: number, field: keyof EnsayoPlt, val: any) => cellChangeRef.current(idx, field, val),
@@ -91,15 +94,20 @@ export default function PltView({
     (idx: number) => deleteRowRef.current(idx),
     []
   );
+  const stableDuplicateRow = useCallback(
+    (idx: number) => duplicateRowRef.current(idx),
+    []
+  );
 
   const columns = useMemo(() => {
     return getPltColumns({
       darkMode,
       collar,
       handleCellChange: stableHandleCellChange,
-      deleteRow: stableDeleteRow
+      deleteRow: stableDeleteRow,
+      duplicateRow: stableDuplicateRow
     });
-  }, [darkMode, collar, stableHandleCellChange, stableDeleteRow]);
+  }, [darkMode, collar, stableHandleCellChange, stableDeleteRow, stableDuplicateRow]);
 
   const handleAlertFix = (fieldId: string) => {
     setActiveSubTab('plt');

@@ -204,8 +204,7 @@ export default function LggView({
         activeTaladroName={activeTaladroName}
         geologo={lastRowGeologo()}
         onAddRow={addCorridaRow}
-        onCloneRow={selectedRowIndex !== null ? () => insertCorridaRow(selectedRowIndex) : undefined}
-        isCloneDisabled={selectedRowIndex === null}
+        addBtnLabel="Agregar corrida"
         recordCount={filteredCorridas.length}
         recordLabel={filteredCorridas.length === 1 ? 'reg.' : 'regs.'}
         sidebarCollapsed={sidebarCollapsed}

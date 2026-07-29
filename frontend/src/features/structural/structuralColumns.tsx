@@ -751,20 +751,20 @@ export function getStructuralColumns({
           return null; // Ocultar botones de acciones en filas inactivas para máxima ligereza
         }
         return (
-          <div className="flex items-center justify-center gap-1.5 h-full w-full bg-navy-950/95">
+          <div className="flex justify-center items-center gap-1.5 h-full bg-navy-950/95 px-1">
             <button
               onClick={() => insertDiscontinuidadRow(row.originalIndex)}
-              className="text-cyan-500 hover:text-cyan-400 p-1 hover:bg-cyan-500/10 rounded transition-colors"
+              className="p-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 hover:text-cyan-300 transition-all duration-150 active:scale-90 flex items-center justify-center shadow-sm cursor-pointer"
               title="Clonar registro estructural"
             >
-              <Copy size={15} />
+              <Copy size={13} />
             </button>
             <button
               onClick={() => deleteRow(row.originalIndex)}
-              className="text-red-400 hover:text-red-300 transition-colors p-1"
+              className="p-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all duration-150 active:scale-90 flex items-center justify-center shadow-sm cursor-pointer"
               title="Eliminar registro estructural"
             >
-              <Trash2 size={15} />
+              <Trash2 size={13} />
             </button>
           </div>
         );

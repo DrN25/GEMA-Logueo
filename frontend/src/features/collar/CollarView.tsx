@@ -304,7 +304,7 @@ export default function CollarSurveyForm({
       )}
 
       {/* Identificación del Taladro */}
-      <div className="glass-panel p-5 rounded-xl border border-navy-800 grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+      <div className="glass-panel p-5 rounded-xl border border-navy-800 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 items-end">
         {/* Código del Taladro */}
         <div className="space-y-1.5">
           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">
@@ -336,13 +336,43 @@ export default function CollarSurveyForm({
           </div>
         </div>
 
+        {/* Proyecto */}
+        <div className="space-y-1.5">
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Proyecto</label>
+          <select
+            value={safeCollar.proyecto || 'Proyecto A'}
+            onChange={(e) => onCollarChange({ ...safeCollar, proyecto: e.target.value })}
+            className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 font-semibold cursor-pointer transition-all"
+          >
+            {safeCollar.proyecto && safeCollar.proyecto !== 'Proyecto A' && safeCollar.proyecto !== 'Proyecto B' && (
+              <option value={safeCollar.proyecto} className="bg-navy-950 text-slate-200 py-1.5">
+                {safeCollar.proyecto}
+              </option>
+            )}
+            <option value="Proyecto A" className="bg-navy-950 text-slate-200 py-1.5">Proyecto A</option>
+            <option value="Proyecto B" className="bg-navy-950 text-slate-200 py-1.5">Proyecto B</option>
+          </select>
+        </div>
+
+        {/* Geólogo */}
+        <div className="space-y-1.5">
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Geólogo</label>
+          <input
+            type="text"
+            value={safeCollar.geologo || ''}
+            onChange={(e) => onCollarChange({ ...safeCollar, geologo: e.target.value })}
+            className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 font-semibold transition-all"
+            placeholder="Geólogo"
+          />
+        </div>
+
         {/* Campaña */}
         <div className="space-y-1.5">
           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Campaña</label>
           <select
             value={safeCollar.campana || ''}
             onChange={(e) => onCollarChange({ ...safeCollar, campana: e.target.value })}
-            className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 font-semibold cursor-pointer  transition-all"
+            className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 font-semibold cursor-pointer transition-all"
           >
             {safeCollar.campana && !availableCampanas.includes(safeCollar.campana) && (
               <option value={safeCollar.campana} className="bg-navy-950 text-slate-200 py-1.5">
@@ -363,11 +393,41 @@ export default function CollarSurveyForm({
           <select
             value={safeCollar.turno || 'D'}
             onChange={(e) => onCollarChange({ ...safeCollar, turno: e.target.value })}
-            className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 font-semibold cursor-pointer  transition-all"
+            className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 font-semibold cursor-pointer transition-all"
           >
             <option value="D" className="bg-navy-950 text-slate-200 py-1.5">Día</option>
             <option value="N" className="bg-navy-950 text-slate-200 py-1.5">Noche</option>
           </select>
+        </div>
+
+        {/* Diámetro */}
+        <div className="space-y-1.5">
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Diámetro</label>
+          <select
+            value={safeCollar.diametro || 'HQ3'}
+            onChange={(e) => onCollarChange({ ...safeCollar, diametro: e.target.value })}
+            className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 font-semibold cursor-pointer transition-all"
+          >
+            <option value="HQ3" className="bg-navy-950 text-slate-200 py-1.5">HQ3</option>
+            <option value="NQ3" className="bg-navy-950 text-slate-200 py-1.5">NQ3</option>
+            <option value="PQ3" className="bg-navy-950 text-slate-200 py-1.5">PQ3</option>
+            <option value="HQ" className="bg-navy-950 text-slate-200 py-1.5">HQ</option>
+            <option value="NQ" className="bg-navy-950 text-slate-200 py-1.5">NQ</option>
+            <option value="PQ" className="bg-navy-950 text-slate-200 py-1.5">PQ</option>
+          </select>
+        </div>
+
+        {/* Inclinación / Dip (°) */}
+        <div className="space-y-1.5">
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Inclinación (°)</label>
+          <input
+            type="number"
+            step="0.1"
+            value={safeCollar.inclinacion ?? -60}
+            onChange={(e) => onCollarChange({ ...safeCollar, inclinacion: parseFloat(e.target.value) || 0 })}
+            className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 font-semibold transition-all"
+            placeholder="-60"
+          />
         </div>
       </div>
 

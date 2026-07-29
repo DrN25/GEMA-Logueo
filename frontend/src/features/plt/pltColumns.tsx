@@ -1,4 +1,4 @@
-import { Trash2, Check, X } from 'lucide-react';
+import { Trash2, Copy, Check, X } from 'lucide-react';
 import type { GridColumn } from '../../components/common/BaseEditableGrid';
 import { FormulaTooltipTrigger } from '../../components/common/FormulaTooltip';
 import type { EnsayoPlt } from '../../App';
@@ -46,13 +46,15 @@ interface PltColumnBuilderProps {
   collar: any;
   handleCellChange: (idx: number, field: keyof EnsayoPlt, val: any) => void;
   deleteRow: (idx: number) => void;
+  duplicateRow?: (idx: number) => void;
 }
 
 export function getPltColumns({
   darkMode,
   collar,
   handleCellChange,
-  deleteRow
+  deleteRow,
+  duplicateRow
 }: PltColumnBuilderProps): GridColumn<EnsayoPlt>[] {
   const isDark = darkMode;
 
@@ -564,8 +566,8 @@ export function getPltColumns({
     },
     {
       key: 'accion',
-      label: 'Elim.',
-      width: 'w-16',
+      label: 'Acciones',
+      width: 'w-20',
       type: 'readonly',
       isStickyRight: true,
       stickyRight: 0,
@@ -575,13 +577,22 @@ export function getPltColumns({
           return null; // Oculta botones de acción en filas inactivas para máxima ligereza
         }
         return (
-          <div className="flex justify-center items-center py-1.5 bg-navy-950/95">
+          <div className="flex justify-center items-center gap-1.5 h-full bg-navy-950/95 px-1">
+            {duplicateRow && (
+              <button
+                onClick={() => duplicateRow(idx)}
+                className="p-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 hover:text-cyan-300 transition-all duration-150 active:scale-90 flex items-center justify-center shadow-sm cursor-pointer"
+                title="Clonar este ensayo"
+              >
+                <Copy size={13} />
+              </button>
+            )}
             <button
               onClick={() => deleteRow(idx)}
-              className="p-1.5 rounded-lg border border-red-200 dark:border-red-500/20 bg-red-50 dark:bg-red-500/5 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/15 hover:text-red-700 dark:hover:text-red-300 transition-all duration-200 shadow-sm active:scale-90 flex items-center justify-center mx-auto"
-              title="Eliminar Ensayo"
+              className="p-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all duration-150 active:scale-90 flex items-center justify-center shadow-sm cursor-pointer"
+              title="Eliminar este ensayo"
             >
-              <Trash2 size={14} />
+              <Trash2 size={13} />
             </button>
           </div>
         );

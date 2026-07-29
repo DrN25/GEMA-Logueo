@@ -812,20 +812,20 @@ export function getLggColumns({
           return null;
         }
         return (
-          <div className="flex justify-center items-center gap-1.5 h-full bg-navy-950/95">
+          <div className="flex justify-center items-center gap-1.5 h-full bg-navy-950/95 px-1">
             <button
               onClick={() => insertCorridaRow(row.originalIndex)}
-              className="p-1.5 rounded bg-navy-800 hover:bg-navy-700 text-cyan-400 hover:text-cyan-300 border border-navy-700/30 transition-all active:scale-90"
+              className="p-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 hover:text-cyan-300 transition-all duration-150 active:scale-90 flex items-center justify-center shadow-sm cursor-pointer"
               title="Clonar esta corrida abajo"
             >
-              <Copy size={12} />
+              <Copy size={13} />
             </button>
             <button
               onClick={() => deleteCorridaRow(row.originalIndex)}
-              className="p-1.5 rounded bg-red-950/20 hover:bg-red-950/50 text-red-400 hover:text-red-300 border border-red-900/20 transition-all active:scale-90"
+              className="p-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all duration-150 active:scale-90 flex items-center justify-center shadow-sm cursor-pointer"
               title="Eliminar esta corrida"
             >
-              <Trash2 size={12} />
+              <Trash2 size={13} />
             </button>
           </div>
         );

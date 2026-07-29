@@ -231,6 +231,20 @@ export function usePltState({
     }
   }, [ensayos_plt, onEnsayosPltChange, selectedRowIndex, onSelectRow]);
 
+  const duplicateRow = useCallback((rowIdx: number) => {
+    const target = ensayos_plt[rowIdx];
+    if (!target) return;
+    const cloned: EnsayoPlt = {
+      ...target,
+      id: undefined,
+      nro_muestra: target.nro_muestra ? `${target.nro_muestra}_copia` : `M${(ensayos_plt.length + 1).toString().padStart(2, '0')}`
+    };
+    const updated = [...ensayos_plt];
+    updated.splice(rowIdx + 1, 0, cloned);
+    onEnsayosPltChange(updated);
+    onSelectRow(rowIdx + 1);
+  }, [ensayos_plt, onEnsayosPltChange, onSelectRow]);
+
   const handleExportExcel = useCallback(() => {
     try {
       const campaignVal = collar.name ? collar.name.match(/\d+/)?.[0] || '2026' : '2026';
@@ -293,6 +307,7 @@ export function usePltState({
     handleCellChange,
     addRow,
     deleteRow,
+    duplicateRow,
     handleExportExcel
   };
 }
