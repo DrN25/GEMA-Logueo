@@ -39,9 +39,7 @@ export default function SaveConfirmModal({
   const allTaladrosNames = allDiffSummary?.unsavedTaladrosNames || [activeTaladroName];
 
   // Si el taladro activo no tiene cambios pero otros taladros sí, seleccionar 'all' por defecto
-  const [saveScope, setSaveScope] = useState<'active' | 'all'>(() => {
-    return activeHasChanges ? 'active' : 'all';
-  });
+  const [saveScope, setSaveScope] = useState<'active' | 'all'>(activeTaladroName ? 'active' : 'all');
 
   const isScopeActive = saveScope === 'active';
 
@@ -86,8 +84,8 @@ export default function SaveConfirmModal({
             </label>
 
             <div className="grid grid-cols-1 gap-2.5">
-              {/* Opción 1: Taladro Activo (Solo si el taladro activo tiene cambios propios) */}
-              {activeHasChanges && (
+              {/* Opción 1: Solo Taladro Activo */}
+              {activeTaladroName && (
                 <button
                   type="button"
                   onClick={() => setSaveScope('active')}
@@ -105,7 +103,7 @@ export default function SaveConfirmModal({
                   <div className="space-y-0.5">
                     <div className="text-xs font-bold text-slate-100 flex items-center gap-1.5">
                       <Database size={13} className="text-cyan-400" />
-                      <span>Guardar solo Taladro Activo: <strong className="text-cyan-400">{activeTaladroName}</strong></span>
+                      <span>Solo Taladro Activo: <strong className="text-cyan-400">{activeTaladroName}</strong></span>
                     </div>
                     <p className="text-xs text-slate-400">
                       Sincronizará las celdas y filas modificadas de este sondaje específico.
@@ -115,32 +113,30 @@ export default function SaveConfirmModal({
               )}
 
               {/* Opción 2: Todos los Taladros con Cambios Pendientes */}
-              {(allTaladrosCount > 1 || !activeHasChanges) && (
-                <button
-                  type="button"
-                  onClick={() => setSaveScope('all')}
-                  className={`flex items-start gap-3 p-3.5 rounded-xl border text-left transition-all ${
-                    !isScopeActive || !activeHasChanges
-                      ? 'bg-emerald-500/10 border-emerald-500/40 text-slate-100 ring-1 ring-emerald-500/30'
-                      : 'bg-navy-950/60 border-navy-800 text-slate-400 hover:bg-navy-850 hover:text-slate-200'
-                  }`}
-                >
-                  <div className={`w-4 h-4 rounded-full border mt-0.5 flex items-center justify-center shrink-0 ${
-                    !isScopeActive || !activeHasChanges ? 'border-emerald-400 bg-emerald-500' : 'border-slate-600'
-                  }`}>
-                    {(!isScopeActive || !activeHasChanges) && <CheckCircle2 size={10} className="text-slate-900" />}
+              <button
+                type="button"
+                onClick={() => setSaveScope('all')}
+                className={`flex items-start gap-3 p-3.5 rounded-xl border text-left transition-all ${
+                  !isScopeActive
+                    ? 'bg-emerald-500/10 border-emerald-500/40 text-slate-100 ring-1 ring-emerald-500/30'
+                    : 'bg-navy-950/60 border-navy-800 text-slate-400 hover:bg-navy-850 hover:text-slate-200'
+                }`}
+              >
+                <div className={`w-4 h-4 rounded-full border mt-0.5 flex items-center justify-center shrink-0 ${
+                  !isScopeActive ? 'border-emerald-400 bg-emerald-500' : 'border-slate-600'
+                }`}>
+                  {!isScopeActive && <CheckCircle2 size={10} className="text-slate-900" />}
+                </div>
+                <div className="space-y-0.5">
+                  <div className="text-xs font-bold text-slate-100 flex items-center gap-1.5">
+                    <Layers size={13} className="text-emerald-400" />
+                    <span>TODOS los Taladros con cambios pendientes (<strong className="text-emerald-400">{allTaladrosCount} sondaje(s)</strong>)</span>
                   </div>
-                  <div className="space-y-0.5">
-                    <div className="text-xs font-bold text-slate-100 flex items-center gap-1.5">
-                      <Layers size={13} className="text-emerald-400" />
-                      <span>Guardar TODOS los Taladros pendientes (<strong className="text-emerald-400">{allTaladrosCount} sondaje(s)</strong>)</span>
-                    </div>
-                    <p className="text-xs text-slate-400">
-                      Sincronizará de forma secuencial todos los registros no guardados en la BD.
-                    </p>
-                  </div>
-                </button>
-              )}
+                  <p className="text-xs text-slate-400">
+                    Sincronizará de forma secuencial todos los registros no guardados en la BD.
+                  </p>
+                </div>
+              </button>
             </div>
           </div>
 

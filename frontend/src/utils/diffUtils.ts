@@ -105,9 +105,23 @@ export function computeTaladroDiff(before: any, after: any): TaladroDiffSummary 
       }
     } catch (e) {}
 
-    // Si el taladro existe en BD pero no tenemos snapshot, usar 'after' como baseline para evitar falsos positivos
+    // Si el taladro existe en BD pero no tenemos snapshot, intentar crear baseline minimo para comparar
     if (existsInDbSummaries) {
-      before = JSON.parse(JSON.stringify(after));
+      before = {
+        name: after.name,
+        proyecto: after.proyecto,
+        geologo: after.geologo,
+        diametro: after.diametro,
+        inclinacion: after.inclinacion,
+        collar_este: after.collar_este,
+        collar_norte: after.collar_norte,
+        collar_cota: after.collar_cota,
+        prof_final_eoh: after.prof_final_eoh,
+        corridas: [],
+        discontinuidades: [],
+        ensayos_plt: [],
+        surveys: [],
+      };
     } else {
       // Es un taladro totalmente nuevo que nunca ha sido guardado en BD
       const corridasAdded = after?.corridas?.length || 0;

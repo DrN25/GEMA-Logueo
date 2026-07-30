@@ -39,9 +39,7 @@ export default function DiscardModal({
   const allTaladrosNames = allDiffSummary?.unsavedTaladrosNames || [activeTaladroName];
 
   // Si el taladro activo no tiene cambios pero otros taladros sí, seleccionar 'all' por defecto
-  const [discardScope, setDiscardScope] = useState<'active' | 'all'>(() => {
-    return activeHasChanges ? 'active' : 'all';
-  });
+  const [discardScope, setDiscardScope] = useState<'active' | 'all'>(activeTaladroName ? 'active' : 'all');
 
   const isScopeActive = discardScope === 'active';
 
@@ -86,8 +84,8 @@ export default function DiscardModal({
             </label>
 
             <div className="grid grid-cols-1 gap-2.5">
-              {/* Opción 1: Taladro Activo (Solo si el taladro activo tiene cambios propios) */}
-              {activeHasChanges && (
+              {/* Opción 1: Solo Taladro Activo */}
+              {activeTaladroName && (
                 <button
                   type="button"
                   onClick={() => setDiscardScope('active')}
@@ -115,32 +113,30 @@ export default function DiscardModal({
               )}
 
               {/* Opción 2: Todos los Taladros */}
-              {(allTaladrosCount > 1 || !activeHasChanges) && (
-                <button
-                  type="button"
-                  onClick={() => setDiscardScope('all')}
-                  className={`flex items-start gap-3 p-3.5 rounded-xl border text-left transition-all ${
-                    !isScopeActive || !activeHasChanges
-                      ? 'bg-red-500/10 border-red-500/40 text-slate-100 ring-1 ring-red-500/30'
-                      : 'bg-navy-950/60 border-navy-800 text-slate-400 hover:bg-navy-850 hover:text-slate-200'
-                  }`}
-                >
-                  <div className={`w-4 h-4 rounded-full border mt-0.5 flex items-center justify-center shrink-0 ${
-                    !isScopeActive || !activeHasChanges ? 'border-red-400 bg-red-500' : 'border-slate-600'
-                  }`}>
-                    {(!isScopeActive || !activeHasChanges) && <Check size={10} className="text-white" />}
+              <button
+                type="button"
+                onClick={() => setDiscardScope('all')}
+                className={`flex items-start gap-3 p-3.5 rounded-xl border text-left transition-all ${
+                  !isScopeActive
+                    ? 'bg-red-500/10 border-red-500/40 text-slate-100 ring-1 ring-red-500/30'
+                    : 'bg-navy-950/60 border-navy-800 text-slate-400 hover:bg-navy-850 hover:text-slate-200'
+                }`}
+              >
+                <div className={`w-4 h-4 rounded-full border mt-0.5 flex items-center justify-center shrink-0 ${
+                  !isScopeActive ? 'border-red-400 bg-red-500' : 'border-slate-600'
+                }`}>
+                  {!isScopeActive && <Check size={10} className="text-white" />}
+                </div>
+                <div className="space-y-0.5">
+                  <div className="text-xs font-bold text-slate-100 flex items-center gap-1.5">
+                    <Layers size={13} className="text-amber-400" />
+                    <span>TODOS los Taladros con cambios pendientes (<strong className="text-amber-400">{allTaladrosCount} sondaje(s)</strong>)</span>
                   </div>
-                  <div className="space-y-0.5">
-                    <div className="text-xs font-bold text-slate-100 flex items-center gap-1.5">
-                      <Layers size={13} className="text-amber-400" />
-                      <span>TODOS los Taladros con cambios pendientes (<strong className="text-amber-400">{allTaladrosCount} sondaje(s)</strong>)</span>
-                    </div>
-                    <p className="text-xs text-slate-400">
-                      Eliminará los borradores no guardados de todo el sistema.
-                    </p>
-                  </div>
-                </button>
-              )}
+                  <p className="text-xs text-slate-400">
+                    Eliminará los borradores no guardados de todo el sistema.
+                  </p>
+                </div>
+              </button>
             </div>
           </div>
 
