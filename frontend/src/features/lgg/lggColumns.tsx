@@ -135,6 +135,14 @@ export function getLggColumns({
 }: LggColumnBuilderProps): GridColumn<CorridaEnriquecida>[] {
   const isDark = darkMode;
 
+  // Clases de fondo sólidas e inalterables por opacidad para prevenir transparencias
+  const defaultHeader = 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold';
+  const stickyHeader = 'bg-slate-300 dark:bg-navy-900 text-slate-800 dark:text-slate-200 font-bold';
+  const blueGroupHeader = 'bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 font-semibold';
+  const purpleGroupHeader = 'bg-purple-100 dark:bg-purple-950 text-purple-800 dark:text-purple-300 font-semibold';
+  const amberGroupHeader = 'bg-amber-200 dark:bg-amber-950 text-amber-900 dark:text-amber-300 font-bold border-b border-amber-500/30';
+  const fuchsiaGroupHeader = 'bg-fuchsia-200 dark:bg-fuchsia-950 text-fuchsia-900 dark:text-fuchsia-300 font-bold border-b border-fuchsia-500/30';
+
   return [
     {
       key: 'corrida',
@@ -143,7 +151,7 @@ export function getLggColumns({
       type: 'readonly',
       isSticky: true,
       stickyLeft: 0,
-      headerBgClass: 'bg-navy-900',
+      headerBgClass: stickyHeader,
       renderCell: (row) => <div className="text-center font-bold text-slate-400 py-1.5">{row.corrida}</div>
     },
     {
@@ -153,7 +161,7 @@ export function getLggColumns({
       type: 'readonly',
       isSticky: true,
       stickyLeft: 48,
-      headerBgClass: 'bg-navy-900',
+      headerBgClass: stickyHeader,
       renderCell: (_, idx) => <div className="text-center text-slate-400 py-1.5 truncate">{lastRowTaladroName(idx)}</div>
     },
     {
@@ -161,21 +169,23 @@ export function getLggColumns({
       label: 'de:',
       width: 'w-16',
       type: 'number',
-      step: '0.01'
+      step: '0.01',
+      headerBgClass: defaultHeader
     },
     {
       key: 'a',
       label: 'a:',
       width: 'w-16',
       type: 'number',
-      step: '0.01'
+      step: '0.01',
+      headerBgClass: defaultHeader
     },
     {
       key: 'perf' as any,
       label: 'Perf. (m)',
       width: 'w-16',
       type: 'readonly',
-      headerBgClass: 'bg-blue-500/5 dark:bg-blue-500/10 text-blue-600 dark:text-blue-300',
+      headerBgClass: blueGroupHeader,
       renderCell: (row) => (
         <FormulaTooltipTrigger formulaId="lgg_perf" params={{ de: row.de, a: row.a, val: (row.a - row.de).toFixed(2) }} position="bottom">
           <div className="text-center font-bold text-blue-400 py-1.5">{(row.a - row.de).toFixed(2)}</div>
@@ -187,7 +197,7 @@ export function getLggColumns({
       label: 'Perf./LR',
       width: 'w-16',
       type: 'readonly',
-      headerBgClass: 'bg-blue-500/5 dark:bg-blue-500/10 text-blue-600 dark:text-blue-300',
+      headerBgClass: blueGroupHeader,
       renderCell: (row) => {
         const perf = parseFloat((row.a - row.de).toFixed(2));
         const rec = row.rec_m || 0;
@@ -215,7 +225,7 @@ export function getLggColumns({
       width: 'w-20',
       type: 'number',
       step: '0.01',
-      headerBgClass: 'bg-blue-500/5 dark:bg-blue-500/10 text-blue-600 dark:text-blue-300'
+      headerBgClass: blueGroupHeader
     },
     {
       key: 'rqd_m',
@@ -223,7 +233,7 @@ export function getLggColumns({
       width: 'w-20',
       type: 'number',
       step: '0.01',
-      headerBgClass: 'bg-blue-500/5 dark:bg-blue-500/10 text-blue-600 dark:text-blue-300'
+      headerBgClass: blueGroupHeader
     },
     {
       key: 'lrf_m',
@@ -231,14 +241,14 @@ export function getLggColumns({
       width: 'w-20',
       type: 'number',
       step: '0.01',
-      headerBgClass: 'bg-blue-500/5 dark:bg-blue-500/10 text-blue-600 dark:text-blue-300'
+      headerBgClass: blueGroupHeader
     },
     {
       key: 'frf' as any,
       label: 'FRF',
       width: 'w-16',
       type: 'readonly',
-      headerBgClass: 'bg-purple-500/5 dark:bg-purple-500/10 text-purple-600 dark:text-purple-300',
+      headerBgClass: purpleGroupHeader,
       renderCell: (row) => {
         const lrf = row.lrf_m || 0;
         const calcFrf = lrf > 0 ? Math.floor(Math.round(lrf * 100) / 5) + 1 : 0;
@@ -256,14 +266,14 @@ export function getLggColumns({
       width: 'w-20',
       type: 'number',
       step: '0.01',
-      headerBgClass: 'bg-blue-500/5 dark:bg-blue-500/10 text-blue-600 dark:text-blue-300'
+      headerBgClass: blueGroupHeader
     },
     {
       key: 'sum_control' as any,
       label: '∑ RQD+LRF + ∑ Frag\'s<10',
       width: 'w-20',
       type: 'readonly',
-      headerBgClass: 'bg-blue-500/5 dark:bg-blue-500/10 text-blue-600 dark:text-blue-300',
+      headerBgClass: blueGroupHeader,
       renderCell: (row) => {
         const sum = parseFloat(((row.rqd_m || 0) + (row.lrf_m || 0) + (row.small_frag_m || 0)).toFixed(2));
         return (
@@ -278,7 +288,7 @@ export function getLggColumns({
       label: 'LR/RQD + LRF',
       width: 'w-16',
       type: 'readonly',
-      headerBgClass: 'bg-blue-500/5 dark:bg-blue-500/10 text-blue-600 dark:text-blue-300',
+      headerBgClass: blueGroupHeader,
       renderCell: (row) => {
         const sum = parseFloat(((row.rqd_m || 0) + (row.lrf_m || 0) + (row.small_frag_m || 0)).toFixed(2));
         const perf = parseFloat((row.a - row.de).toFixed(2));
@@ -307,6 +317,7 @@ export function getLggColumns({
       label: 'LITO 1',
       width: 'w-24',
       type: 'select',
+      headerBgClass: defaultHeader,
       renderCell: (row, _idx, isSelected) => {
         const style = getLithologyStyleNullable(row.lito1, isDark);
         if (!isSelected) {
@@ -346,6 +357,7 @@ export function getLggColumns({
       label: 'LITO 2',
       width: 'w-24',
       type: 'select',
+      headerBgClass: defaultHeader,
       renderCell: (row, _idx, isSelected) => {
         const style = getLithologyStyleNullable(row.lito2, isDark);
         if (!isSelected) {
@@ -385,6 +397,7 @@ export function getLggColumns({
       label: 'LITO 3',
       width: 'w-24',
       type: 'select',
+      headerBgClass: defaultHeader,
       renderCell: (row, _idx, isSelected) => {
         const style = getLithologyStyleNullable(row.lito3, isDark);
         if (!isSelected) {
@@ -424,6 +437,7 @@ export function getLggColumns({
       label: 'Resist. Máx. Estimada (ISRM)',
       width: 'w-24',
       type: 'select',
+      headerBgClass: defaultHeader,
       renderCell: (row, _idx, isSelected) => {
         const normRes = normalizeStrength(row.resistencia);
         const style = getResistenciaStyle(normRes, isDark);
@@ -460,6 +474,7 @@ export function getLggColumns({
       label: 'Linea de orientación',
       width: 'w-20',
       type: 'select',
+      headerBgClass: defaultHeader,
       options: ['N', 'S', 'X']
     },
     {
@@ -467,13 +482,15 @@ export function getLggColumns({
       label: 'Desplaz. 0°-360° (OFFSET)',
       width: 'w-20',
       type: 'number',
-      step: '0.1'
+      step: '0.1',
+      headerBgClass: defaultHeader
     },
     {
       key: 'tipo_est1',
       label: 'Tipo de estructura',
       width: 'w-20',
       type: 'select',
+      headerBgClass: defaultHeader,
       options: ['JN', 'F-10', 'SZ', 'BED', 'VN', 'CON', 'SE', 'F+10', '-1']
     },
     {
@@ -481,37 +498,43 @@ export function getLggColumns({
       label: 'Tipo de estructura 2',
       width: 'w-20',
       type: 'select',
+      headerBgClass: defaultHeader,
       options: ['JN', 'F-10', 'SZ', 'BED', 'VN', 'CON', 'SE', 'F+10', '-1']
     },
     {
       key: 'frac_nat',
       label: 'N° de Fracturas Naturales',
       width: 'w-20',
-      type: 'number'
+      type: 'number',
+      headerBgClass: defaultHeader
     },
     {
       key: 'frac_buz30',
       label: 'N° Frac. Nat. (Buz<30°)',
       width: 'w-20',
-      type: 'number'
+      type: 'number',
+      headerBgClass: defaultHeader
     },
     {
       key: 'frac_buz60',
       label: 'N° Frac. Nat. (30°< Buz <60°)',
       width: 'w-20',
-      type: 'number'
+      type: 'number',
+      headerBgClass: defaultHeader
     },
     {
       key: 'frac_buz90',
       label: 'N° Frac. Nat. (Buz>60°)',
       width: 'w-20',
-      type: 'number'
+      type: 'number',
+      headerBgClass: defaultHeader
     },
     {
       key: 'sum_frac_nat' as any,
       label: '∑ Fracturas Naturales',
       width: 'w-20',
       type: 'readonly',
+      headerBgClass: defaultHeader,
       renderCell: (row) => {
         const sum = (row.frac_buz30 || 0) + (row.frac_buz60 || 0) + (row.frac_buz90 || 0);
         return (
@@ -526,6 +549,7 @@ export function getLggColumns({
       label: 'N\' FN',
       width: 'w-16',
       type: 'readonly',
+      headerBgClass: defaultHeader,
       renderCell: (row) => {
         const sum = (row.frac_buz30 || 0) + (row.frac_buz60 || 0) + (row.frac_buz90 || 0);
         const hasError = sum !== (row.frac_nat || 0);
@@ -551,25 +575,29 @@ export function getLggColumns({
       label: 'Abertura (mm.)',
       width: 'w-20',
       type: 'number',
-      step: '0.01'
+      step: '0.01',
+      headerBgClass: defaultHeader
     },
     {
       key: 'rugosidad',
       label: 'Rugosidad (ISRM)',
       width: 'w-20',
-      type: 'number'
+      type: 'number',
+      headerBgClass: defaultHeader
     },
     {
       key: 'jrc10',
       label: 'JRC10',
       width: 'w-20',
-      type: 'number'
+      type: 'number',
+      headerBgClass: defaultHeader
     },
     {
       key: 'intemperismo',
       label: 'Grado Intemp. (ISRM)',
       width: 'w-20',
       type: 'select',
+      headerBgClass: defaultHeader,
       renderCell: (row, _idx, isSelected) => {
         const style = getIntemperismoStyle(row.intemperismo, isDark);
         if (!isSelected) {
@@ -605,6 +633,7 @@ export function getLggColumns({
       label: 'Tipo de Relleno 1',
       width: 'w-20',
       type: 'select',
+      headerBgClass: defaultHeader,
       options: RELLENO_OPTIONS
     },
     {
@@ -612,6 +641,7 @@ export function getLggColumns({
       label: 'Tipo de Relleno 2',
       width: 'w-20',
       type: 'select',
+      headerBgClass: defaultHeader,
       renderCell: (row, _idx, isSelected) => {
         if (!isSelected) {
           return (
@@ -640,13 +670,15 @@ export function getLggColumns({
       label: 'Espesor Relleno (mm)',
       width: 'w-20',
       type: 'number',
-      step: '0.1'
+      step: '0.1',
+      headerBgClass: defaultHeader
     },
     {
       key: 'alert_abert_rell' as any,
       label: 'Abert./Rel',
       width: 'w-24',
       type: 'readonly',
+      headerBgClass: defaultHeader,
       renderCell: (row) => {
         const hasError = ((row.espesor || 0) > 0 && (row.abertura || 0) <= 0) || ((row.espesor || 0) === 0 && (row.abertura || 0) > 0);
         return (
@@ -671,6 +703,7 @@ export function getLggColumns({
       label: 'Presen. Agua (ISRM)',
       width: 'w-20',
       type: 'select',
+      headerBgClass: defaultHeader,
       renderCell: (row, _idx, isSelected) => {
         const style = getAguaStyle(row.agua_obs, isDark);
         if (!isSelected) {
@@ -706,6 +739,7 @@ export function getLggColumns({
       label: 'Geotécnico',
       width: 'w-24',
       type: 'readonly',
+      headerBgClass: defaultHeader,
       renderCell: (row) => <span className="w-full block px-2 py-1.5 text-center text-slate-400 font-medium">{row.turno ? lastRowGeologo(row.originalIndex) : "RD/RB"}</span>
     },
     {
@@ -713,6 +747,7 @@ export function getLggColumns({
       label: 'Fecha',
       width: 'w-24',
       type: 'readonly',
+      headerBgClass: defaultHeader,
       renderCell: (row) => <span className="w-full block px-2 py-1.5 text-center text-slate-400 font-medium">{lastRowFecha(row.originalIndex)}</span>
     },
     {
@@ -720,6 +755,7 @@ export function getLggColumns({
       label: 'Turno',
       width: 'w-16',
       type: 'select',
+      headerBgClass: defaultHeader,
       renderCell: (row, _idx, isSelected) => {
         if (!isSelected) {
           return (
@@ -745,7 +781,8 @@ export function getLggColumns({
       key: 'comentarios',
       label: 'Comentarios',
       width: 'w-56',
-      type: 'text'
+      type: 'text',
+      headerBgClass: defaultHeader
     },
     {
       key: 'rmr76Score' as any,
@@ -754,7 +791,7 @@ export function getLggColumns({
       type: 'readonly',
       isStickyRight: true,
       stickyRight: 144,
-      headerBgClass: 'bg-amber-500/20 text-amber-300 font-bold border-b border-amber-500/30',
+      headerBgClass: amberGroupHeader,
       cellClassName: 'bg-amber-500/5',
       renderCell: (row) => {
         const score = row.rmr76Score;
@@ -781,7 +818,7 @@ export function getLggColumns({
       type: 'readonly',
       isStickyRight: true,
       stickyRight: 80,
-      headerBgClass: 'bg-fuchsia-500/20 text-fuchsia-300 font-bold border-b border-fuchsia-500/30',
+      headerBgClass: fuchsiaGroupHeader,
       cellClassName: 'bg-fuchsia-500/5',
       renderCell: (row) => {
         const score = row.rmr89Score;
@@ -808,7 +845,7 @@ export function getLggColumns({
       type: 'readonly',
       isStickyRight: true,
       stickyRight: 0,
-      headerBgClass: 'bg-navy-900',
+      headerBgClass: stickyHeader,
       renderCell: (row, _idx, isSelected) => {
         if (!isSelected) {
           return null;
