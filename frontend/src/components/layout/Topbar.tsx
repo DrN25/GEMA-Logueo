@@ -72,17 +72,14 @@ export default function Topbar({
         {/* Indicador Simplificado de Estado de Servidor / BD */}
         <div className="flex items-center gap-2 pr-3 border-r border-navy-800">
           <span className={`w-2.5 h-2.5 rounded-full ${
-            hasAnyUnsaved ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]' :
-            syncStatus === 'synced' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]' :
             syncStatus === 'saving' ? 'bg-blue-500 animate-pulse' :
-            'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]'
+            syncStatus === 'offline' ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' :
+            'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]'
           }`} />
           <span className="text-xs text-slate-400 font-semibold" title={syncMessage}>
             {syncStatus === 'saving' ? 'Guardando datos...' :
-              isCurrentUnsaved ? 'Cambios pendientes' :
-              hasWorkspaceUnsaved ? `${unsavedCount} cambio(s) pendiente(s)` :
-              syncStatus === 'synced' ? 'Conectado con la BD' :
-              'Modo sin conexión'}
+              syncStatus === 'offline' ? 'Modo sin conexión' :
+              'Conectado con la BD'}
           </span>
         </div>
 
