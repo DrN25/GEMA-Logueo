@@ -127,8 +127,9 @@ class AnalisisResult:
     total_taladros_afectados: int = 0
     num_campos_alta: int = 0
     registros_afectados: int = 0
+    no_oblig_total: int = 0
     tablas: dict = field(default_factory=dict)
-    subratings: list = field(default_factory=list)
+    no_oblig: list = field(default_factory=list)
     vista_alta: list = field(default_factory=list)
     detalles: list = field(default_factory=list)
     parrafos: list = field(default_factory=list)
@@ -139,12 +140,11 @@ class AnalisisResult:
 
 
 def _p1_concentracion(filas, grand_total, n_registros, n_taladros):
-    obligatorios = [f for f in filas if f["requerido"] and f["total"] > 0]
-    if len(obligatorios) < 2:
+    if len(filas) < 2:
         return None
-    t1, t2 = obligatorios[0], obligatorios[1]
+    t1, t2 = filas[0], filas[1]
     pct_top2 = (t1["total"] + t2["total"]) / grand_total * 100.0 if grand_total else 0.0
-    restos = obligatorios[2:5]
+    restos = filas[2:5]
     acum = pct_top2
     resto_txt = ""
     if restos:
@@ -156,8 +156,7 @@ def _p1_concentracion(filas, grand_total, n_registros, n_taladros):
 
 
 def _p2_impacto_rmr(filas, registros):
-    afectan = [f for f in filas
-               if f["afecta_rmr"] and f["requerido"] and f["total"] > 0]
+    afectan = [f for f in filas if f["afecta_rmr"] and f["total"] > 0]
     if not afectan:
         return None
     claves = {(f["modulo"], f["clave"]) for f in afectan}
@@ -200,14 +199,14 @@ def _p4_vacio_vs_sin_info(total_vacias, total_sin_info, grand_total):
             f"declarada).")
 
 
-def _p8_no_obligatorios(filas, grand_total, n_registros):
-    no_oblig = [f for f in filas if not f["requerido"] and f["total"] > 0]
-    if len(no_oblig) < 2:
+def _p8_no_obligatorios(filas, grand_total):
+    if len(filas) < 2:
         return None
-    t1, t2 = no_oblig[0], no_oblig[1]
+    t1, t2 = filas[0], filas[1]
     pct = (t1["total"] + t2["total"]) / grand_total * 100.0 if grand_total else 0.0
     return (f"«{t1['etiqueta']}» y «{t2['etiqueta']}» (campos NO obligatorios) concentran "
-            f"el {pct:.1f}% de los datos faltantes ({t1['total'] + t2['total']} registros).")
+            f"el {pct:.1f}% de los datos faltantes no obligatorios "
+            f"({t1['total'] + t2['total']} registros).")
 
 
 def _p5_geologo(registros):
@@ -249,15 +248,14 @@ def _p7_modulo(registros, grand_total):
     return f"El módulo {top_mod} concentra el {pct:.1f}% de los datos faltantes ({n_top})."
 
 
-def _stats_modulos(grupos, filas_main, filas_sub, tabla_c):
+def _stats_modulos(grupos, filas, tabla_c):
     modulos = []
     for m in MODULOS:
         celdas_mod = set()
         for (mod, _), g in grupos.items():
             if mod == m:
                 celdas_mod |= g["celdas"]
-        fs = [f for f in filas_main + filas_sub
-              if f["modulo"] == m and f["total"] > 0]
+        fs = [f for f in filas if f["modulo"] == m and f["total"] > 0]
         top3 = sorted(fs, key=lambda x: x["total"], reverse=True)[:3]
         modulos.append({
             "modulo": m,
@@ -281,22 +279,45 @@ def compute_analysis(diag, incidencias, faltantes_extra=None):
     filas_main = _filas_campo(grupos, incluir_subratings=False)
     filas_sub = _filas_campo(grupos, incluir_subratings=True)
 
-    gran_total = sum(f["total"] for f in filas_main) + sum(f["total"] for f in filas_sub)
-    total_vacias = sum(f["v"] for f in filas_main) + sum(f["v"] for f in filas_sub)
+    req_main = [f for f in filas_main if f["requerido"]]
+    no_oblig_main = [f for f in filas_main if not f["requerido"]]
+    no_oblig_sub = [f for f in filas_sub if not f["requerido"]]
+
+    gran_total = sum(f["total"] for f in req_main)
+    total_vacias = sum(f["v"] for f in req_main)
     total_sin_info = gran_total - total_vacias
+    no_oblig_total = sum(f["total"] for f in no_oblig_main) + sum(f["total"] for f in no_oblig_sub)
 
     celdas_afectadas = set()
-    for g in grupos.values():
-        celdas_afectadas |= g["celdas"]
-    n_registros = len({(r.get("modulo"), r.get("fila_excel")) for r in registros})
+    for f in req_main:
+        celdas_afectadas |= grupos[(f["modulo"], f["clave"])]["celdas"]
+
+    claves_req = {(f["modulo"], f["clave"]) for f in req_main}
+    registros_oblig = [r for r in registros
+                       if (r.get("modulo"), r.get("columna")) in claves_req]
+    n_registros = len({(r.get("modulo"), r.get("fila_excel")) for r in registros_oblig})
 
     tablas = {}
-    tablas["A"] = _construir_tabla([f for f in filas_main if f["v"] > 0], "v", gran_total)
-    tablas["B"] = _construir_tabla([f for f in filas_main if f["s"] > 0], "s", gran_total)
-    tablas["C"] = _construir_tabla([f for f in filas_main if f["total"] > 0], "total", gran_total)
-
-    subratings = _construir_tabla([f for f in filas_sub if f["total"] > 0], "total", gran_total)
+    tablas["A"] = _construir_tabla([f for f in req_main if f["v"] > 0], "v", gran_total)
+    tablas["B"] = _construir_tabla([f for f in req_main if f["s"] > 0], "s", gran_total)
+    tablas["C"] = _construir_tabla([f for f in req_main if f["total"] > 0], "total", gran_total)
     vista_alta = [f for f in tablas["C"] if f["nivel"] == "Alta"]
+
+    no_oblig = []
+    no_oblig_rows = sorted(no_oblig_main, key=lambda x: x["total"], reverse=True)
+    no_oblig_sub_rows = sorted(no_oblig_sub, key=lambda x: x["total"], reverse=True)
+    for f in no_oblig_rows:
+        if f["total"] <= 0:
+            continue
+        pct = f["total"] / no_oblig_total * 100.0 if no_oblig_total else 0.0
+        no_oblig.append({**f, "pct": pct, "divisor": False})
+    if no_oblig_sub_rows:
+        no_oblig.append({"divisor": True})
+        for f in no_oblig_sub_rows:
+            if f["total"] <= 0:
+                continue
+            pct = f["total"] / no_oblig_total * 100.0 if no_oblig_total else 0.0
+            no_oblig.append({**f, "pct": pct, "divisor": False})
 
     resumen_anios = _resumen_anios(diag)
     anios = sorted(set(list(resumen_anios.keys()) + [
@@ -339,8 +360,7 @@ def compute_analysis(diag, incidencias, faltantes_extra=None):
             "total_taladros": len(g["celdas"]),
         })
 
-    main_orden = sorted(filas_main, key=lambda x: x["total"], reverse=True)
-    sub_orden = sorted(filas_sub, key=lambda x: x["total"], reverse=True)
+    main_orden = sorted(req_main, key=lambda x: x["total"], reverse=True)
     pareto = []
     acum = 0.0
     for f in main_orden:
@@ -349,41 +369,34 @@ def compute_analysis(diag, incidencias, faltantes_extra=None):
         pct = f["total"] / gran_total * 100.0 if gran_total else 0.0
         acum += pct
         pareto.append({**f, "pct": pct, "acum": acum, "divisor": False})
-    if sub_orden:
-        pareto.append({"divisor": True})
-        for f in sub_orden:
-            if f["total"] <= 0:
-                continue
-            pct = f["total"] / gran_total * 100.0 if gran_total else 0.0
-            acum += pct
-            pareto.append({**f, "pct": pct, "acum": acum, "divisor": False})
 
     parrafos = []
     p1 = _p1_concentracion(main_orden, gran_total, n_registros, len(celdas_afectadas))
     if p1 is not None:
         parrafos.append(p1)
-    p2 = _p2_impacto_rmr(main_orden, registros)
+    p2 = _p2_impacto_rmr(main_orden, registros_oblig)
     if p2 is not None:
         parrafos.append(p2)
-    p3 = _p3_tendencia(registros)
+    p3 = _p3_tendencia(registros_oblig)
     if p3 is not None:
         parrafos.append(p3)
     p4 = _p4_vacio_vs_sin_info(total_vacias, total_sin_info, gran_total)
     if p4 is not None:
         parrafos.append(p4)
     if PARRAFOS_OPCIONALES:
-        p5 = _p5_geologo(registros)
+        p5 = _p5_geologo(registros_oblig)
         if p5 is not None:
             parrafos.append(p5)
-        p6 = _p6_taladros(registros, len(celdas_afectadas))
+        p6 = _p6_taladros(registros_oblig, len(celdas_afectadas))
         if p6 is not None:
             parrafos.append(p6)
-        p7 = _p7_modulo(registros, gran_total)
+        p7 = _p7_modulo(registros_oblig, gran_total)
         if p7 is not None:
             parrafos.append(p7)
 
     parrafos_secundarios = []
-    p8 = _p8_no_obligatorios(main_orden, gran_total, n_registros)
+    p8 = _p8_no_obligatorios(
+        sorted(no_oblig_main, key=lambda x: x["total"], reverse=True), no_oblig_total)
     if p8 is not None:
         parrafos_secundarios.append(p8)
 
@@ -394,13 +407,14 @@ def compute_analysis(diag, incidencias, faltantes_extra=None):
         total_taladros_afectados=len(celdas_afectadas),
         num_campos_alta=len(vista_alta),
         registros_afectados=n_registros,
+        no_oblig_total=no_oblig_total,
         tablas=tablas,
-        subratings=subratings,
+        no_oblig=no_oblig,
         vista_alta=vista_alta,
         detalles=detalles,
         parrafos=parrafos,
         parrafos_secundarios=parrafos_secundarios,
-        modulos=_stats_modulos(grupos, filas_main, filas_sub, tablas["C"]),
+        modulos=_stats_modulos(grupos, req_main, tablas["C"]),
         pareto=pareto,
         anios=anios,
     )

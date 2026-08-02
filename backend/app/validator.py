@@ -487,7 +487,8 @@ def validate_rmr_sheet_data(
 
         # 1. CLASIFICACIÓN DE CAMPOS VACÍOS VS SIN INFORMACIÓN (-1)
         mandatory_rmr_fields = [
-            ("sondaje", "Sondaje"), ("corrida", "Corrida"), ("de", "Desde (m)"), ("a", "Hasta (m)"),
+            ("sondaje", "Sondaje"), ("corrida", "Corrida"), ("logueador", "Logueador"),
+            ("de", "Desde (m)"), ("a", "Hasta (m)"),
             ("long_corrida", "Long. Corrida (m)"), ("lito1", "Litho 1"), ("rec_m", "Rec (m)"),
             ("rec_pct", "Rec (%)"), ("rqd_m", "RQD (m)"), ("rqd_pct", "RQD (%)"),
             ("lrf_m", "Long. Tramo fracturado (m)"), ("frf", "FRF (zonas trituradas)"),
@@ -1229,7 +1230,8 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
 
         mandatory_est = [
             "profundidad", "alfa", "beta", "forma", "rugosidad", "jrc10", "abertura", 
-            "weathering", "espesor", "relleno1", "dureza_pared", "agua", "geotecnico", "campana"
+            "weathering", "espesor", "relleno1", "dureza_pared", "agua", "geotecnico", "campana",
+            "dip", "azimuth"
         ]
         for key in mandatory_est:
             v_san = sanitize_val(row_dict.get(key), str)
@@ -1831,7 +1833,7 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
             if camp:
                 resumen_celdas[celda_padre]["campania"] = str(camp)
 
-            mandatory_est = ["profundidad", "alfa", "beta", "forma", "rugosidad", "jrc10", "abertura", "weathering", "espesor", "relleno1", "dureza_pared", "agua", "geotecnico", "campana"]
+            mandatory_est = ["profundidad", "alfa", "beta", "forma", "rugosidad", "jrc10", "abertura", "weathering", "espesor", "relleno1", "dureza_pared", "agua", "geotecnico", "campana", "dip", "azimuth"]
             for key in mandatory_est:
                 if key not in e_map: continue
                 val_raw = row_dict.get(key)

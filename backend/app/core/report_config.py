@@ -97,10 +97,10 @@ CAMPOS_EXTRA_A_CAPTURAR = {
     "LGG": ["lito2", "lito3", "tipo_est2", "relleno2", "comentarios", "frf"],
     "Estructural": [
         "de", "a", "lito1", "lito2", "lito3", "tipo_estructura",
-        "dip", "azimuth", "relleno2", "comentario",
+        "relleno2", "comentario",
     ],
     "Validación RMR": [
-        "fecha", "logueador", "lito2", "lito3", "presencia_agua",
+        "fecha", "lito2", "lito3", "presencia_agua",
         "rmr76", "rmr89", "campana",
     ] + sorted(SUBRATINGS_LABELS),
 }

@@ -217,15 +217,11 @@ def _seccion_tabla_ab(ws, r0, c0, titulo, desc, filas, campo, toggle, base_total
     return r + 1
 
 
-def _h_sub(n):
-    return n + 6
-
-
 def _seccion_tabla_c(ws, r0, c0, filas, gran_total):
-    r = _titulo_desc(ws, r0, c0, 7, "TABLA C · COMBINADO (VACÍAS + -1)",
-                     "Visión global de los datos faltantes por campo. Nivel de Atención "
-                     "según el % combinado del módulo; es la tabla de referencia del "
-                     "reporte.")
+    r = _titulo_desc(ws, r0, c0, 7, "TABLA C · COMBINADO (VACÍAS + -1) · OBLIGATORIOS",
+                     "Visión global de los datos faltantes de campos obligatorios. Nivel "
+                     "de Atención según el % combinado del módulo; es la tabla de "
+                     "referencia del reporte y concilia con el Catálogo de Errores.")
     r = _cabecera(ws, r, c0, ["Módulo", "Campo", "Vacías", "-1", "Total", "% del Total",
                               "Nivel de Atención"])
     for idx, f in enumerate(filas):
@@ -257,54 +253,70 @@ def _seccion_tabla_c(ws, r0, c0, filas, gran_total):
         _put(ws, r, c0 + 5, "—", font=font_regular, align=alignment_center, fill=fill_kpi_gray)
         _put(ws, r, c0 + 6, "—", font=font_regular, align=alignment_center, fill=fill_kpi_gray)
         r += 1
-        r = _nota(ws, r, c0, 7, f"Base del %: {gran_total} faltantes identificados "
-                               f"(vacías + -1) = 100%. El % de cada fila es sobre el total "
-                               f"de su módulo (o global según el selector).")
-    return r + 1
-
-
-def _seccion_subratings(ws, r0, c0, filas):
-    r = _titulo_desc(ws, r0, c0, 7, "SUB-RATINGS RMR'76 / RMR'89 (sección separada)",
-                     "Campos derivados del cálculo RMR (resultado, no entrada). Se muestran "
-                     "aparte para no mezclarlos con los campos principales.")
-    r = _cabecera(ws, r, c0, ["Módulo", "Campo (Sub-ratings)", "Vacías", "-1", "Total",
-                              "% del Total", "Nivel de Atención"])
-    for idx, f in enumerate(filas):
-        zebra = fill_zebra if idx % 2 == 1 else None
-        _put(ws, r, c0, f["modulo"], font=font_italic, fill=zebra, align=alignment_center)
-        _put(ws, r, c0 + 1, f["etiqueta"], font=font_italic, fill=zebra, align=alignment_left)
-        _put(ws, r, c0 + 2, f["v"], fmt="#,##0", align=alignment_right, fill=zebra)
-        _put(ws, r, c0 + 3, f["s"], fmt="#,##0", align=alignment_right, fill=zebra)
-        _put(ws, r, c0 + 4, f["total"], font=font_bold, fmt="#,##0", align=alignment_right, fill=zebra)
-        _put(ws, r, c0 + 5, f["pct_g"] / 100.0, fmt="0.00%", align=alignment_right, fill=zebra)
-        _celda_nivel(ws, r, c0 + 6, f["nivel"], zebra)
-        r += 1
-    if not filas:
-        cell = _put(ws, r, c0, "Sin sub-ratings con datos faltantes.", font=font_italic,
-                    align=alignment_left)
-        ws.merge_cells(start_row=r, start_column=c0, end_row=r, end_column=c0 + 6)
-        r += 1
-    else:
-        _cf_contadores(ws, r0 + 3, r - 1, c0 + 4)
-        _cf_pct(ws, r0 + 3, r - 1, c0 + 5)
-        total = sum(f["total"] for f in filas)
-        _put(ws, r, c0, "TOTAL", font=font_bold, align=alignment_center, fill=fill_kpi_gray)
-        _put(ws, r, c0 + 1, "—", font=font_regular, align=alignment_center, fill=fill_kpi_gray)
-        _put(ws, r, c0 + 2, sum(f["v"] for f in filas), font=font_bold, fmt="#,##0",
-             align=alignment_right, fill=fill_kpi_gray)
-        _put(ws, r, c0 + 3, sum(f["s"] for f in filas), font=font_bold, fmt="#,##0",
-             align=alignment_right, fill=fill_kpi_gray)
-        _put(ws, r, c0 + 4, total, font=font_bold, fmt="#,##0", align=alignment_right, fill=fill_kpi_gray)
-        _put(ws, r, c0 + 5, "—", font=font_regular, align=alignment_center, fill=fill_kpi_gray)
-        _put(ws, r, c0 + 6, "—", font=font_regular, align=alignment_center, fill=fill_kpi_gray)
-        r += 1
-        r = _nota(ws, r, c0, 7, f"Base del %: {total} faltantes en sub-ratings (solo "
-                               f"campos derivados del cálculo RMR).")
+        r = _nota(ws, r, c0, 7, f"Base del %: {gran_total} faltantes identificados en "
+                               f"campos obligatorios (vacías + -1) = 100%. El % de cada "
+                               f"fila es sobre el total de su módulo (o global según el "
+                               f"selector).")
     return r + 1
 
 
 def _h_alta(n):
     return n + 6
+
+
+def _h_no_oblig(n):
+    return n + 6
+
+
+def _seccion_no_oblig(ws, r0, c0, filas, total):
+    r = _titulo_desc(ws, r0, c0, 7, "CAMPOS NO OBLIGATORIOS · INFORMACIÓN COMPLEMENTARIA",
+                     "No forman parte de la auditoría de campos obligatorios y no generan "
+                     "incidencias en el Catálogo de Errores. Se muestran por interés. "
+                     "Rosa: afectan al RMR (p. ej. FRF) · Ámbar: no obligatorios.")
+    _leyenda(ws, r - 1, c0 + 9, [
+        ("RMR", COLORES["rmr_fucsia"], "Afectan al RMR"),
+        ("NO", COLORES["no_rmr_ambar"], "No obligatorios"),
+    ])
+    r = _cabecera(ws, r, c0, ["Módulo", "Campo", "Vacías", "-1", "Total", "% del Total"])
+    for row in filas:
+        if row.get("divisor"):
+            cell = _put(ws, r, c0, "Sub-ratings del cálculo RMR'76 / RMR'89", font=font_italic,
+                        align=alignment_left, fill=fill_kpi_gray)
+            ws.merge_cells(start_row=r, start_column=c0, end_row=r, end_column=c0 + 5)
+            for cc in range(c0, c0 + 6):
+                ws.cell(row=r, column=cc).border = border_thin
+            r += 1
+            continue
+        fondo = ROSA_FILL if row["afecta_rmr"] else AMBAR_FILL
+        fuente = font_italic if row["es_subrating"] else font_regular
+        _put(ws, r, c0, row["modulo"], font=font_bold, fill=fondo, align=alignment_center)
+        _put(ws, r, c0 + 1, row["etiqueta"], font=fuente, fill=fondo, align=alignment_left)
+        _put(ws, r, c0 + 2, row["v"], fmt="#,##0", align=alignment_right, fill=fondo)
+        _put(ws, r, c0 + 3, row["s"], fmt="#,##0", align=alignment_right, fill=fondo)
+        _put(ws, r, c0 + 4, row["total"], font=font_bold, fmt="#,##0", align=alignment_right, fill=fondo)
+        _put(ws, r, c0 + 5, row["pct"] / 100.0, fmt="0.00%", align=alignment_right, fill=fondo)
+        r += 1
+    if not filas:
+        cell = _put(ws, r, c0, "Sin datos en campos no obligatorios.", font=font_italic,
+                    align=alignment_left)
+        ws.merge_cells(start_row=r, start_column=c0, end_row=r, end_column=c0 + 5)
+        r += 1
+    else:
+        _cf_contadores(ws, r0 + 3, r - 1, c0 + 4)
+        _cf_pct(ws, r0 + 3, r - 1, c0 + 5)
+        total_v = sum(row["v"] for row in filas if not row.get("divisor"))
+        total_s = sum(row["s"] for row in filas if not row.get("divisor"))
+        _put(ws, r, c0, "TOTAL", font=font_bold, align=alignment_center, fill=fill_kpi_gray)
+        _put(ws, r, c0 + 1, "—", font=font_regular, align=alignment_center, fill=fill_kpi_gray)
+        _put(ws, r, c0 + 2, total_v, font=font_bold, fmt="#,##0", align=alignment_right, fill=fill_kpi_gray)
+        _put(ws, r, c0 + 3, total_s, font=font_bold, fmt="#,##0", align=alignment_right, fill=fill_kpi_gray)
+        _put(ws, r, c0 + 4, total, font=font_bold, fmt="#,##0", align=alignment_right, fill=fill_kpi_gray)
+        _put(ws, r, c0 + 5, 1.0, fmt="0.00%", align=alignment_right, fill=fill_kpi_gray)
+        r += 1
+        r = _nota(ws, r, c0, 7, f"Base: {total} faltantes en campos no obligatorios. "
+                               f"No están incluidos en los totales de campos obligatorios "
+                               f"ni en el Catálogo de Errores.")
+    return r + 1
 
 
 def _seccion_alta(ws, r0, c0, filas, anclas, r_indice, gran_total):
@@ -466,12 +478,7 @@ def _color_barra(row):
     return COLORES["no_rmr_ambar"]
 
 
-def _leyenda(ws, r, c0):
-    chips = [
-        ("RMR", COLORES["rmr_fucsia"], "Afectan al RMR"),
-        ("OBL", COLORES["obligatorio_verde"], "Obligatorios"),
-        ("NO", COLORES["no_rmr_ambar"], "No obligatorios"),
-    ]
+def _leyenda(ws, r, c0, chips):
     col = c0
     for texto_corto, color, texto in chips:
         cel = _put(ws, r, col, texto_corto, font=font_header, align=alignment_center)
@@ -481,12 +488,15 @@ def _leyenda(ws, r, c0):
 
 
 def _seccion_pareto(ws, r0, c0, pareto, gran_total):
-    r = _titulo_desc(ws, r0, c0, 7, "ANÁLISIS DE PARETO · ¿QUÉ CAMPOS CONCENTRAN LOS "
-                                   "DATOS FALTANTES?",
-                     "Campos ordenados de mayor a menor cantidad de faltantes, con % del "
-                     "total y % acumulado. Rosa: afectan al RMR · Verde: obligatorios · "
-                     "Ámbar: no obligatorios.")
-    _leyenda(ws, r - 1, c0 + 9)
+    r = _titulo_desc(ws, r0, c0, 7, "ANÁLISIS DE PARETO · ¿QUÉ CAMPOS OBLIGATORIOS "
+                                   "CONCENTRAN LOS DATOS FALTANTES?",
+                     "Campos obligatorios ordenados de mayor a menor cantidad de "
+                     "faltantes, con % del total y % acumulado. Rosa: afectan al RMR · "
+                     "Verde: obligatorios.")
+    _leyenda(ws, r - 1, c0 + 9, [
+        ("RMR", COLORES["rmr_fucsia"], "Afectan al RMR"),
+        ("OBL", COLORES["obligatorio_verde"], "Obligatorios"),
+    ])
     r = _cabecera(ws, r, c0, ["Módulo", "CAMPO", "VACÍAS", "-1", "OCURRENCIAS",
                               "% DEL TOTAL", "% ACUM."])
     for row in pareto:
@@ -628,7 +638,7 @@ def crear_hoja_analisis_vacios(wb, result, index=3):
     tabla_a = result.tablas.get("A", [])
     tabla_b = result.tablas.get("B", [])
     tabla_c = result.tablas.get("C", [])
-    sub = result.subratings
+    no_oblig = result.no_oblig
     vista_alta = result.vista_alta
     detalles = result.detalles
     pareto = result.pareto
@@ -638,9 +648,7 @@ def crear_hoja_analisis_vacios(wb, result, index=3):
 
     r_tablas = 13
     h_abc = max(_h_campos(len(tabla_a)), _h_campos(len(tabla_b)), _h_campos(len(tabla_c)))
-    r_sub = r_tablas + h_abc + 1
-    h_sub = _h_sub(len(sub))
-    r_alta = r_sub + h_sub + 1
+    r_alta = r_tablas + h_abc + 1
     h_alta = _h_alta(len(vista_alta))
     r_parrafos = r_alta + h_alta + 1
     h_parrafos = _h_parrafos(len(parrafos), len(parrafos_sec))
@@ -654,7 +662,9 @@ def crear_hoja_analisis_vacios(wb, result, index=3):
         h_bandas.append(h + 1)
     r_pareto = r_detalles + (sum(h_bandas) if bandas else 1)
     h_pareto = _h_pareto(len(pareto))
-    r_panel = r_pareto + h_pareto + 1
+    r_no_oblig = r_pareto + h_pareto + 1
+    h_no_oblig = _h_no_oblig(len(no_oblig))
+    r_panel = r_no_oblig + h_no_oblig + 1
     h_panel = _h_modulos()
     r_nota = r_panel + h_panel + 1
     anclas_detalle = []
@@ -672,14 +682,16 @@ def crear_hoja_analisis_vacios(wb, result, index=3):
         ("Lectura", f"B{r_parrafos}"),
         ("Detalles", f"B{r_detalles}"),
         ("Pareto", f"B{r_pareto}"),
+        ("No Obligatorios", f"B{r_no_oblig}"),
         ("Panel Módulos", f"B{r_panel}"),
     ]
     for i, (texto, destino) in enumerate(enlaces_indice):
         _link(ws, r_indice, 2 + i, destino, texto, align=alignment_center)
 
     _put(ws, 2, 2, "ANÁLISIS DE DATOS FALTANTES", font=font_title)
-    _put(ws, 3, 2, "Consolidado de campos vacíos y sin información (-1) por módulo, con "
-                   "nivel de atención, tendencias anuales y análisis de Pareto.",
+    _put(ws, 3, 2, "Consolidado de campos OBLIGATORIOS vacíos y sin información (-1) por "
+                   "módulo, con nivel de atención, tendencias anuales y análisis de "
+                   "Pareto. Los campos no obligatorios se muestran en la sección final.",
          font=font_subtitle)
 
     _kpi_card(ws, 5, 2, "TALADROS AFECTADOS", result.total_taladros_afectados,
@@ -703,19 +715,19 @@ def crear_hoja_analisis_vacios(wb, result, index=3):
     ws.add_data_validation(dv)
     dv.add("J5")
 
-    _seccion_tabla_ab(ws, r_tablas, 2, "TABLA A · CAMPOS VACÍOS",
-                      "Celdas sin contenido (posible descuido de registro). Nivel de "
-                      "Atención según el % de celdas vacías del módulo.",
+    _seccion_tabla_ab(ws, r_tablas, 2, "TABLA A · CAMPOS VACÍOS (OBLIGATORIOS)",
+                      "Celdas sin contenido (posible descuido de registro), solo campos "
+                      "obligatorios. Nivel de Atención según el % de celdas vacías del "
+                      "módulo.",
                       tabla_a, "v", True, result.total_vacias, "celdas vacías identificadas",
                       "Vacías (N)")
-    _seccion_tabla_ab(ws, r_tablas, 8, "TABLA B · SIN INFORMACIÓN (-1)",
-                      "Celdas con valor -1 (sin dato registrado a propósito). Nivel de "
-                      "Atención según el % de -1 del módulo.",
+    _seccion_tabla_ab(ws, r_tablas, 8, "TABLA B · SIN INFORMACIÓN -1 (OBLIGATORIOS)",
+                      "Celdas con valor -1 (sin dato registrado a propósito), solo campos "
+                      "obligatorios. Nivel de Atención según el % de -1 del módulo.",
                       tabla_b, "s", True, result.total_sin_info, "valores -1 identificados",
                       "Sin info (N)")
     _seccion_tabla_c(ws, r_tablas, 14, tabla_c, result.total_faltantes)
 
-    _seccion_subratings(ws, r_sub, 2, sub)
     _seccion_alta(ws, r_alta, 2, vista_alta, anclas_detalle, r_indice, result.total_faltantes)
     _escribir_parrafos(ws, r_parrafos, 2, parrafos, parrafos_sec)
 
@@ -730,13 +742,15 @@ def crear_hoja_analisis_vacios(wb, result, index=3):
     _seccion_pareto(ws, r_pareto, 2, pareto, result.total_faltantes)
     _grafico_pareto(ws, r_pareto, 2, pareto)
 
+    _seccion_no_oblig(ws, r_no_oblig, 2, no_oblig, result.no_oblig_total)
+
     _seccion_modulos(ws, r_panel, 2, modulos, r_indice, result.total_faltantes)
 
     nota_rmr = ("Los campos en ROSA son parámetros que alimentan el cálculo del RMR "
                 "(Bieniawski): provienen del Logueo General (LGG) y de la orientación "
-                "estructural (Dip/Azimut). En VERDE: campos obligatorios. En ÁMBAR: campos "
-                "no obligatorios. Su ausencia impide obtener una clasificación "
-                "geomecánica válida del macizo rocoso.")
+                "estructural (Dip/Azimut). En VERDE: campos obligatorios. En ÁMBAR: "
+                "campos no obligatorios (sección final, no auditados). Su ausencia impide "
+                "obtener una clasificación geomecánica válida del macizo rocoso.")
     cel = _put(ws, r_nota, 2, nota_rmr, font=font_italic, align=alignment_wrap)
     ws.merge_cells(start_row=r_nota, start_column=2, end_row=r_nota, end_column=15)
     ws.row_dimensions[r_nota].height = 45
