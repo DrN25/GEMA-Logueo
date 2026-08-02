@@ -66,13 +66,14 @@ REQUIRED_FIELDS_POR_MODULO = {
     "Estructural": {
         "profundidad", "alfa", "beta", "forma", "rugosidad", "jrc10", "abertura",
         "weathering", "espesor", "relleno1", "dureza_pared", "agua", "geotecnico", "campana",
+        "dip", "azimuth",
     },
     "Validación RMR": {
         "sondaje", "corrida", "de", "a", "long_corrida", "lito1", "rec_m", "rec_pct",
         "rqd_m", "rqd_pct", "lrf_m", "frf", "frac_nat", "total_frac", "ff_1m",
         "espaciamiento_mm", "resistencia", "tipo_estructura", "abertura_mm",
         "rugosidad", "relleno", "clasificacion_relleno", "intemperismo", "jrc10",
-        "espesor_relleno",
+        "espesor_relleno", "logueador",
     },
 }
 
@@ -109,6 +110,9 @@ COLORES = {
     "rmr_rojo": "C00000",
     "rmr_rosa": "FF80C0",
     "no_rmr_ambar": "FFC000",
+    "obligatorio_verde": "2E8B57",
+    "obligatorio_verde_claro": "D9EAD3",
+    "no_obligatorio_ambar_claro": "FFF2CC",
     "rosa_claro": "FCE4EC",
     "alta_durazno": "FCE4D6",
     "media_amarillo": "FFF2CC",

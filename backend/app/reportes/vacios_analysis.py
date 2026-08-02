@@ -11,7 +11,7 @@ from app.core.report_config import (
 )
 
 TIPOS_FALTANTE = {"VACIO", "SIN_INFORMACION"}
-VALORES_SIN_INFO = {"-1", "-1.0", "-1,0"}
+MODULOS = ["LGG", "Estructural", "Validación RMR"]
 
 
 def _nivel_atencion(modulo, clave, pct):
@@ -77,6 +77,7 @@ def _filas_campo(grupos, incluir_subratings):
             "total": g["v"] + g["s"],
             "celdas": len(g["celdas"]),
             "afecta_rmr": clave in RMR_AFFECTING_POR_MODULO.get(modulo, set()),
+            "requerido": clave in REQUIRED_FIELDS_POR_MODULO.get(modulo, set()),
             "es_subrating": es_sub,
         })
     return filas
@@ -131,28 +132,32 @@ class AnalisisResult:
     vista_alta: list = field(default_factory=list)
     detalles: list = field(default_factory=list)
     parrafos: list = field(default_factory=list)
+    parrafos_secundarios: list = field(default_factory=list)
+    modulos: list = field(default_factory=list)
     pareto: list = field(default_factory=list)
     anios: list = field(default_factory=list)
 
 
 def _p1_concentracion(filas, grand_total, n_registros, n_taladros):
-    if len(filas) < 2:
+    obligatorios = [f for f in filas if f["requerido"] and f["total"] > 0]
+    if len(obligatorios) < 2:
         return None
-    t1, t2 = filas[0], filas[1]
+    t1, t2 = obligatorios[0], obligatorios[1]
     pct_top2 = (t1["total"] + t2["total"]) / grand_total * 100.0 if grand_total else 0.0
-    restos = filas[2:5]
+    restos = obligatorios[2:5]
     acum = pct_top2
     resto_txt = ""
     if restos:
         resto_txt = ", y junto con " + ", ".join(f"«{r['etiqueta']}»" for r in restos)
         acum += sum(r["total"] for r in restos) / grand_total * 100.0 if grand_total else 0.0
-    return (f"«{t1['etiqueta']}» y «{t2['etiqueta']}» concentran el {pct_top2:.1f}% de los "
-            f"{n_registros} registros con datos faltantes ({n_taladros} taladros){resto_txt} "
-            f"y explican el {acum:.1f}% del total.")
+    return (f"«{t1['etiqueta']}» y «{t2['etiqueta']}» (campos obligatorios) concentran el "
+            f"{pct_top2:.1f}% de los {n_registros} registros con datos faltantes "
+            f"({n_taladros} taladros){resto_txt} y explican el {acum:.1f}% del total.")
 
 
 def _p2_impacto_rmr(filas, registros):
-    afectan = [f for f in filas if f["afecta_rmr"] and f["total"] > 0]
+    afectan = [f for f in filas
+               if f["afecta_rmr"] and f["requerido"] and f["total"] > 0]
     if not afectan:
         return None
     claves = {(f["modulo"], f["clave"]) for f in afectan}
@@ -161,9 +166,10 @@ def _p2_impacto_rmr(filas, registros):
     n_taladros = len({r.get("celda_padre") for r in registros
                       if (r.get("modulo"), r.get("columna")) in claves})
     n_campos = len({f["clave"] for f in filas if f["total"] > 0})
-    return (f"{len(afectan)} de los {n_campos} campos con datos faltantes son parámetros de "
-            f"entrada para el cálculo del RMR (Bieniawski); su ausencia compromete la "
-            f"clasificación geomecánica en {n_taladros} taladros ({n_registros} registros).")
+    return (f"{len(afectan)} de los {n_campos} campos con datos faltantes son parámetros "
+            f"obligatorios de entrada para el cálculo del RMR (Bieniawski); su ausencia "
+            f"compromete la clasificación geomecánica en {n_taladros} taladros "
+            f"({n_registros} registros).")
 
 
 def _p3_tendencia(registros):
@@ -192,6 +198,16 @@ def _p4_vacio_vs_sin_info(total_vacias, total_sin_info, grand_total):
     return (f"El {pct_v:.1f}% de los datos faltantes corresponde a celdas vacías (posible "
             f"descuido de registro) y el {pct_s:.1f}% a valores -1 (sin información "
             f"declarada).")
+
+
+def _p8_no_obligatorios(filas, grand_total, n_registros):
+    no_oblig = [f for f in filas if not f["requerido"] and f["total"] > 0]
+    if len(no_oblig) < 2:
+        return None
+    t1, t2 = no_oblig[0], no_oblig[1]
+    pct = (t1["total"] + t2["total"]) / grand_total * 100.0 if grand_total else 0.0
+    return (f"«{t1['etiqueta']}» y «{t2['etiqueta']}» (campos NO obligatorios) concentran "
+            f"el {pct:.1f}% de los datos faltantes ({t1['total'] + t2['total']} registros).")
 
 
 def _p5_geologo(registros):
@@ -233,6 +249,29 @@ def _p7_modulo(registros, grand_total):
     return f"El módulo {top_mod} concentra el {pct:.1f}% de los datos faltantes ({n_top})."
 
 
+def _stats_modulos(grupos, filas_main, filas_sub, tabla_c):
+    modulos = []
+    for m in MODULOS:
+        celdas_mod = set()
+        for (mod, _), g in grupos.items():
+            if mod == m:
+                celdas_mod |= g["celdas"]
+        fs = [f for f in filas_main + filas_sub
+              if f["modulo"] == m and f["total"] > 0]
+        top3 = sorted(fs, key=lambda x: x["total"], reverse=True)[:3]
+        modulos.append({
+            "modulo": m,
+            "taladros_afectados": len(celdas_mod),
+            "faltantes": sum(f["total"] for f in fs),
+            "vacias": sum(f["v"] for f in fs),
+            "sin_info": sum(f["s"] for f in fs),
+            "n_campos": len(fs),
+            "n_alta": len([f for f in tabla_c if f["modulo"] == m and f["nivel"] == "Alta"]),
+            "top3": [{"etiqueta": t["etiqueta"], "total": t["total"]} for t in top3],
+        })
+    return modulos
+
+
 def compute_analysis(diag, incidencias, faltantes_extra=None):
     registros = [r for r in (incidencias or []) if r.get("tipo_incidencia") in TIPOS_FALTANTE]
     if faltantes_extra:
@@ -252,15 +291,12 @@ def compute_analysis(diag, incidencias, faltantes_extra=None):
     n_registros = len({(r.get("modulo"), r.get("fila_excel")) for r in registros})
 
     tablas = {}
-    tabla_a = _construir_tabla([f for f in filas_main if f["v"] > 0], "v", gran_total)
-    tabla_b = _construir_tabla([f for f in filas_main if f["s"] > 0], "s", gran_total)
-    tabla_c = _construir_tabla([f for f in filas_main if f["total"] > 0], "total", gran_total)
-    tablas["A"] = tabla_a
-    tablas["B"] = tabla_b
-    tablas["C"] = tabla_c
+    tablas["A"] = _construir_tabla([f for f in filas_main if f["v"] > 0], "v", gran_total)
+    tablas["B"] = _construir_tabla([f for f in filas_main if f["s"] > 0], "s", gran_total)
+    tablas["C"] = _construir_tabla([f for f in filas_main if f["total"] > 0], "total", gran_total)
 
     subratings = _construir_tabla([f for f in filas_sub if f["total"] > 0], "total", gran_total)
-    vista_alta = [f for f in tabla_c if f["nivel"] == "Alta"]
+    vista_alta = [f for f in tablas["C"] if f["nivel"] == "Alta"]
 
     resumen_anios = _resumen_anios(diag)
     anios = sorted(set(list(resumen_anios.keys()) + [
@@ -346,6 +382,11 @@ def compute_analysis(diag, incidencias, faltantes_extra=None):
         if p7 is not None:
             parrafos.append(p7)
 
+    parrafos_secundarios = []
+    p8 = _p8_no_obligatorios(main_orden, gran_total, n_registros)
+    if p8 is not None:
+        parrafos_secundarios.append(p8)
+
     return AnalisisResult(
         total_vacias=total_vacias,
         total_sin_info=total_sin_info,
@@ -358,6 +399,8 @@ def compute_analysis(diag, incidencias, faltantes_extra=None):
         vista_alta=vista_alta,
         detalles=detalles,
         parrafos=parrafos,
+        parrafos_secundarios=parrafos_secundarios,
+        modulos=_stats_modulos(grupos, filas_main, filas_sub, tablas["C"]),
         pareto=pareto,
         anios=anios,
     )
