@@ -264,61 +264,6 @@ def _h_alta(n):
     return n + 6
 
 
-def _h_no_oblig(n):
-    return n + 6
-
-
-def _seccion_no_oblig(ws, r0, c0, filas, total):
-    r = _titulo_desc(ws, r0, c0, 7, "CAMPOS NO OBLIGATORIOS · INFORMACIÓN COMPLEMENTARIA",
-                     "No forman parte de la auditoría de campos obligatorios y no generan "
-                     "incidencias en el Catálogo de Errores. Se muestran por interés. "
-                     "Rosa: afectan al RMR (p. ej. FRF) · Ámbar: no obligatorios.")
-    _leyenda(ws, r - 1, c0 + 9, [
-        ("RMR", COLORES["rmr_fucsia"], "Afectan al RMR"),
-        ("NO", COLORES["no_rmr_ambar"], "No obligatorios"),
-    ])
-    r = _cabecera(ws, r, c0, ["Módulo", "Campo", "Vacías", "-1", "Total", "% del Total"])
-    for row in filas:
-        if row.get("divisor"):
-            cell = _put(ws, r, c0, "Sub-ratings del cálculo RMR'76 / RMR'89", font=font_italic,
-                        align=alignment_left, fill=fill_kpi_gray)
-            ws.merge_cells(start_row=r, start_column=c0, end_row=r, end_column=c0 + 5)
-            for cc in range(c0, c0 + 6):
-                ws.cell(row=r, column=cc).border = border_thin
-            r += 1
-            continue
-        fondo = ROSA_FILL if row["afecta_rmr"] else AMBAR_FILL
-        fuente = font_italic if row["es_subrating"] else font_regular
-        _put(ws, r, c0, row["modulo"], font=font_bold, fill=fondo, align=alignment_center)
-        _put(ws, r, c0 + 1, row["etiqueta"], font=fuente, fill=fondo, align=alignment_left)
-        _put(ws, r, c0 + 2, row["v"], fmt="#,##0", align=alignment_right, fill=fondo)
-        _put(ws, r, c0 + 3, row["s"], fmt="#,##0", align=alignment_right, fill=fondo)
-        _put(ws, r, c0 + 4, row["total"], font=font_bold, fmt="#,##0", align=alignment_right, fill=fondo)
-        _put(ws, r, c0 + 5, row["pct"] / 100.0, fmt="0.00%", align=alignment_right, fill=fondo)
-        r += 1
-    if not filas:
-        cell = _put(ws, r, c0, "Sin datos en campos no obligatorios.", font=font_italic,
-                    align=alignment_left)
-        ws.merge_cells(start_row=r, start_column=c0, end_row=r, end_column=c0 + 5)
-        r += 1
-    else:
-        _cf_contadores(ws, r0 + 3, r - 1, c0 + 4)
-        _cf_pct(ws, r0 + 3, r - 1, c0 + 5)
-        total_v = sum(row["v"] for row in filas if not row.get("divisor"))
-        total_s = sum(row["s"] for row in filas if not row.get("divisor"))
-        _put(ws, r, c0, "TOTAL", font=font_bold, align=alignment_center, fill=fill_kpi_gray)
-        _put(ws, r, c0 + 1, "—", font=font_regular, align=alignment_center, fill=fill_kpi_gray)
-        _put(ws, r, c0 + 2, total_v, font=font_bold, fmt="#,##0", align=alignment_right, fill=fill_kpi_gray)
-        _put(ws, r, c0 + 3, total_s, font=font_bold, fmt="#,##0", align=alignment_right, fill=fill_kpi_gray)
-        _put(ws, r, c0 + 4, total, font=font_bold, fmt="#,##0", align=alignment_right, fill=fill_kpi_gray)
-        _put(ws, r, c0 + 5, 1.0, fmt="0.00%", align=alignment_right, fill=fill_kpi_gray)
-        r += 1
-        r = _nota(ws, r, c0, 7, f"Base: {total} faltantes en campos no obligatorios. "
-                               f"No están incluidos en los totales de campos obligatorios "
-                               f"ni en el Catálogo de Errores.")
-    return r + 1
-
-
 def _seccion_alta(ws, r0, c0, filas, anclas, r_indice, gran_total):
     r = _titulo_desc(ws, r0, c0, 8, "CAMPOS EN NIVEL DE ATENCIÓN ALTA",
                      "Campos obligatorios con más del 10% de faltantes en su módulo. "
@@ -487,19 +432,12 @@ def _leyenda(ws, r, c0, chips):
         col += 2
 
 
-def _seccion_pareto(ws, r0, c0, pareto, gran_total):
-    r = _titulo_desc(ws, r0, c0, 7, "ANÁLISIS DE PARETO · ¿QUÉ CAMPOS OBLIGATORIOS "
-                                   "CONCENTRAN LOS DATOS FALTANTES?",
-                     "Campos obligatorios ordenados de mayor a menor cantidad de "
-                     "faltantes, con % del total y % acumulado. Rosa: afectan al RMR · "
-                     "Verde: obligatorios.")
-    _leyenda(ws, r - 1, c0 + 9, [
-        ("RMR", COLORES["rmr_fucsia"], "Afectan al RMR"),
-        ("OBL", COLORES["obligatorio_verde"], "Obligatorios"),
-    ])
+def _seccion_ranking(ws, r0, c0, titulo, desc, chips, filas, gran_total, base_nota):
+    r = _titulo_desc(ws, r0, c0, 7, titulo, desc)
+    _leyenda(ws, r - 1, c0 + 9, chips)
     r = _cabecera(ws, r, c0, ["Módulo", "CAMPO", "VACÍAS", "-1", "OCURRENCIAS",
                               "% DEL TOTAL", "% ACUM."])
-    for row in pareto:
+    for row in filas:
         if row.get("divisor"):
             cell = _put(ws, r, c0, "Sub-ratings del cálculo RMR'76 / RMR'89", font=font_italic,
                         align=alignment_left, fill=fill_kpi_gray)
@@ -518,16 +456,16 @@ def _seccion_pareto(ws, r0, c0, pareto, gran_total):
         _put(ws, r, c0 + 5, row["pct"] / 100.0, fmt="0.00%", align=alignment_right, fill=fondo)
         _put(ws, r, c0 + 6, row["acum"] / 100.0, fmt="0.00%", align=alignment_right, fill=fondo)
         r += 1
-    if not pareto:
-        cell = _put(ws, r, c0, "Sin datos para el Pareto.", font=font_italic, align=alignment_left)
+    if not filas:
+        cell = _put(ws, r, c0, "Sin datos para este ranking.", font=font_italic, align=alignment_left)
         ws.merge_cells(start_row=r, start_column=c0, end_row=r, end_column=c0 + 6)
         r += 1
     else:
         _cf_contadores(ws, r0 + 3, r - 1, c0 + 4)
         _cf_pct(ws, r0 + 3, r - 1, c0 + 5)
         _cf_pct(ws, r0 + 3, r - 1, c0 + 6)
-        total_v = sum(row["v"] for row in pareto if not row.get("divisor"))
-        total_s = sum(row["s"] for row in pareto if not row.get("divisor"))
+        total_v = sum(row["v"] for row in filas if not row.get("divisor"))
+        total_s = sum(row["s"] for row in filas if not row.get("divisor"))
         _put(ws, r, c0, "TOTAL", font=font_bold, align=alignment_center, fill=fill_kpi_gray)
         _put(ws, r, c0 + 1, "—", font=font_regular, align=alignment_center, fill=fill_kpi_gray)
         _put(ws, r, c0 + 2, total_v, font=font_bold, fmt="#,##0", align=alignment_right, fill=fill_kpi_gray)
@@ -537,12 +475,12 @@ def _seccion_pareto(ws, r0, c0, pareto, gran_total):
         _put(ws, r, c0 + 6, 1.0, fmt="0.00%", align=alignment_right, fill=fill_kpi_gray)
         r += 1
         r = _nota(ws, r, c0, 7, f"Base: {gran_total} faltantes identificados = 100% "
-                               f"(vacías + -1 de todos los módulos).")
+                               f"({base_nota}).")
     return r + 1
 
 
-def _grafico_pareto(ws, r0, c0, pareto):
-    top = [row for row in pareto if not row.get("divisor")][:15]
+def _grafico_ranking(ws, r0, c0, filas):
+    top = [row for row in filas if not row.get("divisor")][:15]
     if not top:
         return
     r1 = r0 + 2
@@ -573,8 +511,8 @@ def _grafico_pareto(ws, r0, c0, pareto):
     line.y_axis.crosses = "max"
     chart.y_axis.axId = 100
     chart += line
-    chart.width = 24
-    chart.height = 13
+    chart.width = 22
+    chart.height = max(6.0, min(13.0, (len(top) + 4) * 0.5))
     ws.add_chart(chart, f"{get_column_letter(c0 + 9)}{r0 + 2}")
 
 
@@ -638,10 +576,11 @@ def crear_hoja_analisis_vacios(wb, result, index=3):
     tabla_a = result.tablas.get("A", [])
     tabla_b = result.tablas.get("B", [])
     tabla_c = result.tablas.get("C", [])
-    no_oblig = result.no_oblig
     vista_alta = result.vista_alta
     detalles = result.detalles
-    pareto = result.pareto
+    pareto_oblig = result.pareto_oblig
+    pareto_no_oblig = result.pareto_no_oblig
+    pareto_ambos = result.pareto_ambos
     parrafos = result.parrafos
     parrafos_sec = result.parrafos_secundarios
     modulos = result.modulos
@@ -660,11 +599,11 @@ def crear_hoja_analisis_vacios(wb, result, index=3):
         if len(banda) > 1:
             h = max(h, _h_detalle(len(banda[1]["anual"])))
         h_bandas.append(h + 1)
-    r_pareto = r_detalles + (sum(h_bandas) if bandas else 1)
-    h_pareto = _h_pareto(len(pareto))
-    r_no_oblig = r_pareto + h_pareto + 1
-    h_no_oblig = _h_no_oblig(len(no_oblig))
-    r_panel = r_no_oblig + h_no_oblig + 1
+    r_ranking = r_detalles + (sum(h_bandas) if bandas else 1)
+    h_r1 = _h_pareto(len(pareto_oblig))
+    h_r2 = _h_pareto(len(pareto_no_oblig))
+    h_r3 = _h_pareto(len(pareto_ambos))
+    r_panel = r_ranking + 2 + h_r1 + 1 + h_r2 + 1 + h_r3 + 1
     h_panel = _h_modulos()
     r_nota = r_panel + h_panel + 1
     anclas_detalle = []
@@ -681,8 +620,7 @@ def crear_hoja_analisis_vacios(wb, result, index=3):
         ("Campos ALTA", f"B{r_alta}"),
         ("Lectura", f"B{r_parrafos}"),
         ("Detalles", f"B{r_detalles}"),
-        ("Pareto", f"B{r_pareto}"),
-        ("No Obligatorios", f"B{r_no_oblig}"),
+        ("Ranking", f"B{r_ranking}"),
         ("Panel Módulos", f"B{r_panel}"),
     ]
     for i, (texto, destino) in enumerate(enlaces_indice):
@@ -690,9 +628,9 @@ def crear_hoja_analisis_vacios(wb, result, index=3):
 
     _put(ws, 2, 2, "ANÁLISIS DE DATOS FALTANTES", font=font_title)
     _put(ws, 3, 2, "Consolidado de campos OBLIGATORIOS vacíos y sin información (-1) por "
-                   "módulo, con nivel de atención, tendencias anuales y análisis de "
-                   "Pareto. Los campos no obligatorios se muestran en la sección final.",
-         font=font_subtitle)
+                   "módulo, con nivel de atención, tendencias anuales y ranking de "
+                   "campos con más datos faltantes (obligatorios, no obligatorios y "
+                   "ambos).", font=font_subtitle)
 
     _kpi_card(ws, 5, 2, "TALADROS AFECTADOS", result.total_taladros_afectados,
               fill_kpi_gray, font_kpi_val_blue)
@@ -739,18 +677,54 @@ def crear_hoja_analisis_vacios(wb, result, index=3):
             _panel_detalle(ws, r_ini, c0, d, r_indice)
         r_banda += h_bandas[bandas.index(banda)]
 
-    _seccion_pareto(ws, r_pareto, 2, pareto, result.total_faltantes)
-    _grafico_pareto(ws, r_pareto, 2, pareto)
+    _titulo_desc(ws, r_ranking, 2, 7, "RANKING DE CAMPOS CON MÁS DATOS FALTANTES",
+                 "Campos ordenados de mayor a menor cantidad de faltantes, con % sobre "
+                 "su base y % acumulado (diagrama de Pareto). Tres vistas: solo "
+                 "obligatorios, solo no obligatorios y todos juntos.")
+    chips_oblig = [
+        ("RMR", COLORES["rmr_fucsia"], "Afectan al RMR"),
+        ("OBL", COLORES["obligatorio_verde"], "Obligatorios"),
+    ]
+    chips_no_oblig = [
+        ("RMR", COLORES["rmr_fucsia"], "Afectan al RMR"),
+        ("NO", COLORES["no_rmr_ambar"], "No obligatorios"),
+    ]
+    chips_ambos = [
+        ("RMR", COLORES["rmr_fucsia"], "Afectan al RMR"),
+        ("OBL", COLORES["obligatorio_verde"], "Obligatorios"),
+        ("NO", COLORES["no_rmr_ambar"], "No obligatorios"),
+    ]
 
-    _seccion_no_oblig(ws, r_no_oblig, 2, no_oblig, result.no_oblig_total)
+    r1 = r_ranking + 2
+    _seccion_ranking(ws, r1, 2, "VISTA 1 · SOLO CAMPOS OBLIGATORIOS",
+                     "Ranking exclusivo de campos obligatorios. Rosa: afectan al RMR · "
+                     "Verde: obligatorios.", chips_oblig, pareto_oblig,
+                     result.total_faltantes, "vacías + -1 de campos obligatorios")
+    _grafico_ranking(ws, r1, 2, pareto_oblig)
+    r2 = r1 + h_r1 + 1
+    _seccion_ranking(ws, r2, 2, "VISTA 2 · SOLO CAMPOS NO OBLIGATORIOS",
+                     "Ranking exclusivo de campos no obligatorios (no auditados como "
+                     "obligatorios en el Catálogo de Errores). Rosa: afectan al RMR "
+                     "(p. ej. FRF) · Ámbar: no obligatorios.", chips_no_oblig,
+                     pareto_no_oblig, result.no_oblig_total,
+                     "vacías + -1 de campos no obligatorios")
+    _grafico_ranking(ws, r2, 2, pareto_no_oblig)
+    r3 = r2 + h_r2 + 1
+    _seccion_ranking(ws, r3, 2, "VISTA 3 · TODOS LOS CAMPOS (OBLIGATORIOS + NO OBLIGATORIOS)",
+                     "Todos los campos juntos, incluyendo sub-ratings RMR al final. "
+                     "Rosa: afectan al RMR · Verde: obligatorios · Ámbar: no "
+                     "obligatorios.", chips_ambos, pareto_ambos,
+                     result.total_faltantes + result.no_oblig_total,
+                     "vacías + -1 de todos los campos")
+    _grafico_ranking(ws, r3, 2, pareto_ambos)
 
     _seccion_modulos(ws, r_panel, 2, modulos, r_indice, result.total_faltantes)
 
     nota_rmr = ("Los campos en ROSA son parámetros que alimentan el cálculo del RMR "
                 "(Bieniawski): provienen del Logueo General (LGG) y de la orientación "
                 "estructural (Dip/Azimut). En VERDE: campos obligatorios. En ÁMBAR: "
-                "campos no obligatorios (sección final, no auditados). Su ausencia impide "
-                "obtener una clasificación geomecánica válida del macizo rocoso.")
+                "campos no obligatorios (no auditados). Su ausencia impide obtener una "
+                "clasificación geomecánica válida del macizo rocoso.")
     cel = _put(ws, r_nota, 2, nota_rmr, font=font_italic, align=alignment_wrap)
     ws.merge_cells(start_row=r_nota, start_column=2, end_row=r_nota, end_column=15)
     ws.row_dimensions[r_nota].height = 45

@@ -129,13 +129,14 @@ class AnalisisResult:
     registros_afectados: int = 0
     no_oblig_total: int = 0
     tablas: dict = field(default_factory=dict)
-    no_oblig: list = field(default_factory=list)
     vista_alta: list = field(default_factory=list)
     detalles: list = field(default_factory=list)
     parrafos: list = field(default_factory=list)
     parrafos_secundarios: list = field(default_factory=list)
     modulos: list = field(default_factory=list)
-    pareto: list = field(default_factory=list)
+    pareto_oblig: list = field(default_factory=list)
+    pareto_no_oblig: list = field(default_factory=list)
+    pareto_ambos: list = field(default_factory=list)
     anios: list = field(default_factory=list)
 
 
@@ -303,21 +304,40 @@ def compute_analysis(diag, incidencias, faltantes_extra=None):
     tablas["C"] = _construir_tabla([f for f in req_main if f["total"] > 0], "total", gran_total)
     vista_alta = [f for f in tablas["C"] if f["nivel"] == "Alta"]
 
-    no_oblig = []
-    no_oblig_rows = sorted(no_oblig_main, key=lambda x: x["total"], reverse=True)
-    no_oblig_sub_rows = sorted(no_oblig_sub, key=lambda x: x["total"], reverse=True)
-    for f in no_oblig_rows:
-        if f["total"] <= 0:
-            continue
-        pct = f["total"] / no_oblig_total * 100.0 if no_oblig_total else 0.0
-        no_oblig.append({**f, "pct": pct, "divisor": False})
+    global_total = gran_total + no_oblig_total
+
+    def _filas_ranking(filas, base_total):
+        filas_ok = [f for f in filas if f["total"] > 0]
+        filas_ok.sort(key=lambda x: x["total"], reverse=True)
+        ranking = []
+        acum = 0.0
+        for f in filas_ok:
+            pct = f["total"] / base_total * 100.0 if base_total else 0.0
+            acum += pct
+            ranking.append({**f, "pct": pct, "acum": acum, "divisor": False})
+        return ranking
+
+    no_oblig_rows = _filas_ranking(no_oblig_main, no_oblig_total)
+    no_oblig_sub_rows = sorted((f for f in no_oblig_sub if f["total"] > 0),
+                               key=lambda x: x["total"], reverse=True)
     if no_oblig_sub_rows:
-        no_oblig.append({"divisor": True})
+        no_oblig_rows.append({"divisor": True})
+        acum = no_oblig_rows[-2]["acum"] if len(no_oblig_rows) > 1 else 0.0
         for f in no_oblig_sub_rows:
-            if f["total"] <= 0:
-                continue
             pct = f["total"] / no_oblig_total * 100.0 if no_oblig_total else 0.0
-            no_oblig.append({**f, "pct": pct, "divisor": False})
+            acum += pct
+            no_oblig_rows.append({**f, "pct": pct, "acum": acum, "divisor": False})
+
+    todos_main = _filas_ranking(filas_main, global_total)
+    todos_sub = sorted((f for f in filas_sub if f["total"] > 0),
+                       key=lambda x: x["total"], reverse=True)
+    if todos_sub:
+        todos_main.append({"divisor": True})
+        acum = todos_main[-2]["acum"] if len(todos_main) > 1 else 0.0
+        for f in todos_sub:
+            pct = f["total"] / global_total * 100.0 if global_total else 0.0
+            acum += pct
+            todos_main.append({**f, "pct": pct, "acum": acum, "divisor": False})
 
     resumen_anios = _resumen_anios(diag)
     anios = sorted(set(list(resumen_anios.keys()) + [
@@ -361,14 +381,7 @@ def compute_analysis(diag, incidencias, faltantes_extra=None):
         })
 
     main_orden = sorted(req_main, key=lambda x: x["total"], reverse=True)
-    pareto = []
-    acum = 0.0
-    for f in main_orden:
-        if f["total"] <= 0:
-            continue
-        pct = f["total"] / gran_total * 100.0 if gran_total else 0.0
-        acum += pct
-        pareto.append({**f, "pct": pct, "acum": acum, "divisor": False})
+    pareto_oblig = _filas_ranking(req_main, gran_total)
 
     parrafos = []
     p1 = _p1_concentracion(main_orden, gran_total, n_registros, len(celdas_afectadas))
@@ -409,12 +422,13 @@ def compute_analysis(diag, incidencias, faltantes_extra=None):
         registros_afectados=n_registros,
         no_oblig_total=no_oblig_total,
         tablas=tablas,
-        no_oblig=no_oblig,
         vista_alta=vista_alta,
         detalles=detalles,
         parrafos=parrafos,
         parrafos_secundarios=parrafos_secundarios,
         modulos=_stats_modulos(grupos, req_main, tablas["C"]),
-        pareto=pareto,
+        pareto_oblig=pareto_oblig,
+        pareto_no_oblig=no_oblig_rows,
+        pareto_ambos=todos_main,
         anios=anios,
     )
