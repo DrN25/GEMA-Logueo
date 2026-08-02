@@ -6,6 +6,7 @@ import re
 import openpyxl
 from typing import List, Dict, Any, Optional
 from app.core.rules import WEATHERING_COMPATIBILITY, MASTER_ERROR_RULES
+from app.core.report_config import CAMPOS_EXTRA_A_CAPTURAR
 from app.calculator import (
     STRENGTH_RATINGS, WEATHERING_RATINGS_76, WEATHERING_RATINGS_89,
     ROUGHNESS_RATINGS_76, ROUGHNESS_RATINGS_89, FILLING_CLASSES,
@@ -217,6 +218,45 @@ def safe_str(val, default=""):
     if val is None: return default
     return str(val).strip()
 
+class FaltantesCollector:
+    def __init__(self):
+        self._registros = []
+
+    def registrar(self, modulo, fila_excel, celda_padre, celda_hija, columna, valor_raw, campania, geotecnico):
+        if valor_raw is None:
+            tipo = "VACIO"
+        else:
+            txt = str(valor_raw).strip()
+            if txt == "":
+                tipo = "VACIO"
+            elif txt in ("-1", "-1.0", "-1,0"):
+                tipo = "SIN_INFORMACION"
+            else:
+                return
+        self._registros.append({
+            "fila_excel": fila_excel,
+            "celda_padre": celda_padre,
+            "celda_hija": celda_hija,
+            "columna": columna,
+            "tipo_incidencia": tipo,
+            "campania": str(campania) if campania not in (None, "") else "N/A",
+            "geotecnico": geotecnico if geotecnico else "N/A",
+            "sector_geotecnico": "N/A",
+            "modulo": modulo,
+        })
+
+    def dump(self):
+        return list(self._registros)
+
+def capturar_faltantes_extra(collector, modulo, row_dict, claves, fila_excel, celda_padre, celda_hija, campania, geotecnico):
+    if collector is None:
+        return
+    for clave in claves:
+        if clave not in row_dict:
+            continue
+        collector.registrar(modulo, fila_excel, celda_padre, celda_hija, clave,
+                            row_dict.get(clave), campania, geotecnico)
+
 def sanitize_val(val, target_type):
     if val is None:
         return None
@@ -343,7 +383,8 @@ def validate_rmr_sheet_data(
     resumen_celdas: dict,
     incidencias: list,
     r_counters: dict,
-    custom_map: dict = None
+    custom_map: dict = None,
+    collector: FaltantesCollector = None
 ) -> int:
     """
     Realiza el escaneo y auditoría geomecánica masiva de la hoja 'Validación_RMR' (o similar)
@@ -360,6 +401,8 @@ def validate_rmr_sheet_data(
         for k, v in custom_map.items():
             if v is not None and isinstance(v, int) and v >= 0:
                 rmr_map[k] = v + 1
+
+    rmr_extra = list(CAMPOS_EXTRA_A_CAPTURAR["Validación RMR"])
 
     print(f"[*] Iniciando escaneo de Validación_RMR. Fila inicial: {h_idx + 1}, Fila máxima: {ws_rmr.max_row}", flush=True)
 
@@ -461,6 +504,9 @@ def validate_rmr_sheet_data(
                 reg_err_rmr(field_key, None, "VACIO", f"El campo obligatorio '{field_lbl}' se encuentra vacío.")
             elif str(val_raw).strip() in ["-1", "-1.0", "-1,0"]:
                 reg_err_rmr(field_key, val_raw, "SIN_INFORMACION", f"El campo obligatorio '{field_lbl}' no contiene información (-1).")
+
+        capturar_faltantes_extra(collector, "Validación RMR", row_dict, rmr_extra, r,
+                                 celda_padre, celda_hija, row_dict.get("campana"), None)
 
         # 2. MATCHING CON CORRIDA LGG
         rmr_by_taladro[taladro].append(row_dict)
@@ -689,14 +735,20 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
     ws_est = wb[est_sheet]
 
     lgg_header, lgg_map = find_header_row_and_mapping(ws_lgg, LGG_PATTERNS)
+    lgg_claves_detectadas = set(lgg_map.keys())
     for k, v in FALLBACK_LGG_MAP.items():
         if k not in lgg_map:
             lgg_map[k] = v
 
     est_header, est_map = find_header_row_and_mapping(ws_est, EST_PATTERNS)
+    est_claves_detectadas = set(est_map.keys())
     for k, v in FALLBACK_EST_MAP.items():
         if k not in est_map:
             est_map[k] = v
+
+    lgg_extra = [k for k in CAMPOS_EXTRA_A_CAPTURAR["LGG"] if k in lgg_claves_detectadas]
+    est_extra = [k for k in CAMPOS_EXTRA_A_CAPTURAR["Estructural"] if k in est_claves_detectadas]
+    collector = FaltantesCollector()
 
     incidencias = []
     lgg_runs = []
@@ -793,6 +845,8 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
             v_san = sanitize_val(row_dict.get(key), str)
             if v_san is None:
                 registrar_lgg_error(key, None, "VACIO", f"El campo obligatorio '{key}' se encuentra vacío o es -1.")
+
+        capturar_faltantes_extra(collector, "LGG", row_dict, lgg_extra, r, celda_padre, celda_hija, camp, geo)
 
         de = sanitize_val(row_dict.get("de"), float)
         a = sanitize_val(row_dict.get("a"), float)
@@ -1182,6 +1236,8 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
             if v_san is None:
                 registrar_est_error(key, None, "VACIO", f"El campo obligatorio '{key}' se encuentra vacío o es -1.")
 
+        capturar_faltantes_extra(collector, "Estructural", row_dict, est_extra, r, celda_padre, celda_hija, camp, geo)
+
         raw_depth = row_dict.get("profundidad")
         if depth is not None and depth < 0:
             registrar_est_error("profundidad", raw_depth, "ALERTA", f"Profundidad ({depth}m) no puede ser negativa.")
@@ -1298,7 +1354,7 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
     if rmr_sheet_name:
         ws_rmr = wb[rmr_sheet_name]
         r_counters = {"total_ok": 0, "total_vacios": 0, "total_sin_informacion": 0, "total_advertencias": 0, "total_alertas": 0}
-        total_rmr_filas = validate_rmr_sheet_data(ws_rmr, lgg_runs, resumen_celdas, incidencias, r_counters)
+        total_rmr_filas = validate_rmr_sheet_data(ws_rmr, lgg_runs, resumen_celdas, incidencias, r_counters, collector=collector)
         total_vacios += r_counters["total_vacios"]
         total_sin_informacion += r_counters["total_sin_informacion"]
         total_advertencias += r_counters["total_advertencias"]
@@ -1334,7 +1390,8 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
         "distribucion_filas_campana": filas_por_campana,
         "distribucion_geotecnico": filas_por_geotecnico,
         "incidencias": incidencias,
-        "resumen_por_celda_padre": resumen_celdas
+        "resumen_por_celda_padre": resumen_celdas,
+        "faltantes_no_obligatorios": collector.dump()
     }
 
     tmp_path = output_json_path + ".tmp"
@@ -1372,6 +1429,8 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
     filas_por_geotecnico = {}
     last_a_by_taladro = {}
 
+    collector = FaltantesCollector()
+
     max_lgg = {}
     max_est = {}
     eoh_collar = {}
@@ -1382,8 +1441,11 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
     if conf_lgg:
         ws_lgg = wb_main[conf_lgg["sheet"]]
         h_idx, l_map = find_header_row_and_mapping(ws_lgg, LGG_PATTERNS)
+        lgg_claves_detectadas = set(l_map.keys())
         for k, v in FALLBACK_LGG_MAP.items():
             if k not in l_map: l_map[k] = v
+
+        lgg_extra = [k for k in CAMPOS_EXTRA_A_CAPTURAR["LGG"] if k in lgg_claves_detectadas]
             
         print(f"[*] Iniciando escaneo de LGG V2. Fila inicial: {h_idx + 1}, Fila máxima: {ws_lgg.max_row}", flush=True)
         
@@ -1496,6 +1558,8 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
                     reg_err(key, None, "VACIO", f"El campo obligatorio '{key}' se encuentra vacío.")
                 elif str(val_raw).strip() in ["-1", "-1.0", "-1,0"]:
                     reg_err(key, val_raw, "SIN_INFORMACION", f"El campo obligatorio '{key}' no contiene información (-1).")
+
+            capturar_faltantes_extra(collector, "LGG", row_dict, lgg_extra, r, celda_padre, celda_hija, camp, geo)
 
             # --- 3. VALIDACIÓN DE CATÁLOGOS ---
             tipo_est1_can = get_canonical_value(tipo_est1_raw, VALID_STRUCTURES)
@@ -1664,8 +1728,11 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
     if conf_est:
         ws_est = wb_main[conf_est["sheet"]]
         h_idx, e_map = find_header_row_and_mapping(ws_est, EST_PATTERNS)
+        est_claves_detectadas = set(e_map.keys())
         for k, v in FALLBACK_EST_MAP.items():
             if k not in e_map: e_map[k] = v
+
+        est_extra = [k for k in CAMPOS_EXTRA_A_CAPTURAR["Estructural"] if k in est_claves_detectadas]
             
         print(f"[*] Iniciando escaneo de EST V2. Fila inicial: {h_idx + 1}, Fila máxima: {ws_est.max_row}", flush=True)
         
@@ -1772,6 +1839,8 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
                     reg_err_est(key, None, "VACIO", f"El campo obligatorio '{key}' se encuentra vacío.")
                 elif str(val_raw).strip() in ["-1", "-1.0", "-1,0"]:
                     reg_err_est(key, val_raw, "SIN_INFORMACION", f"El campo obligatorio '{key}' no contiene información (-1).")
+
+            capturar_faltantes_extra(collector, "Estructural", row_dict, est_extra, r, celda_padre, celda_hija, camp, geo)
 
             raw_depth = row_dict.get("profundidad")
             if depth is not None and depth < -0.0001:
@@ -1883,7 +1952,7 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
         ws_rmr = wb_main[rmr_sheet_name]
         custom_rmr_map = conf_rmr.get("mappings") if conf_rmr else None
         r_counters = {"total_ok": 0, "total_vacios": 0, "total_sin_informacion": 0, "total_advertencias": 0, "total_alertas": 0}
-        total_rmr_filas = validate_rmr_sheet_data(ws_rmr, lgg_runs, resumen_celdas, incidencias, r_counters, custom_map=custom_rmr_map)
+        total_rmr_filas = validate_rmr_sheet_data(ws_rmr, lgg_runs, resumen_celdas, incidencias, r_counters, custom_map=custom_rmr_map, collector=collector)
         total_vacios += r_counters["total_vacios"]
         total_sin_informacion += r_counters["total_sin_informacion"]
         total_advertencias += r_counters["total_advertencias"]
@@ -1991,7 +2060,8 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
         "distribucion_filas_campana": filas_por_campana,
         "distribucion_geotecnico": filas_por_geotecnico,
         "incidencias": incidencias,
-        "resumen_por_celda_padre": resumen_celdas
+        "resumen_por_celda_padre": resumen_celdas,
+        "faltantes_no_obligatorios": collector.dump()
     }
 
     tmp_path = output_json_path + ".tmp"

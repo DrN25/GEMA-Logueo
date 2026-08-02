@@ -18,6 +18,8 @@ from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
 
 from app.core.rules import MASTER_ERROR_RULES, get_rule_by_msg
 from app.validator import validate_logueo_bulk_sheets, validate_revision_bulk_v2, safe_float, safe_int, safe_str
+from app.reportes.vacios_analysis import compute_analysis
+from app.reportes.vacios_sheet import crear_hoja_analisis_vacios
 
 router = APIRouter(prefix="/api", tags=["Auditoria"])
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -787,6 +789,14 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
                 ws_err.cell(row=r_idx, column=col_idx).border = border_thin
                 
         ws_err.auto_filter.ref = f"B{header_row_idx}:J{end_data_row}"
+
+    # --- HOJA ESPECIAL: ANÁLISIS DE DATOS FALTANTES ---
+    try:
+        faltantes_extra = diag.get("faltantes_no_obligatorios") or []
+        resultado_vacios = compute_analysis(diag, filtered, faltantes_extra)
+        crear_hoja_analisis_vacios(wb, resultado_vacios, index=3)
+    except Exception as e:
+        print(f"[-] Error al generar la hoja de análisis de datos faltantes: {e}", flush=True)
 
     # Auto-ajuste de Columnas
     for ws in wb.worksheets:
