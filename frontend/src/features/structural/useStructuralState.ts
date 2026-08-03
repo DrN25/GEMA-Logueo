@@ -237,7 +237,7 @@ export function useStructuralState({
       relleno2: "-1",
       dureza_pared: "-1",   // <-- Vacío
       agua: "-1",           // <-- Vacío
-      geotecnico: geologo || "",
+      geotecnico: "",
       comentario: "",
       corrida: matchingCorrida ? matchingCorrida.corrida : 0,
       tipo: "Natural"
@@ -269,10 +269,10 @@ export function useStructuralState({
       forma: prevRow.forma,
       rugosidad: prevRow.rugosidad,
       profundidad: prevRow.profundidad,
-      alfa: 45.0,
+      alfa: -1,
       beta: -1,
-      jrc10: 10,
-      abertura: 0.1,
+      jrc10: -1,
+      abertura: -1,
       espesor: 0.0,
       comentario: ""
     };

@@ -44,6 +44,8 @@ class DiscontinuidadSchema(BaseModel):
     a: float
     profundidad: float
     litologia: str
+    litologia2: Optional[str] = "-1"
+    litologia3: Optional[str] = "-1"
     tipo_estructura: str
     alfa: float
     beta: float

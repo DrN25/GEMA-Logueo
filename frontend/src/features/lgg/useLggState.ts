@@ -256,7 +256,7 @@ export function useLggState({
       relleno2: '-1',
       espesor: -1,       // <-- Vacío
       agua_obs: '-1',    // <-- Vacío
-      turno: defaultTurno,
+      turno: '',
       comentarios: ''
     };
 

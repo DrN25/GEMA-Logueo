@@ -1,3 +1,4 @@
+import math
 import re
 from datetime import date, datetime
 from fastapi import APIRouter, HTTPException, Depends
@@ -57,6 +58,32 @@ def to_int0(val) -> int:
     except (ValueError, TypeError):
         return 0
     return 0 if v < 0 else v
+
+def calc_frf(lrf_val) -> int:
+    """Calcula el número de fragmentos de roca fracturada (FRF) a partir de LRF (m)."""
+    lrf = lrf_val or 0.0
+    return math.floor(round(lrf * 100) / 5) + 1 if lrf > 0 else 0
+
+def safe_int(val, default: int = -1) -> int:
+    """Convierte valores numéricos/string a entero; devuelve default si no es numérico."""
+    if val is None:
+        return default
+    try:
+        f = float(str(val).strip())
+        return int(f) if f.is_integer() else round(f)
+    except (ValueError, TypeError):
+        return default
+
+def find_corrida_num(profundidad, de, a, corridas) -> int:
+    """Deriva el número de corrida de una discontinuidad por profundidad o intervalo."""
+    if profundidad is not None:
+        for c in corridas:
+            if c.IntervaloDe <= profundidad <= c.IntervaloA:
+                return c.NumeroRegistro
+    for c in corridas:
+        if c.IntervaloDe == de and c.IntervaloA == a:
+            return c.NumeroRegistro
+    return 1
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Endpoints de Dashboard e Historial
@@ -175,6 +202,7 @@ def get_taladro(name: str, db: Session = Depends(get_db)):
     rotura_map = {r.TipoFracturaPLT_ID: r.Codigo.strip() for r in db.query(models.TipoFracturaPLT).all()}
     dir_map = {d.DireccionID: d.Codigo.strip() for d in db.query(models.DireccionRuptura).all()}
     isrm_map = {r.ResistenciaISRM_ID: r.Codigo.strip() for r in db.query(models.ResistenciaISRM).all()}
+    geotecnico_map = {g.GeotecnicoID: g.NombreCompleto.strip() for g in db.query(models.Geotecnico).all()}
 
     # 1. Recuperar Trayectorias (Surveys)
     surveys_list = []
@@ -194,7 +222,7 @@ def get_taladro(name: str, db: Session = Depends(get_db)):
         rec_val = float(c.LongitudRecuperada) if c.LongitudRecuperada is not None else 0.0
         rqd_val = float(c.SumaFragmentos10cm) if c.SumaFragmentos10cm is not None else 0.0
         lrf_val = float(c.LongitudRocaFracturada) if c.LongitudRocaFracturada is not None else 0.0
-        frf_val = int(c.FRF) if c.FRF is not None else (math.floor(round(lrf_val * 100) / 5) + 1 if lrf_val > 0 else 0)
+        frf_val = int(c.FRF) if c.FRF is not None else calc_frf(lrf_val)
         
         # Reconstrucción matemática del balance de fragmentos del testigo
         calculated_small_frag = max(0.0, round(rec_val - rqd_val - lrf_val, 2))
@@ -208,26 +236,26 @@ def get_taladro(name: str, db: Session = Depends(get_db)):
             lrf_m=lrf_val,
             frf=frf_val,
             small_frag_m=calculated_small_frag, # Campo calculado dinámicamente
-            lito1=lito_map.get(c.Litologia1ID, "LMT"),
-            lito2=lito_map.get(c.Litologia2ID, "-1"),
-            lito3=lito_map.get(c.Litologia3ID, "-1"),
+            lito1=lito_map.get(c.Litologia1ID) or "-1",
+            lito2=lito_map.get(c.Litologia2ID) or "-1",
+            lito3=lito_map.get(c.Litologia3ID) or "-1",
             resistencia=normalize_strength(c.ResistenciaEstimada),
             orientacion="X",                    # Campo opcional por defecto
             offset=0.0,                         # Campo opcional por defecto
-            tipo_est1=est_map.get(c.TipoEstructura1ID, "-1"),
-            tipo_est2=est_map.get(c.TipoEstructura2ID, "-1"),
-            frac_nat=c.NumFracturasNaturales or 0,
-            frac_buz30=c.NumFracBuz30 or 0,
-            frac_buz60=c.NumFrac30a60 or 0,
-            frac_buz90=c.NumFracBuz60 or 0,
-            abertura=float(c.Abertura) if c.Abertura is not None else 0.0,
-            rugosidad=int(c.Rugosidad) if (c.Rugosidad and c.Rugosidad.isdigit()) else 1,
-            jrc10=int(c.JRC10) if c.JRC10 is not None else 0,
-            intemperismo=c.GradoIntemperismo or "UWF",
-            relleno1=c.TipoRelleno1 or "cwf",
+            tipo_est1=est_map.get(c.TipoEstructura1ID) or "-1",
+            tipo_est2=est_map.get(c.TipoEstructura2ID) or "-1",
+            frac_nat=c.NumFracturasNaturales if c.NumFracturasNaturales is not None else -1,
+            frac_buz30=c.NumFracBuz30 if c.NumFracBuz30 is not None else -1,
+            frac_buz60=c.NumFrac30a60 if c.NumFrac30a60 is not None else -1,
+            frac_buz90=c.NumFracBuz60 if c.NumFracBuz60 is not None else -1,
+            abertura=float(c.Abertura) if c.Abertura is not None else -1.0,
+            rugosidad=safe_int(c.Rugosidad, -1),
+            jrc10=int(round(float(c.JRC10))) if c.JRC10 is not None else -1,
+            intemperismo=c.GradoIntemperismo or "-1",
+            relleno1=c.TipoRelleno1 or "-1",
             relleno2=c.TipoRelleno2 or "-1",
-            espesor=float(c.EspesorRelleno) if c.EspesorRelleno is not None else 0.0,
-            agua_obs=c.PresenciaAgua or "CDC",
+            espesor=float(c.EspesorRelleno) if c.EspesorRelleno is not None else -1.0,
+            agua_obs=c.PresenciaAgua or "-1",
             turno="D",
             comentarios=c.Comentarios or ""
         ))
@@ -241,25 +269,25 @@ def get_taladro(name: str, db: Session = Depends(get_db)):
             de=float(d.IntervaloDe),
             a=float(d.IntervaloA),
             profundidad=float(d.Profundidad) if d.Profundidad is not None else float(d.IntervaloDe),
-            litologia=lito_map.get(d.Litologia1ID, "LMT"),
-            litologia2=lito_map.get(d.Litologia2ID, "-1"),
-            litologia3=lito_map.get(d.Litologia3ID, "-1"),
-            tipo_estructura=est_map.get(d.TipoEstructuraID, "JN"),
-            alfa=float(d.Alpha) if d.Alpha is not None else 0.0,
-            beta=float(d.Beta) if d.Beta is not None else 0.0,
-            forma=1,
-            rugosidad=d.Rugosidad or "1",
-            jrc10=int(d.JRC10) if d.JRC10 is not None else 0,
-            abertura=float(d.Abertura) if d.Abertura is not None else 0.0,
-            weathering=d.GradoIntemperismo or "UWF",
-            espesor=float(d.EspesorRelleno) if d.EspesorRelleno is not None else 0.0,
-            relleno1=d.TipoRelleno1 or "cwf",
+            litologia=lito_map.get(d.Litologia1ID) or "-1",
+            litologia2=lito_map.get(d.Litologia2ID) or "-1",
+            litologia3=lito_map.get(d.Litologia3ID) or "-1",
+            tipo_estructura=est_map.get(d.TipoEstructuraID) or "-1",
+            alfa=float(d.Alpha) if d.Alpha is not None else -1.0,
+            beta=float(d.Beta) if d.Beta is not None else -1.0,
+            forma=safe_int(d.Forma, -1),
+            rugosidad=safe_int(d.Rugosidad, -1),
+            jrc10=int(round(float(d.JRC10))) if d.JRC10 is not None else -1,
+            abertura=float(d.Abertura) if d.Abertura is not None else -1.0,
+            weathering=d.GradoIntemperismo or "-1",
+            espesor=float(d.EspesorRelleno) if d.EspesorRelleno is not None else -1.0,
+            relleno1=d.TipoRelleno1 or "-1",
             relleno2=d.TipoRelleno2 or "-1",
             dureza_pared=normalize_strength(d.DurezaParedEstructura),
-            agua=d.PresenciaAgua or "CDC",
-            geotecnico=s.Geotecnico or "RD/RB",
+            agua=d.PresenciaAgua or "-1",
+            geotecnico=geotecnico_map.get(d.GeotecnicoID) or "-1",
             comentario=d.IntervaloComentario or "",
-            corrida=1,
+            corrida=find_corrida_num(d.Profundidad, d.IntervaloDe, d.IntervaloA, db_corridas),
             tipo="Natural"
         ))
 

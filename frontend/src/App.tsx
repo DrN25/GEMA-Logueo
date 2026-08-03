@@ -662,10 +662,20 @@ export default function App() {
                 a: match.a,
                 corrida: match.corrida,
                 litologia: match.lito1,
+                lito1: match.lito1,
+                lito2: match.lito2 || '-1',
+                lito3: match.lito3 || '-1',
+                litologia2: match.lito2 || '-1',
+                litologia3: match.lito3 || '-1',
                 dureza_pared: match.resistencia
               };
             }
-            return disc;
+            return {
+              ...disc,
+              lito1: disc.litologia ?? disc.lito1 ?? '-1',
+              lito2: disc.litologia2 ?? disc.lito2 ?? '-1',
+              lito3: disc.litologia3 ?? disc.lito3 ?? '-1'
+            };
           });
         }
 
@@ -732,10 +742,20 @@ export default function App() {
                 a: match.a,
                 corrida: match.corrida,
                 litologia: match.lito1,
+                lito1: match.lito1,
+                lito2: match.lito2 || '-1',
+                lito3: match.lito3 || '-1',
+                litologia2: match.lito2 || '-1',
+                litologia3: match.lito3 || '-1',
                 dureza_pared: match.resistencia
               };
             }
-            return disc;
+            return {
+              ...disc,
+              lito1: disc.litologia ?? disc.lito1 ?? '-1',
+              lito2: disc.litologia2 ?? disc.lito2 ?? '-1',
+              lito3: disc.litologia3 ?? disc.lito3 ?? '-1'
+            };
           });
         }
 
@@ -771,30 +791,19 @@ export default function App() {
           inclinacion: -60.0,
           campana: "2026",
           fecha_registro: new Date().toISOString().split('T')[0],
-          collar_este_proyectado: 1205.4,
-          collar_norte_proyectado: 8432.8,
-          collar_cota_proyectado: 4120.0,
-          prof_final_eoh_proyectada: 150.0,
+          collar_este_proyectado: 0,
+          collar_norte_proyectado: 0,
+          collar_cota_proyectado: 0,
+          prof_final_eoh_proyectada: 0,
           comentarios_proyectado: "",
-          collar_este: 1205.4,
-          collar_norte: 8432.8,
-          collar_cota: 4120.0,
-          prof_final_eoh: 150.0,
+          collar_este: 0,
+          collar_norte: 0,
+          collar_cota: 0,
+          prof_final_eoh: 0,
           comentarios: "",
           turno: "D",
-          surveys: [
-            { depth: 0, dip: -60.0, azimuth: 120.0 },
-            { depth: 50.0, dip: -60.5, azimuth: 121.2 }
-          ],
-          corridas: [
-            {
-              corrida: 1, de: 0, a: 1.5, rec_m: 1.5, rqd_m: 1.3, lrf_m: 0.1, small_frag_m: 0.1,
-              lito1: "LMT", resistencia: "R4", orientacion: "X", offset: 0.0,
-              tipo_est1: "JN", frac_nat: 1, frac_buz30: 0, frac_buz60: 1, frac_buz90: 0,
-              abertura: 0.1, rugosidad: 2, jrc10: 10, intemperismo: "UWF", relleno1: "cwf",
-              espesor: 0, agua_obs: "CDC", comentarios: "Corrida inicial"
-            }
-          ],
+          surveys: [],
+          corridas: [],
           discontinuidades: [],
           ensayos_plt: []
         };

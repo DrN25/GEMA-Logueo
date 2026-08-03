@@ -1,6 +1,7 @@
 import datetime
 import math
 from sqlalchemy.orm import Session
+from fastapi import HTTPException
 from app import models
 from app.calculator import calculate_row_rmr
 
@@ -149,10 +150,10 @@ class GemaMigrationEngine:
         if not collar:
             collar = models.Collar(
                 SondajeID=sondaje.SondajeID,
-                CoordenadaEste=self.sanitize_val(data.get("collar_este", 794000.0)),
-                CoordenadaNorte=self.sanitize_val(data.get("collar_norte", 8441000.0)),
-                Elevacion=self.sanitize_val(data.get("collar_cota", 4000.0)),
-                ProfundidadTotal=self.sanitize_val(data.get("prof_final_eoh", 100.0)),
+                CoordenadaEste=self.sanitize_val(data.get("collar_este", 794000.0)) or 0.0,
+                CoordenadaNorte=self.sanitize_val(data.get("collar_norte", 8441000.0)) or 0.0,
+                Elevacion=self.sanitize_val(data.get("collar_cota", 4000.0)) or 0.0,
+                ProfundidadTotal=self.sanitize_val(data.get("prof_final_eoh", 100.0)) or 0.0,
                 Comentarios=data.get("comentarios", ""),
                 CoordenadaEsteProyectado=self.sanitize_val(data.get("collar_este_proyectado")),
                 CoordenadaNorteProyectado=self.sanitize_val(data.get("collar_norte_proyectado")),
@@ -163,10 +164,10 @@ class GemaMigrationEngine:
             )
             self.db.add(collar)
         else:
-            collar.CoordenadaEste = self.sanitize_val(data.get("collar_este", 794000.0))
-            collar.CoordenadaNorte = self.sanitize_val(data.get("collar_norte", 8441000.0))
-            collar.Elevacion = self.sanitize_val(data.get("collar_cota", 4000.0))
-            collar.ProfundidadTotal = self.sanitize_val(data.get("prof_final_eoh", 100.0))
+            collar.CoordenadaEste = self.sanitize_val(data.get("collar_este", 794000.0)) or 0.0
+            collar.CoordenadaNorte = self.sanitize_val(data.get("collar_norte", 8441000.0)) or 0.0
+            collar.Elevacion = self.sanitize_val(data.get("collar_cota", 4000.0)) or 0.0
+            collar.ProfundidadTotal = self.sanitize_val(data.get("prof_final_eoh", 100.0)) or 0.0
             collar.Comentarios = data.get("comentarios", "")
             collar.CoordenadaEsteProyectado = self.sanitize_val(data.get("collar_este_proyectado"))
             collar.CoordenadaNorteProyectado = self.sanitize_val(data.get("collar_norte_proyectado"))
@@ -185,9 +186,9 @@ class GemaMigrationEngine:
         for s in surveys:
             survey = models.Survey(
                 SondajeID=sondaje_id,
-                Profundidad=self.sanitize_val(s.get("depth")),
-                Inclinacion=self.sanitize_val(s.get("dip")),
-                Azimut=self.sanitize_val(s.get("azimuth")),
+                Profundidad=self.sanitize_val(s.get("depth")) or 0.0,
+                Inclinacion=self.sanitize_val(s.get("dip")) or 0.0,
+                Azimut=self.sanitize_val(s.get("azimuth")) or 0.0,
                 FechaRegistro=datetime.datetime.now()
             )
             self.db.add(survey)
@@ -200,9 +201,22 @@ class GemaMigrationEngine:
         self.db.query(models.ValidacionRMR).filter_by(SondajeID=sondaje_id).delete()
         self.db.flush()
 
+        seen_intervals = set()
         for c in corridas:
             de_val = self.sanitize_val(c.get("de"), float)
             a_val = self.sanitize_val(c.get("a"), float)
+
+            if de_val is None or a_val is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Corrida {c.get('corrida')}: los campos 'de' y 'a' son obligatorios y no pueden estar vacíos."
+                )
+            if (de_val, a_val) in seen_intervals:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Corrida {c.get('corrida')}: intervalo [{de_val}, {a_val}] duplicado — corrija los valores antes de guardar."
+                )
+            seen_intervals.add((de_val, a_val))
             
             l1_id = self.resolve_lito(c.get("lito1"))
             l2_id = self.resolve_lito(c.get("lito2"))
@@ -328,6 +342,13 @@ class GemaMigrationEngine:
         self.db.flush()
 
         for d in discontinuidades:
+            de_val = self.sanitize_val(d.get("de"))
+            a_val = self.sanitize_val(d.get("a"))
+            if de_val is None or a_val is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Discontinuidad en profundidad {d.get('profundidad')}: los campos 'de' y 'a' son obligatorios y no pueden estar vacíos."
+                )
             l1_id = self.resolve_lito(d.get("litologia"))
             l2_id = self.resolve_lito(d.get("litologia2")) # Mapeado de litología secundaria
             l3_id = self.resolve_lito(d.get("litologia3")) # Mapeado de litología terciaria
@@ -335,8 +356,8 @@ class GemaMigrationEngine:
             
             struct = models.LogueoEstructural(
                 SondajeID=sondaje_id,
-                IntervaloDe=self.sanitize_val(d.get("de")),
-                IntervaloA=self.sanitize_val(d.get("a")),
+                IntervaloDe=de_val,
+                IntervaloA=a_val,
                 Profundidad=self.sanitize_val(d.get("profundidad")),
                 Litologia1ID=l1_id,
                 Litologia2ID=l2_id,

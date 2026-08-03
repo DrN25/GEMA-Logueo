@@ -116,7 +116,14 @@ def calculate_row_rmr(data: Dict[str, Any], water_table_m: float = 97.0) -> Dict
         # Validar si el avance es ERROR
         if perf > 1.6:
             return {"error": "Longitud de corrida excede 1.6m"}
-            
+
+        # Validar que los campos de metraje y fracturas no estén vacíos (-1 / None / "")
+        required_core = ("rec_m", "rqd_m", "lrf_m", "frac_nat")
+        for key in required_core:
+            v = data.get(key)
+            if v is None or v == -1 or (isinstance(v, str) and v.strip() in ("", "-1")):
+                return {"error": "Fila incompleta: campo obligatorio vacío"}
+
         rec_m = float(data.get("rec_m", 0.0))
         rqd_m = float(data.get("rqd_m", 0.0))
         
