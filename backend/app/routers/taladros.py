@@ -74,17 +74,6 @@ def safe_int(val, default: int = -1) -> int:
     except (ValueError, TypeError):
         return default
 
-def find_corrida_num(profundidad, de, a, corridas) -> int:
-    """Deriva el número de corrida de una discontinuidad por profundidad o intervalo."""
-    if profundidad is not None:
-        for c in corridas:
-            if c.IntervaloDe <= profundidad <= c.IntervaloA:
-                return c.NumeroRegistro
-    for c in corridas:
-        if c.IntervaloDe == de and c.IntervaloA == a:
-            return c.NumeroRegistro
-    return 1
-
 # ──────────────────────────────────────────────────────────────────────────────
 # Endpoints de Dashboard e Historial
 # ──────────────────────────────────────────────────────────────────────────────
@@ -342,6 +331,8 @@ def get_taladro(name: str, db: Session = Depends(get_db)):
     dir_map = {d.DireccionID: d.Codigo.strip() for d in db.query(models.DireccionRuptura).all()}
     isrm_map = {r.ResistenciaISRM_ID: r.Codigo.strip() for r in db.query(models.ResistenciaISRM).all()}
     geotecnico_map = {g.GeotecnicoID: g.NombreCompleto.strip() for g in db.query(models.Geotecnico).all()}
+    tipo_ensayo_map = {t.TipoEnsayoPLT_ID: t.Codigo.strip() for t in db.query(models.TipoEnsayoPLT).all()}
+    diametro_map = {d.DiametroID: d.Codigo.strip() for d in db.query(models.DiametroPerfora).all()}
 
     # 1. Recuperar Trayectorias (Surveys)
     surveys_list = []
@@ -402,7 +393,29 @@ def get_taladro(name: str, db: Session = Depends(get_db)):
     # 3. Recuperar Discontinuidades Estructurales (EST)
     discontinuidades_list = []
     db_discs = db.query(models.LogueoEstructural).filter_by(SondajeID=s.SondajeID).order_by(models.LogueoEstructural.Profundidad).all()
+
+    # Precomputar corridas en floats + mapa de intervalos para derivar el número
+    # de corrida de cada discontinuidad sin O(n*m) sobre Decimal (perf: 631x257).
+    corr_de = [float(c.IntervaloDe) for c in db_corridas]
+    corr_a = [float(c.IntervaloA) for c in db_corridas]
+    corr_num = [c.NumeroRegistro for c in db_corridas]
+    interval_map = {(d, a): num for d, a, num in zip(corr_de, corr_a, corr_num)}
+
     for d in db_discs:
+        prof = float(d.Profundidad) if d.Profundidad is not None else None
+        corrida_num = 1
+        if prof is not None:
+            for i, de_ in enumerate(corr_de):
+                if de_ <= prof <= corr_a[i]:
+                    corrida_num = corr_num[i]
+                    break
+            else:
+                corrida_num = interval_map.get(
+                    (round(float(d.IntervaloDe), 2), round(float(d.IntervaloA), 2)), 1)
+        else:
+            corrida_num = interval_map.get(
+                (round(float(d.IntervaloDe), 2), round(float(d.IntervaloA), 2)), 1)
+
         discontinuidades_list.append(DiscontinuidadSchema(
             id=d.LogueoEstructuralID,
             de=float(d.IntervaloDe),
@@ -426,7 +439,7 @@ def get_taladro(name: str, db: Session = Depends(get_db)):
             agua=d.PresenciaAgua or "-1",
             geotecnico=geotecnico_map.get(d.GeotecnicoID) or "-1",
             comentario=d.IntervaloComentario or "",
-            corrida=find_corrida_num(d.Profundidad, d.IntervaloDe, d.IntervaloA, db_corridas),
+            corrida=corrida_num,
             tipo="Natural"
         ))
 
@@ -448,8 +461,8 @@ def get_taladro(name: str, db: Session = Depends(get_db)):
             norte_m=float(plt.CoordenadaNorte) if plt.CoordenadaNorte else 0.0,
             elevacion_msnm=float(plt.Elevacion) if plt.Elevacion else 0.0,
             long_de_muestra_mm=float(plt.LongMuestra_mm) if plt.LongMuestra_mm else 0.0,
-            tipo_de_ensayo=db.query(models.TipoEnsayoPLT.Codigo).filter_by(TipoEnsayoPLT_ID=plt.TipoEnsayoPLT_ID).scalar() or "D",
-            diametro_taladro_nominacion=db.query(models.DiametroPerfora.Codigo).filter_by(DiametroID=plt.DiametroID).scalar() or "HQ",
+            tipo_de_ensayo=tipo_ensayo_map.get(plt.TipoEnsayoPLT_ID, "D"),
+            diametro_taladro_nominacion=diametro_map.get(plt.DiametroID, "HQ"),
             litologia_1=lito_map.get(plt.LitologiaID_1, "LMT"),
             litologia_2=lito_map.get(plt.LitologiaID_2, "-"),
             litologia_3=lito_map.get(plt.LitologiaID_3, "-"),
