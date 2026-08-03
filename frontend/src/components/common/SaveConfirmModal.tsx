@@ -1,10 +1,13 @@
-import { useState } from 'react';
-import { Save, CheckCircle2, X, Database, Layers, Activity } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Save, CheckCircle2, X, Database, Layers, Activity, AlertCircle, AlertTriangle } from 'lucide-react';
 import type { TaladroDiffSummary, AllTaladrosDiffSummary } from '../../utils/diffUtils';
+import { validateLogueoMandatory } from '../../utils/mandatoryRules';
+import { validateLogueoQAQC } from '../../utils/qaQcRules';
 
 interface SaveConfirmModalProps {
   show: boolean;
   activeTaladroName: string;
+  activeTaladro?: any | null;
   activeDiffSummary?: TaladroDiffSummary | null;
   allDiffSummary?: AllTaladrosDiffSummary | null;
   onConfirm: (scope: 'active' | 'all') => void;
@@ -15,18 +18,20 @@ interface SaveConfirmModalProps {
  * Modal de pre-confirmación de guardado (Pre-Flight Audit).
  * Permite al usuario revisar de forma amigable la información y métricas
  * antes de enviar la transacción a SQL Server.
+ * El guardado se BLOQUEA si hay campos obligatorios vacíos o errores
+ * CRITICOS de QA/QC (las ADVERTENCIAS no bloquean). Red de seguridad final:
+ * recalcula todo con evaluateAll=true al abrir el modal.
  * Tamaño mínimo de letra: 12px (text-xs).
  */
 export default function SaveConfirmModal({
   show,
   activeTaladroName,
+  activeTaladro,
   activeDiffSummary,
   allDiffSummary,
   onConfirm,
   onClose,
 }: SaveConfirmModalProps) {
-  if (!show) return null;
-
   // Métricas del taladro activo
   const activeFieldsCount = activeDiffSummary?.totalFieldsChanged || 0;
   const activeAddedCount = activeDiffSummary?.totalRowsAdded || 0;
@@ -42,6 +47,30 @@ export default function SaveConfirmModal({
   const [saveScope, setSaveScope] = useState<'active' | 'all'>(activeTaladroName ? 'active' : 'all');
 
   const isScopeActive = saveScope === 'active';
+
+  // ─── AUDITORÍA FINAL (red de seguridad): vacíos + QA/QC críticos ─────────
+  const blockingIssues = useMemo(() => {
+    if (!activeTaladro) return { vacios: [], criticas: [], advertencias: [] };
+    const vacios = validateLogueoMandatory(activeTaladro);
+    const qaqc = validateLogueoQAQC(
+      activeTaladro,
+      activeTaladro.surveys || [],
+      activeTaladro.corridas || [],
+      activeTaladro.discontinuidades || [],
+      activeTaladro.ensayos_plt || [],
+      true // evaluateAll: red de seguridad final
+    );
+    return {
+      vacios,
+      criticas: qaqc.filter(a => a.type === 'CRITICA'),
+      advertencias: qaqc.filter(a => a.type === 'ADVERTENCIA'),
+    };
+  }, [activeTaladro]);
+
+  const totalBlockingCount = blockingIssues.vacios.length + blockingIssues.criticas.length;
+  const hasBlockingErrors = totalBlockingCount > 0;
+
+  if (!show) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm animate-fade-in">
@@ -181,10 +210,67 @@ export default function SaveConfirmModal({
             )}
           </div>
 
+          {/* BANNER DE BLOQUEO POR CAMPOS VACÍOS O ERRORES CRÍTICOS */}
+          {hasBlockingErrors && (
+            <div className="bg-rose-950/80 border-2 border-rose-500 rounded-2xl p-4 space-y-3 shadow-[0_0_25px_rgba(244,63,94,0.2)] text-rose-100">
+              <div className="flex items-start gap-3 border-b border-rose-500/30 pb-3">
+                <div className="p-2 bg-rose-500/20 border border-rose-500/50 text-rose-400 rounded-lg shrink-0">
+                  <AlertCircle size={20} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-rose-100 uppercase tracking-wide">
+                    ¡GUARDADO BLOQUEADO!
+                  </h4>
+                  <p className="text-xs text-rose-300 font-medium mt-0.5">
+                    El sistema detectó {totalBlockingCount} problema(s) crítico(s) que impiden sincronizar
+                    con la base de datos: campos obligatorios vacíos o errores críticos de QA/QC.
+                  </p>
+                </div>
+              </div>
+
+              <div className="max-h-48 overflow-y-auto space-y-2 pr-2">
+                {blockingIssues.criticas.map((err, idx) => (
+                  <div key={`crit-${idx}`} className="text-xs bg-red-950/70 border border-red-500/50 rounded-xl p-3 flex items-center justify-between text-red-100">
+                    <span className="font-semibold leading-tight">{err.message}</span>
+                    <span className="text-[10px] font-extrabold px-2 py-1 rounded-lg bg-red-500/30 text-red-200 uppercase shrink-0 ml-2 border border-red-500/40 tracking-wider">
+                      Crítico
+                    </span>
+                  </div>
+                ))}
+                {blockingIssues.vacios.map((issue, idx) => (
+                  <div key={`vac-${idx}`} className="text-xs bg-violet-900/60 border border-violet-500/40 rounded-xl p-3 flex items-center justify-between text-violet-100">
+                    <span className="font-semibold leading-tight">{issue.message}</span>
+                    <span className="text-[10px] font-extrabold px-2 py-1 rounded-lg bg-violet-500/30 text-violet-200 uppercase shrink-0 ml-2 border border-violet-500/40 tracking-wider">
+                      {issue.section}
+                    </span>
+                  </div>
+                ))}
+                {blockingIssues.advertencias.map((err, idx) => (
+                  <div key={`adv-${idx}`} className="text-xs bg-amber-950/60 border border-amber-500/40 rounded-xl p-3 flex items-center justify-between text-amber-100">
+                    <span className="font-semibold leading-tight">{err.message}</span>
+                    <span className="text-[10px] font-extrabold px-2 py-1 rounded-lg bg-amber-500/30 text-amber-200 uppercase shrink-0 ml-2 border border-amber-500/40 tracking-wider">
+                      Advertencia
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Warning Banner (solo si no hay bloqueo) */}
+          {!hasBlockingErrors && (
+            <div className="flex items-center gap-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-300 text-xs">
+              <AlertTriangle size={16} className="shrink-0 text-amber-400" />
+              <span>Al confirmar, los datos serán guardados y auditados de forma permanente en la base de datos.</span>
+            </div>
+          )}
+
           {/* Pie y Botones */}
           <div className="pt-2 border-t border-navy-800/80 flex items-center justify-between">
             <span className="text-xs text-slate-400 font-semibold">
-              Verifique los datos antes de continuar.
+              {hasBlockingErrors
+                ? 'Corrija los errores señalados para habilitar el guardado.'
+                : 'Verifique los datos antes de continuar.'}
             </span>
 
             <div className="flex items-center gap-2.5">
@@ -198,8 +284,13 @@ export default function SaveConfirmModal({
 
               <button
                 type="button"
-                onClick={() => onConfirm(saveScope)}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-400/30 shadow-[0_0_15px_rgba(16,185,129,0.25)] transition-all active:scale-95"
+                disabled={hasBlockingErrors}
+                onClick={() => !hasBlockingErrors && onConfirm(saveScope)}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
+                  hasBlockingErrors
+                    ? 'bg-navy-900 border border-navy-800 text-slate-500 cursor-not-allowed opacity-50'
+                    : 'bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-400/30 shadow-[0_0_15px_rgba(16,185,129,0.25)] active:scale-95'
+                }`}
               >
                 <Save size={14} />
                 <span>Sí, Guardar Cambios</span>

@@ -64,14 +64,18 @@ function getCellTdStyle(
 ): React.CSSProperties {
   let alert: ValidationAlert | undefined;
 
+  // El motor QA/QC SSOT emite fieldIds con el formato `${idPrefix}-${colKey}-${rowIndex}`
+  // (coincide con el id del input). Se conserva el formato legado como fallback.
+  const newId = `${idPrefix}-${colKey}-${alertRowIndex}`;
   if (idPrefix === 'lgg-cell') {
-    alert = rowAlerts.find(a => a.field === `${colKey}-${alertRowIndex}`);
+    alert = rowAlerts.find(a => a.fieldId === newId || a.field === `${colKey}-${alertRowIndex}`);
   } else if (idPrefix === 'struct-cell') {
-    alert = rowAlerts.find(a => a.field === `struct-${colKey}-${alertRowIndex}`);
+    alert = rowAlerts.find(a => a.fieldId === newId || a.field === `struct-${colKey}-${alertRowIndex}`);
   } else if (idPrefix === 'plt-cell') {
-    alert = rowAlerts.find(a => a.field === `plt-${colKey}-${alertRowIndex}`);
+    alert = rowAlerts.find(a => a.fieldId === newId || a.field === `plt-${colKey}-${alertRowIndex}`);
   } else {
     alert = rowAlerts.find(a =>
+      a.fieldId === newId ||
       a.field === `${idPrefix}-${colKey}-${alertRowIndex}` ||
       a.field === `${colKey}-${alertRowIndex}`
     );
@@ -111,7 +115,7 @@ function getCellTdStyle(
   let background: string | undefined;
 
   if (alert) {
-    const isCritical = alert.type === 'CRITICAL';
+    const isCritical = alert.type === 'CRITICA' || alert.type === 'CRITICAL';
     const alertColor = isCritical ? 'rgba(239, 68, 68, 0.85)' : 'rgba(245, 158, 11, 0.75)';
     const alertBg = isCritical ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.12)';
 
@@ -501,7 +505,7 @@ export default function BaseEditableGrid<T>({
   const alertsByRow = useMemo(() => {
     const map = new Map<number, ValidationAlert[]>();
     for (const alert of alerts) {
-      const match = alert.field.match(/-(\d+)$/);
+      const match = (alert.fieldId ?? alert.field)?.match(/-(\d+)$/);
       if (match) {
         const rowIdx = parseInt(match[1]);
         if (!map.has(rowIdx)) map.set(rowIdx, []);

@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { AlertOctagon, AlertTriangle, CheckCircle, Minimize2, MapPin, Tag, ArrowLeftRight, HelpCircle } from 'lucide-react';
-import type { ValidationAlert } from '../../utils/qaqcValidator';
+import type { QaQcAlert } from '../../utils/qaQcRules';
 
 interface ValidationPanelProps {
-  alerts: ValidationAlert[];
+  alerts: QaQcAlert[];
   onFocusField: (fieldId: string) => void;
 }
 
@@ -23,6 +23,29 @@ export default function ValidationPanel({ alerts, onFocusField }: ValidationPane
   const getAlertContext = (fieldId: string) => {
     if (!fieldId) return { tab: 'LGG', column: 'General' };
 
+    if (fieldId.startsWith('header-')) {
+      const colName = fieldId.split('-').slice(1).join('-');
+      let column = 'General';
+      switch (colName) {
+        case 'name': column = 'Código'; break;
+        case 'proyecto': column = 'Proyecto'; break;
+        case 'geologo': column = 'Geólogo'; break;
+        case 'diametro': column = 'Diámetro'; break;
+        case 'inclinacion': column = 'Inclinación'; break;
+        case 'campana': column = 'Campaña'; break;
+        case 'turno': column = 'Turno'; break;
+        case 'collar_este': column = 'Este Oficial'; break;
+        case 'collar_norte': column = 'Norte Oficial'; break;
+        case 'collar_cota': column = 'Cota Oficial'; break;
+        case 'prof_final_eoh': column = 'Prof. EOH'; break;
+        case 'collar_este_proyectado': column = 'Este Proyect.'; break;
+        case 'collar_norte_proyectado': column = 'Norte Proyect.'; break;
+        case 'collar_cota_proyectado': column = 'Cota Proyect.'; break;
+        case 'prof_final_eoh_proyectada': column = 'EOH Proyect.'; break;
+      }
+      return { tab: 'Collar', column };
+    }
+
     if (fieldId.startsWith('survey-')) {
       const parts = fieldId.split('-');
       const colName = parts[1] || '';
@@ -33,9 +56,8 @@ export default function ValidationPanel({ alerts, onFocusField }: ValidationPane
       return { tab: 'Survey', column };
     }
 
-    if (fieldId.startsWith('plt-')) {
-      const parts = fieldId.split('-');
-      const colName = parts[1] || '';
+    if (fieldId.startsWith('plt-cell-')) {
+      const colName = fieldId.split('-')[2] || '';
       let column = 'General';
       switch (colName) {
         case 'fecha': column = 'Fecha'; break;
@@ -59,9 +81,8 @@ export default function ValidationPanel({ alerts, onFocusField }: ValidationPane
       return { tab: 'PLT', column };
     }
 
-    if (fieldId.startsWith('struct-')) {
-      const parts = fieldId.split('-');
-      const colName = parts[1] || '';
+    if (fieldId.startsWith('struct-cell-')) {
+      const colName = fieldId.split('-')[2] || '';
       let column = 'General';
       switch (colName) {
         case 'profundidad': column = 'Profundidad'; break;
@@ -85,27 +106,33 @@ export default function ValidationPanel({ alerts, onFocusField }: ValidationPane
       return { tab: 'LG EST', column };
     }
 
-    const parts = fieldId.split('-');
-    const key = parts[0];
-    let column = 'General';
-    switch (key) {
-      case 'de': column = 'Desde'; break;
-      case 'a': column = 'Hasta'; break;
-      case 'rec_m': column = 'Recup.'; break;
-      case 'rqd_m': column = 'RQD'; break;
-      case 'lrf_m': column = 'LRF'; break;
-      case 'small_frag_m': column = 'Frag < 10'; break;
-      case 'frac_nat': column = 'Fracturas'; break;
-      case 'abertura': column = 'Abertura'; break;
-      case 'espesor': column = 'Espesor'; break;
-      case 'intemperismo': column = 'Intemp.'; break;
-      case 'resistencia': column = 'Resist.'; break;
+    if (fieldId.startsWith('lgg-cell-')) {
+      const colName = fieldId.split('-')[2] || '';
+      let column = 'General';
+      switch (colName) {
+        case 'de': column = 'Desde'; break;
+        case 'a': column = 'Hasta'; break;
+        case 'rec_m': column = 'Recup.'; break;
+        case 'rqd_m': column = 'RQD'; break;
+        case 'lrf_m': column = 'LRF'; break;
+        case 'small_frag_m': column = 'Frag < 10'; break;
+        case 'frac_nat': column = 'Fracturas'; break;
+        case 'abertura': column = 'Abertura'; break;
+        case 'espesor': column = 'Espesor'; break;
+        case 'intemperismo': column = 'Intemp.'; break;
+        case 'resistencia': column = 'Resist.'; break;
+        case 'lito1': column = 'Lito 1'; break;
+        case 'tipo_est1': column = 'Tipo Est.'; break;
+        case 'agua_obs': column = 'Agua'; break;
+      }
+      return { tab: 'LGG', column };
     }
-    return { tab: 'LGG', column };
+
+    return { tab: 'LGG', column: 'General' };
   };
 
-  const criticalCount = alerts.filter(a => a.type === 'CRITICAL').length;
-  const warningCount = alerts.filter(a => a.type === 'WARNING').length;
+  const criticalCount = alerts.filter(a => a.type === 'CRITICA').length;
+  const warningCount = alerts.filter(a => a.type === 'ADVERTENCIA').length;
   const vacioCount = alerts.filter(a => a.type === 'VACIO').length;
 
   if (!isOpen) {
@@ -218,18 +245,18 @@ export default function ValidationPanel({ alerts, onFocusField }: ValidationPane
         ) : (
           [...alerts]
             .sort((a, b) => {
-              const weight = { 'CRITICAL': 0, 'WARNING': 1, 'VACIO': 2 };
+              const weight = { 'CRITICA': 0, 'CRITICAL': 0, 'ADVERTENCIA': 1, 'WARNING': 1, 'VACIO': 2 };
               return weight[a.type] - weight[b.type];
             })
             .map((alert, idx) => {
-              const isCritical = alert.type === 'CRITICAL';
-              const isWarning = alert.type === 'WARNING';
-              const context = getAlertContext(alert.field);
+              const isCritical = alert.type === 'CRITICA';
+              const isWarning = alert.type === 'ADVERTENCIA';
+              const context = getAlertContext(alert.fieldId);
 
               return (
                 <div
                   key={idx}
-                  onClick={() => onFocusField(alert.field)}
+                  onClick={() => onFocusField(alert.fieldId)}
                   className={`p-3 rounded-lg border text-left cursor-pointer transition-all hover:scale-[1.01] active:scale-[0.99] ${isCritical
                       ? 'bg-red-50 dark:bg-red-950/45 border-red-200 dark:border-red-800/40 text-red-800 dark:text-slate-200 hover:bg-red-100 dark:hover:bg-red-950/60'
                       : isWarning

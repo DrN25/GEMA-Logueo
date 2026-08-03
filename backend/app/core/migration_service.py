@@ -24,8 +24,10 @@ class GemaMigrationEngine:
         """Sanitiza celdas vacías, -1, o N/A para guardarse como NULL físico en SQL Server."""
         if val is None:
             return None
+        if isinstance(val, (int, float)) and val == -1:
+            return None
         val_str = str(val).strip().upper()
-        if val_str in ("", "-1", "N/A", "NULL", "NONE"):
+        if val_str in ("", "-1", "-1.0", "N/A", "NULL", "NONE"):
             return None
         try:
             return target_type(val)

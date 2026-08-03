@@ -247,17 +247,17 @@ export default function StructuralQaqcPanel({
             ) : (
               <div className="space-y-2.5 max-h-[480px] overflow-y-auto pr-1 scrollbar-thin">
                 {structuralAlerts.map((alert, index) => {
-                  const isCritical = alert.type === 'CRITICAL';
-                  const context = getAlertContext(alert.field);
+                  const isCritical = alert.type === 'CRITICA' || alert.type === 'CRITICAL';
+                  const context = getAlertContext(alert.fieldId ?? alert.field ?? '');
 
                   // Extract row number (1-based for the user)
-                  const match = alert.field.match(/\d+/);
+                  const match = (alert.fieldId ?? alert.field ?? '').match(/\d+/);
                   const rowNumber = match ? parseInt(match[0], 10) + 1 : 'N/A';
 
                   return (
                     <div
                       key={index}
-                      onClick={() => handleAlertFix(alert.field)}
+                      onClick={() => handleAlertFix(alert.fieldId ?? alert.field ?? '')}
                       className={`group p-3 rounded-xl border transition-all duration-200 cursor-pointer flex items-center justify-between ${isCritical
                         ? 'bg-red-500/5 hover:bg-red-500/10 border-red-500/25 hover:border-red-500/40'
                         : 'bg-amber-500/5 hover:bg-amber-500/10 border-amber-500/25 hover:border-amber-500/40'

@@ -492,15 +492,15 @@ export default function LggQaqcPanel({
               </div>
             ) : (
               [...safeAlerts]
-                .sort((a, b) => (a?.type === 'CRITICAL' ? -1 : 1) - (b?.type === 'CRITICAL' ? -1 : 1))
+                .sort((a, b) => ((a?.type === 'CRITICA' || a?.type === 'CRITICAL') ? -1 : 1) - ((b?.type === 'CRITICA' || b?.type === 'CRITICAL') ? -1 : 1))
                 .map((alert, idx) => {
                   if (!alert) return null;
-                  const isCritical = alert.type === 'CRITICAL';
-                  const context = getAlertContext(alert.field);
+                  const isCritical = alert.type === 'CRITICA' || alert.type === 'CRITICAL';
+                  const context = getAlertContext(alert.fieldId ?? alert.field ?? '');
                   return (
                     <div
                       key={idx}
-                      onClick={() => handleAlertFix(alert.field)}
+                      onClick={() => handleAlertFix(alert.fieldId ?? alert.field ?? '')}
                       className={`p-3.5 rounded-lg border text-left cursor-pointer transition-all hover:translate-x-1 active:scale-[0.99] flex justify-between items-center ${isCritical
                         ? 'bg-red-500/5 dark:bg-red-950/20 border-red-500/20 text-red-200 hover:bg-red-500/10 hover:border-red-500/35'
                         : 'bg-amber-500/5 dark:bg-amber-950/15 border-amber-500/25 text-amber-200 hover:bg-amber-500/10 hover:border-amber-500/35'

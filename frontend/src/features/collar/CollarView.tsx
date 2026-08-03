@@ -247,7 +247,7 @@ export default function CollarSurveyForm({
 
   // --- Estilos de Alertas ---
   const getInputStyle = (fieldId: string) => {
-    const parentAlert = safeAlerts.find(a => a.field === fieldId);
+    const parentAlert = safeAlerts.find(a => a.fieldId === fieldId || a.fieldId === `header-${fieldId}` || a.field === fieldId);
     if (!parentAlert) {
       return 'border-navy-800 bg-navy-950/80 focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 text-slate-100';
     }
@@ -340,6 +340,7 @@ export default function CollarSurveyForm({
         <div className="space-y-1.5">
           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Proyecto</label>
           <select
+            id="header-proyecto"
             value={safeCollar.proyecto || 'Proyecto A'}
             onChange={(e) => onCollarChange({ ...safeCollar, proyecto: e.target.value })}
             className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 font-semibold cursor-pointer transition-all"
@@ -358,6 +359,7 @@ export default function CollarSurveyForm({
         <div className="space-y-1.5">
           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Geólogo</label>
           <input
+            id="header-geologo"
             type="text"
             value={safeCollar.geologo || ''}
             onChange={(e) => onCollarChange({ ...safeCollar, geologo: e.target.value })}
@@ -370,6 +372,7 @@ export default function CollarSurveyForm({
         <div className="space-y-1.5">
           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Campaña</label>
           <select
+            id="header-campana"
             value={safeCollar.campana || ''}
             onChange={(e) => onCollarChange({ ...safeCollar, campana: e.target.value })}
             className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 font-semibold cursor-pointer transition-all"
@@ -391,6 +394,7 @@ export default function CollarSurveyForm({
         <div className="space-y-1.5">
           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Turno</label>
           <select
+            id="header-turno"
             value={safeCollar.turno || 'D'}
             onChange={(e) => onCollarChange({ ...safeCollar, turno: e.target.value })}
             className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 font-semibold cursor-pointer transition-all"
@@ -404,6 +408,7 @@ export default function CollarSurveyForm({
         <div className="space-y-1.5">
           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Diámetro</label>
           <select
+            id="header-diametro"
             value={safeCollar.diametro || 'HQ3'}
             onChange={(e) => onCollarChange({ ...safeCollar, diametro: e.target.value })}
             className="w-full bg-navy-950 border border-navy-800 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 font-semibold cursor-pointer transition-all"
@@ -421,6 +426,7 @@ export default function CollarSurveyForm({
         <div className="space-y-1.5">
           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Inclinación (°)</label>
           <input
+            id="header-inclinacion"
             type="number"
             step="0.1"
             value={safeCollar.inclinacion ?? -60}
@@ -447,6 +453,7 @@ export default function CollarSurveyForm({
                 Este Proyectado (X - m)
               </label>
               <input
+                id="header-collar_este_proyectado"
                 type="number"
                 value={toCollarInputValue(safeCollar.collar_este_proyectado)}
                 onChange={(e) => handleCollarChangeWithClamping('collar_este_proyectado', fromCollarInputValue(e.target.value))}
@@ -462,6 +469,7 @@ export default function CollarSurveyForm({
                 Norte Proyectado (Y - m)
               </label>
               <input
+                id="header-collar_norte_proyectado"
                 type="number"
                 value={toCollarInputValue(safeCollar.collar_norte_proyectado)}
                 onChange={(e) => handleCollarChangeWithClamping('collar_norte_proyectado', fromCollarInputValue(e.target.value))}
@@ -477,6 +485,7 @@ export default function CollarSurveyForm({
                 Cota Proyectada (Z - msnm)
               </label>
               <input
+                id="header-collar_cota_proyectado"
                 type="number"
                 value={toCollarInputValue(safeCollar.collar_cota_proyectado)}
                 onChange={(e) => handleCollarChangeWithClamping('collar_cota_proyectado', fromCollarInputValue(e.target.value))}
@@ -492,6 +501,7 @@ export default function CollarSurveyForm({
                 Prof. EOH Proyectada (m)
               </label>
               <input
+                id="header-prof_final_eoh_proyectada"
                 type="number"
                 step="0.01"
                 value={toCollarInputValue(safeCollar.prof_final_eoh_proyectada)}
@@ -532,6 +542,7 @@ export default function CollarSurveyForm({
                 Este Oficial (X - m)
               </label>
               <input
+                id="header-collar_este"
                 type="number"
                 value={toCollarInputValue(safeCollar.collar_este)}
                 onChange={(e) => handleCollarChangeWithClamping('collar_este', fromCollarInputValue(e.target.value))}
@@ -547,6 +558,7 @@ export default function CollarSurveyForm({
                 Norte Oficial (Y - m)
               </label>
               <input
+                id="header-collar_norte"
                 type="number"
                 value={toCollarInputValue(safeCollar.collar_norte)}
                 onChange={(e) => handleCollarChangeWithClamping('collar_norte', fromCollarInputValue(e.target.value))}
@@ -562,6 +574,7 @@ export default function CollarSurveyForm({
                 Cota Oficial (Z - msnm)
               </label>
               <input
+                id="header-collar_cota"
                 type="number"
                 value={toCollarInputValue(safeCollar.collar_cota)}
                 onChange={(e) => handleCollarChangeWithClamping('collar_cota', fromCollarInputValue(e.target.value))}
@@ -577,6 +590,7 @@ export default function CollarSurveyForm({
                 Prof. Final EOH Oficial (m)
               </label>
               <input
+                id="header-prof_final_eoh"
                 type="number"
                 step="0.01"
                 value={toCollarInputValue(safeCollar.prof_final_eoh)}

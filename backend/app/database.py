@@ -1,6 +1,6 @@
 import os
 import urllib.parse
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 def load_dotenv():
@@ -26,12 +26,33 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 engine = None
 connect_args = {}
 
+def _attach_sqlite_schemas(engine, sqlite_path):
+    """SQLite no soporta los esquemas "dbo"/"cat"/"plt" de los modelos (SQL Server).
+    Se emulan adjuntando UN ARCHIVO POR ESQUEMA (adjuntar el mismo archivo varias
+    veces produce "database is locked" al escribir en una transacción)."""
+    base = os.path.dirname(sqlite_path) or "."
+    files = {
+        "dbo": os.path.join(base, "geolog_dbo.db").replace("\\", "/"),
+        "cat": os.path.join(base, "geolog_cat.db").replace("\\", "/"),
+        "plt": os.path.join(base, "geolog_plt.db").replace("\\", "/"),
+    }
+    @event.listens_for(engine, "connect")
+    def _listener(dbapi_conn, _record):
+        cur = dbapi_conn.cursor()
+        for schema, path in files.items():
+            cur.execute("ATTACH DATABASE ? AS ?", (path, schema))
+        cur.close()
+    return engine
+
 # 1. Probar DATABASE_URL primero si está configurado
 if DATABASE_URL:
     try:
         if "sqlite" in DATABASE_URL:
-            connect_args = {"check_same_thread": False}
-        engine = create_engine(DATABASE_URL, connect_args=connect_args, pool_pre_ping=True)
+            connect_args = {"check_same_thread": False, "timeout": 30}
+            engine = create_engine(DATABASE_URL, connect_args=connect_args, pool_pre_ping=True)
+            _attach_sqlite_schemas(engine, DATABASE_URL.replace("sqlite:///", ""))
+        else:
+            engine = create_engine(DATABASE_URL, connect_args=connect_args, pool_pre_ping=True)
         # Verificar conexión
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
@@ -88,8 +109,9 @@ if not engine:
 if not engine:
     sqlite_path = os.path.join(os.path.dirname(__file__), "geolog.db")
     DATABASE_URL = f"sqlite:///{sqlite_path}"
-    connect_args = {"check_same_thread": False}
+    connect_args = {"check_same_thread": False, "timeout": 30}
     engine = create_engine(DATABASE_URL, connect_args=connect_args, pool_pre_ping=True)
+    _attach_sqlite_schemas(engine, sqlite_path)
     print(f"ADVERTENCIA: Fallaron las conexiones a SQL Server. Cayendo en base de datos SQLite local: '{sqlite_path}'")
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

@@ -22,7 +22,9 @@ import RqdDashboard from './features/dashboard/RqdDashboard';
 import ReportsPdf from './features/reports/ReportsPdf';
 import BulkAuditor from './features/auditor/BulkAuditor';
 
-import { validateCollarAndSurvey, validateRowQAQC, validateStructuralQAQC, validatePltQAQC, type ValidationAlert } from './utils/qaqcValidator';
+import { validateLogueoQAQC, type QaQcAlert } from './utils/qaQcRules';
+import { validateLogueoMandatory, toVacioAlerts } from './utils/mandatoryRules';
+import { subscribeTouched, resetTouchedFields } from './utils/qaQcTouch';
 import { resolveLithologyCascade } from './utils/catalogData';
 import { calculateRowRmr } from './utils/formulaEngine';
 import { computeTaladroHash } from './utils/hashUtils';
@@ -1518,28 +1520,33 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [activeTaladro]);
 
-  const activeAlerts = useMemo((): ValidationAlert[] => {
+  // Re-render de validaciones cuando se marca un campo como "tocado" (blur)
+  const [touchedTick, setTouchedTick] = useState(0);
+  useEffect(() => {
+    return subscribeTouched(() => setTouchedTick(t => t + 1));
+  }, []);
+
+  // Resetear el registro de campos "tocados" al cambiar de taladro activo
+  useEffect(() => {
+    resetTouchedFields();
+  }, [activeTaladro?.name]);
+
+  const activeAlerts = useMemo((): QaQcAlert[] => {
     if (!validationSnapshot) return [];
 
-    const surveyAlerts = validateCollarAndSurvey(validationSnapshot, validationSnapshot.surveys);
-
-    const lggAlerts = validationSnapshot.corridas.flatMap((row, idx) =>
-      validateRowQAQC(row, idx, validationSnapshot.corridas)
-    );
-
-    const structuralAlerts = validateStructuralQAQC(
-      validationSnapshot.discontinuidades,
-      validationSnapshot.corridas
-    );
-
-    const pltAlerts = validatePltQAQC(
+    // Motor QA/QC SSOT (misma arquitectura que GEMA-Mapeo)
+    const qaqc = validateLogueoQAQC(
+      validationSnapshot,
+      validationSnapshot.surveys || [],
+      validationSnapshot.corridas || [],
+      validationSnapshot.discontinuidades || [],
       validationSnapshot.ensayos_plt || [],
-      validationSnapshot.corridas,
-      validationSnapshot
+      true // evaluateAll: siempre evaluar todo (red de seguridad)
     );
-
-    return [...surveyAlerts, ...lggAlerts, ...structuralAlerts, ...pltAlerts];
-  }, [validationSnapshot]);
+    // Campos obligatorios (VACIO) — filas vacantes ignoradas
+    const vacios = toVacioAlerts(validateLogueoMandatory(validationSnapshot));
+    return [...qaqc, ...vacios];
+  }, [validationSnapshot, touchedTick]);
 
   // Mapped field focusing logic from ValidationPanel
   const handleFocusField = (fieldId: string) => {
@@ -1549,7 +1556,7 @@ export default function App() {
     const isStruct = fieldId.startsWith('struct-');
     const isPlt = fieldId.startsWith('plt-');
 
-    if (fieldId.startsWith('survey-') || fieldId.startsWith('collar-')) {
+    if (fieldId.startsWith('survey-') || fieldId.startsWith('collar-') || fieldId.startsWith('header-')) {
       targetView = 'collar';
     } else if (fieldId.endsWith('-input') || fieldId === 'input-sondaje-name') {
       targetView = 'collar';
@@ -2010,6 +2017,7 @@ export default function App() {
       <SaveConfirmModal
         show={showSaveConfirmModal}
         activeTaladroName={activeTaladro?.name || ''}
+        activeTaladro={showSaveConfirmModal ? activeTaladro : null}
         activeDiffSummary={showSaveConfirmModal && activeTaladro ? computeTaladroDiff(dbSnapshotData, activeTaladro) : null}
         allDiffSummary={showSaveConfirmModal ? computeAllTaladrosDiff(activeTaladro, dbSnapshotData) : null}
         onConfirm={handleConfirmSave}

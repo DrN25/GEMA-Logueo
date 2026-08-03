@@ -1,6 +1,7 @@
 export interface ValidationAlert {
-  type: 'CRITICAL' | 'WARNING' | 'VACIO'; // <--- TRES NIVELES DE GRAVEDAD
-  field: string;
+  type: 'CRITICAL' | 'WARNING' | 'VACIO' | 'CRITICA' | 'ADVERTENCIA'; // <--- NIVELES DE GRAVEDAD
+  field?: string;      // Formato legado (ej. "rec_m-0")
+  fieldId?: string;    // Formato SSOT (ej. "lgg-cell-rec_m-0") — coincide con el id del input
   message: string;
   corridaIndex?: number;
   surveyIndex?: number;

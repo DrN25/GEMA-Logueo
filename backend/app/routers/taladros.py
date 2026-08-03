@@ -388,6 +388,9 @@ def save_taladro(taladro: TaladroSchema, db: Session = Depends(get_db)):
         db.commit()
         return {"status": "success", "message": f"Taladro {taladro.name} migrado y guardado con éxito en GEMA"}
         
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Fallo en migración de guardado: {str(e)}")
