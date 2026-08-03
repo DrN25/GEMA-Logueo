@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Plus,
   Search,
@@ -59,6 +59,8 @@ interface DashboardProps {
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
   onFilterChange: (filters: { dateRange?: string }) => void;
+  onAdvancedFiltersChange: (filters: { proyecto: string; geologo: string; diametro: string }) => void;
+  advancedFilters: { proyecto: string; geologo: string; diametro: string };
   onSelectTaladro: (name: string) => void;
   onCreateTaladro: (newTaladro: any) => void;
   onDeleteTaladro: (name: string) => void;
@@ -68,6 +70,10 @@ export const formatCampanaLabel = (str: string): string => {
   if (!str) return '';
   return str.replace(/^CAMPAÑA\s*/i, '').replace(/^CAMPAÑA_/i, '').trim();
 };
+
+// Fecha local YYYY-MM-DD (evita el desfase UTC de toISOString en zonas negativas)
+const toLocalDateStr = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 export default function Dashboard({
   taladros,
@@ -85,6 +91,8 @@ export default function Dashboard({
   onPageChange,
   onPageSizeChange,
   onFilterChange,
+  onAdvancedFiltersChange,
+  advancedFilters,
   onSelectTaladro,
   onCreateTaladro,
   onDeleteTaladro,
@@ -107,33 +115,26 @@ export default function Dashboard({
   const [campana, setCampana] = useState(availableCampanas[0] || '2026');
   const [turno, setTurno] = useState('D');
 
-  // Filtros avanzados locales (borrador en inputs)
-  const [advProyectoInput, setAdvProyectoInput] = useState('');
-  const [advGeologoInput, setAdvGeologoInput] = useState('');
-  const [advDiametroInput, setAdvDiametroInput] = useState('');
+  // Filtros avanzados: borrador local en inputs; los valores APLICADOS vienen
+  // de App.tsx (se aplican en el pipeline ANTES de la paginación).
+  const [advProyectoInput, setAdvProyectoInput] = useState(advancedFilters.proyecto);
+  const [advGeologoInput, setAdvGeologoInput] = useState(advancedFilters.geologo);
+  const [advDiametroInput, setAdvDiametroInput] = useState(advancedFilters.diametro);
 
-  // Filtros avanzados aplicados (solo se activan al hacer clic en "Aplicar Filtros")
-  const [appliedAdvProyecto, setAppliedAdvProyecto] = useState('');
-  const [appliedAdvGeologo, setAppliedAdvGeologo] = useState('');
-  const [appliedAdvDiametro, setAppliedAdvDiametro] = useState('');
+  const applyAdvancedFilters = () => {
+    onAdvancedFiltersChange({
+      proyecto: advProyectoInput,
+      geologo: advGeologoInput,
+      diametro: advDiametroInput
+    });
+  };
 
-  // Filtrado local en cliente por campos avanzados aplicados
-  const filteredTaladrosList = useMemo(() => {
-    let list = [...taladros];
-    if (appliedAdvProyecto.trim()) {
-      const q = appliedAdvProyecto.trim().toLowerCase();
-      list = list.filter(t => t.proyecto && t.proyecto.toLowerCase().includes(q));
-    }
-    if (appliedAdvGeologo.trim()) {
-      const q = appliedAdvGeologo.trim().toLowerCase();
-      list = list.filter(t => t.geologo && t.geologo.toLowerCase().includes(q));
-    }
-    if (appliedAdvDiametro.trim()) {
-      const q = appliedAdvDiametro.trim().toLowerCase();
-      list = list.filter(t => t.diametro && t.diametro.toLowerCase().includes(q));
-    }
-    return list;
-  }, [taladros, appliedAdvProyecto, appliedAdvGeologo, appliedAdvDiametro]);
+  const clearAdvancedFilters = () => {
+    setAdvProyectoInput('');
+    setAdvGeologoInput('');
+    setAdvDiametroInput('');
+    onAdvancedFiltersChange({ proyecto: '', geologo: '', diametro: '' });
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -150,7 +151,7 @@ export default function Dashboard({
       diametro,
       inclinacion,
       campana,
-      fecha_registro: new Date().toISOString().split('T')[0],
+      fecha_registro: toLocalDateStr(new Date()),
       collar_este_proyectado: 0.0,
       collar_norte_proyectado: 0.0,
       collar_cota_proyectado: 0.0,
@@ -181,8 +182,8 @@ export default function Dashboard({
   const dateObj = new Date();
   const filterLabel = activeDateRange === 'hoy' ? 'Hoy' :
     activeDateRange === 'ayer' ? 'Ayer' :
-      activeDateRange === 'semana' ? 'Esta semana' :
-        activeDateRange === 'mes' ? 'Este mes' :
+      activeDateRange === 'semana' ? 'Últimos 7 días' :
+        activeDateRange === 'mes' ? 'Últimos 30 días' :
           activeDateRange === 'ano' ? 'Este año' : 'Todo';
 
   const totalGlobal = kpis?.total_taladros || taladros.length;
@@ -217,8 +218,8 @@ export default function Dashboard({
         {[
           { key: 'hoy', label: 'Hoy' },
           { key: 'ayer', label: 'Ayer' },
-          { key: 'semana', label: 'Esta semana' },
-          { key: 'mes', label: 'Este mes' },
+          { key: 'semana', label: 'Últimos 7 días' },
+          { key: 'mes', label: 'Últimos 30 días' },
           { key: 'ano', label: 'Este año' },
           { key: 'todo', label: 'Todo' },
         ].map(chip => (
@@ -251,11 +252,7 @@ export default function Dashboard({
               value={advProyectoInput}
               onChange={(e) => setAdvProyectoInput(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  setAppliedAdvProyecto(advProyectoInput);
-                  setAppliedAdvGeologo(advGeologoInput);
-                  setAppliedAdvDiametro(advDiametroInput);
-                }
+                if (e.key === 'Enter') applyAdvancedFilters();
               }}
               className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500"
             />
@@ -268,11 +265,7 @@ export default function Dashboard({
               value={advGeologoInput}
               onChange={(e) => setAdvGeologoInput(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  setAppliedAdvProyecto(advProyectoInput);
-                  setAppliedAdvGeologo(advGeologoInput);
-                  setAppliedAdvDiametro(advDiametroInput);
-                }
+                if (e.key === 'Enter') applyAdvancedFilters();
               }}
               className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500"
             />
@@ -285,38 +278,23 @@ export default function Dashboard({
               value={advDiametroInput}
               onChange={(e) => setAdvDiametroInput(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  setAppliedAdvProyecto(advProyectoInput);
-                  setAppliedAdvGeologo(advGeologoInput);
-                  setAppliedAdvDiametro(advDiametroInput);
-                }
+                if (e.key === 'Enter') applyAdvancedFilters();
               }}
               className="w-full bg-navy-950 border border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500"
             />
           </div>
           <div className="flex items-end gap-2">
             <button
-              onClick={() => {
-                setAppliedAdvProyecto(advProyectoInput);
-                setAppliedAdvGeologo(advGeologoInput);
-                setAppliedAdvDiametro(advDiametroInput);
-              }}
+              onClick={applyAdvancedFilters}
               className="w-full bg-cyan-500/10 border border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/20 px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
               title="Aplicar filtros avanzados a la lista"
             >
               <Filter size={13} />
               <span>Aplicar Filtros</span>
             </button>
-            {(advProyectoInput || advGeologoInput || advDiametroInput || appliedAdvProyecto || appliedAdvGeologo || appliedAdvDiametro) && (
+            {(advProyectoInput || advGeologoInput || advDiametroInput || advancedFilters.proyecto || advancedFilters.geologo || advancedFilters.diametro) && (
               <button
-                onClick={() => {
-                  setAdvProyectoInput('');
-                  setAdvGeologoInput('');
-                  setAdvDiametroInput('');
-                  setAppliedAdvProyecto('');
-                  setAppliedAdvGeologo('');
-                  setAppliedAdvDiametro('');
-                }}
+                onClick={clearAdvancedFilters}
                 className="bg-navy-900 border border-navy-800 text-slate-300 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap"
                 title="Limpiar campos de filtros avanzados"
               >
@@ -481,23 +459,16 @@ export default function Dashboard({
           )}
 
           {/* Indicador de Filtros Avanzados Aplicados */}
-          {(appliedAdvProyecto || appliedAdvGeologo || appliedAdvDiametro) && (
+          {(advancedFilters.proyecto || advancedFilters.geologo || advancedFilters.diametro) && (
             <div className="flex items-center justify-between gap-3 bg-indigo-500/10 border border-indigo-500/30 rounded-xl px-4 py-2 text-xs text-indigo-300 animate-fade-in shadow-md">
               <div className="flex items-center gap-2 font-medium">
                 <Filter size={15} className="text-indigo-400 shrink-0" />
                 <span>
-                  Filtros activos: <strong className="text-white font-bold">{[appliedAdvProyecto && `Proyecto: ${appliedAdvProyecto}`, appliedAdvGeologo && `Geólogo: ${appliedAdvGeologo}`, appliedAdvDiametro && `Diámetro: ${appliedAdvDiametro}`].filter(Boolean).join(' · ')}</strong>
+                  Filtros activos: <strong className="text-white font-bold">{[advancedFilters.proyecto && `Proyecto: ${advancedFilters.proyecto}`, advancedFilters.geologo && `Geólogo: ${advancedFilters.geologo}`, advancedFilters.diametro && `Diámetro: ${advancedFilters.diametro}`].filter(Boolean).join(' · ')}</strong>
                 </span>
               </div>
               <button
-                onClick={() => {
-                  setAdvProyectoInput('');
-                  setAdvGeologoInput('');
-                  setAdvDiametroInput('');
-                  setAppliedAdvProyecto('');
-                  setAppliedAdvGeologo('');
-                  setAppliedAdvDiametro('');
-                }}
+                onClick={clearAdvancedFilters}
                 className="flex items-center gap-1.5 bg-navy-950 border border-indigo-700/80 text-slate-100 hover:bg-slate-900 hover:border-indigo-400 hover:text-indigo-300 font-bold px-3 py-1.5 rounded-lg text-[11px] transition-all shadow-md active:scale-95 shrink-0 ml-2 cursor-pointer"
                 title="Limpiar únicamente los filtros avanzados"
               >
@@ -534,7 +505,7 @@ export default function Dashboard({
                   ))}
                 </tr>
               ))}
-              {!loading && filteredTaladrosList.map(t => (
+              {!loading && taladros.map(t => (
                 <tr
                   key={t.name}
                   onClick={() => onSelectTaladro(t.name)}
@@ -589,8 +560,7 @@ export default function Dashboard({
                     No se encontraron taladros en este rango. {activeDateRange === 'hoy' ? 'Registra el primero del día.' : 'Prueba cambiando el filtro de fecha o búsqueda.'}
                   </td>
                 </tr>
-              )}
-            </tbody>
+              )}            </tbody>
           </table>
         </div>
 

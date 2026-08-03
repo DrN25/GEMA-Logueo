@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+﻿import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Construction,
   Database
@@ -210,9 +210,9 @@ export default function App() {
   const [showCatalogsModal, setShowCatalogsModal] = useState<boolean>(false);
   const [showFormulasModal, setShowFormulasModal] = useState<boolean>(false);
 
-  // Catálogo de Campañas dinámico desde la BD
+  // CatÃ¡logo de CampaÃ±as dinÃ¡mico desde la BD
   const [availableCampanas, setAvailableCampanas] = useState<string[]>([
-    "Campaña 2020", "Campaña 2021", "Campaña 2022", "Campaña 2023", "Campaña 2024", "Campaña 2025", "Campaña 2026"
+    "CampaÃ±a 2020", "CampaÃ±a 2021", "CampaÃ±a 2022", "CampaÃ±a 2023", "CampaÃ±a 2024", "CampaÃ±a 2025", "CampaÃ±a 2026"
   ]);
 
   useEffect(() => {
@@ -233,7 +233,7 @@ export default function App() {
     }
   };
 
-  // Estados del Dashboard: KPIs, paginación, filtros de fecha y búsqueda por botón
+  // Estados del Dashboard: KPIs, paginaciÃ³n, filtros de fecha y bÃºsqueda por botÃ³n
   const [dashboardKpis, setDashboardKpis] = useState<any>(null);
   const [dashboardLoading, setDashboardLoading] = useState<boolean>(false);
   const [page, setPage] = useState<number>(() => {
@@ -278,7 +278,19 @@ export default function App() {
     }
   });
 
-  // Persistir parámetros de dashboard en localStorage
+  // Filtros avanzados del dashboard (proyecto / geÃ³logo / diÃ¡metro) â€” se aplican
+  // en el pipeline de filtrado ANTES de la paginaciÃ³n para mantener coherencia.
+  const [advancedFilters, setAdvancedFilters] = useState<{ proyecto: string; geologo: string; diametro: string }>({
+    proyecto: '',
+    geologo: '',
+    diametro: ''
+  });
+
+  // Totales devueltos por el servidor (paginación server-side)
+  const [serverTotalFiltered, setServerTotalFiltered] = useState<number>(0);
+  const [serverTotalPages, setServerTotalPages] = useState<number>(1);
+
+  // Persistir parÃ¡metros de dashboard en localStorage
   useEffect(() => {
     try {
       localStorage.setItem('geolog_dashboard_page', String(page));
@@ -315,8 +327,8 @@ export default function App() {
 
   const [isLoadingTaladro, setIsLoadingTaladro] = useState<boolean>(false);
 
-  // ─── SNAPSHOT HASH: Detección inteligente de dirty state ──────────────────
-  // dbSnapshotHash guarda el hash del estado del taladro tal como está en la BD.
+  // â”€â”€â”€ SNAPSHOT HASH: DetecciÃ³n inteligente de dirty state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // dbSnapshotHash guarda el hash del estado del taladro tal como estÃ¡ en la BD.
   // null = taladro nuevo que nunca ha existido en BD (siempre dirty).
   const [dbSnapshotHash, setDbSnapshotHash] = useState<number | null>(() => {
     const savedName = localStorage.getItem('geolog_active_taladro_name');
@@ -344,7 +356,7 @@ export default function App() {
     return null;
   });
 
-  // Modal de resultado de guardado con reporte de auditoría
+  // Modal de resultado de guardado con reporte de auditorÃ­a
   const [saveResultModal, setSaveResultModal] = useState<{
     show: boolean;
     success: boolean;
@@ -353,10 +365,10 @@ export default function App() {
     diffSummary?: TaladroDiffSummary | null;
   }>({ show: false, success: false, message: '' });
 
-  // Modal de pre-confirmación de guardado
+  // Modal de pre-confirmaciÃ³n de guardado
   const [showSaveConfirmModal, setShowSaveConfirmModal] = useState<boolean>(false);
 
-  // Modal de confirmación para descartar cambios
+  // Modal de confirmaciÃ³n para descartar cambios
   const [showDiscardModal, setShowDiscardModal] = useState<boolean>(false);
 
   // Contador reactivo de taladros con cambios pendientes
@@ -401,10 +413,50 @@ export default function App() {
     }
   }, [darkMode]);
 
-  // Cargar estadísticas KPI del Dashboard desde el servidor
-  const fetchDashboardStats = async () => {
+  // Params de filtro compartidos entre el listado paginado y los KPIs (patrón Mapeo)
+  const buildDashboardQueryParams = (dr?: string, term?: string, globalSearch?: boolean, adv?: { proyecto: string; geologo: string; diametro: string }) => {
+    const params = new URLSearchParams();
+    const drActive = dr || activeDateRange;
+    const now = new Date();
+    const toLocal = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    if (drActive !== 'todo') {
+      if (drActive === 'hoy') {
+        params.set('fecha_desde', toLocal(now));
+        params.set('fecha_hasta', toLocal(now));
+      } else if (drActive === 'ayer') {
+        const y = new Date(now); y.setDate(y.getDate() - 1);
+        params.set('fecha_desde', toLocal(y));
+        params.set('fecha_hasta', toLocal(y));
+      } else if (drActive === 'semana') {
+        const w = new Date(now); w.setDate(w.getDate() - 7);
+        params.set('fecha_desde', toLocal(w));
+        params.set('fecha_hasta', toLocal(now));
+      } else if (drActive === 'mes') {
+        const m = new Date(now); m.setDate(m.getDate() - 30);
+        params.set('fecha_desde', toLocal(m));
+        params.set('fecha_hasta', toLocal(now));
+      } else if (drActive === 'ano') {
+        params.set('fecha_desde', `${now.getFullYear()}-01-01`);
+        params.set('fecha_hasta', toLocal(now));
+      }
+    }
+    const gSearch = globalSearch !== undefined ? globalSearch : isGlobalSearch;
+    if (gSearch) params.set('search_global', 'true');
+    const termActive = term !== undefined ? term : searchTerm;
+    if (termActive.trim()) params.set('q', termActive.trim());
+    const advActive = adv || advancedFilters;
+    if (advActive.proyecto.trim()) params.set('proyecto', advActive.proyecto.trim());
+    if (advActive.geologo.trim()) params.set('geologo', advActive.geologo.trim());
+    if (advActive.diametro.trim()) params.set('diametro', advActive.diametro.trim());
+    return params;
+  };
+
+  // Cargar estadísticas KPI del Dashboard desde el servidor (con los mismos filtros del listado)
+  const fetchDashboardStats = async (dr?: string, term?: string, globalSearch?: boolean, adv?: { proyecto: string; geologo: string; diametro: string }) => {
     try {
-      const res = await fetch(`${API_BASE}/api/taladros/dashboard-stats`);
+      const params = buildDashboardQueryParams(dr, term, globalSearch, adv);
+      const res = await fetch(`${API_BASE}/api/taladros/dashboard-stats?${params}`);
       if (res.ok) {
         const data = await res.json();
         setDashboardKpis(data);
@@ -417,36 +469,47 @@ export default function App() {
   // Fetch drillhole lists on mount
   useEffect(() => {
     fetchTaladros();
-    fetchDashboardStats();
   }, []);
 
-  // Filtrado y paginación en memoria para resiliencia offline/online
+  // Filtrado y paginaciÃ³n en memoria para resiliencia offline/online
+  // Fecha local YYYY-MM-DD (evita el desfase UTC de toISOString en zonas negativas)
+  const toLocalDateStr = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+  // Modo offline: los filtros/paginación viven en el servidor; solo en modo offline
+  // se filtran/paginan los summaries del caché local en memoria.
+  const isOfflineMode = syncStatus === 'offline';
+
   const filteredTaladros = useMemo(() => {
+    // ONLINE: la lista ya viene filtrada y paginada del servidor.
+    if (!isOfflineMode) return taladros;
+
+    // OFFLINE: filtrar el caché completo en memoria (respaldo).
     let list = [...taladros];
 
     // Helper para extraer YYYY-MM-DD
     const getFechaStr = (f?: string) => f ? f.split('T')[0] : '';
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
+    const todayStr = toLocalDateStr(now);
 
-    // 1. Filtrado por rango de fechas (Hoy, Ayer, Esta Semana, Este Mes, Este Año, Todo)
+    // 1. Filtrado por rango de fechas (Hoy, Ayer, Últimos 7/30 días, Este Año, Todo)
     if (!isGlobalSearch) {
       if (activeDateRange === 'hoy') {
         list = list.filter(t => getFechaStr(t.fecha_registro) === todayStr);
       } else if (activeDateRange === 'ayer') {
         const yesterday = new Date(now);
         yesterday.setDate(yesterday.getDate() - 1);
-        const yestStr = yesterday.toISOString().split('T')[0];
+        const yestStr = toLocalDateStr(yesterday);
         list = list.filter(t => getFechaStr(t.fecha_registro) === yestStr);
       } else if (activeDateRange === 'semana') {
         const weekAgo = new Date(now);
         weekAgo.setDate(weekAgo.getDate() - 7);
-        const weekStartStr = weekAgo.toISOString().split('T')[0];
+        const weekStartStr = toLocalDateStr(weekAgo);
         list = list.filter(t => getFechaStr(t.fecha_registro) >= weekStartStr);
       } else if (activeDateRange === 'mes') {
         const monthAgo = new Date(now);
-        monthAgo.setMonth(monthAgo.getMonth() - 1);
-        const monthStartStr = monthAgo.toISOString().split('T')[0];
+        monthAgo.setDate(monthAgo.getDate() - 30);
+        const monthStartStr = toLocalDateStr(monthAgo);
         list = list.filter(t => getFechaStr(t.fecha_registro) >= monthStartStr);
       } else if (activeDateRange === 'ano') {
         const yearStartStr = `${now.getFullYear()}-01-01`;
@@ -454,7 +517,19 @@ export default function App() {
       }
     }
 
-    // 2. Búsqueda por texto (código de taladro, geólogo o proyecto)
+    // 2. Filtros avanzados (proyecto / geólogo / diámetro) — antes de paginar
+    const advP = advancedFilters.proyecto.trim().toLowerCase();
+    const advG = advancedFilters.geologo.trim().toLowerCase();
+    const advD = advancedFilters.diametro.trim().toLowerCase();
+    if (advP || advG || advD) {
+      list = list.filter(t =>
+        (!advP || (t.proyecto && t.proyecto.toLowerCase().includes(advP))) &&
+        (!advG || (t.geologo && t.geologo.toLowerCase().includes(advG))) &&
+        (!advD || (t.diametro && t.diametro.toLowerCase().includes(advD)))
+      );
+    }
+
+    // 3. Búsqueda por texto (código de taladro, geólogo o proyecto)
     if (searchTerm.trim()) {
       const query = searchTerm.toLowerCase().trim();
       list = list.filter(t =>
@@ -465,14 +540,14 @@ export default function App() {
     }
 
     return list;
-  }, [taladros, activeDateRange, searchTerm, isGlobalSearch]);
+  }, [taladros, activeDateRange, searchTerm, isGlobalSearch, advancedFilters, isOfflineMode]);
 
-  // ─── CÁLCULO DINÁMICO DE KPIS PARA EL DASHBOARD ───
+  // â”€â”€â”€ CÃLCULO DINÃMICO DE KPIS PARA EL DASHBOARD â”€â”€â”€
   const computedDashboardKpis = useMemo(() => {
     if (dashboardKpis) return dashboardKpis;
     const list = filteredTaladros;
     const total_taladros = list.length;
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = toLocalDateStr(new Date());
 
     let perf_total_m = 0;
     let perf_total_hoy = 0;
@@ -550,32 +625,52 @@ export default function App() {
     };
   }, [filteredTaladros, activeTaladro]);
 
-  const totalFilteredTaladros = filteredTaladros.length;
-  const totalDashboardPages = Math.max(1, Math.ceil(totalFilteredTaladros / pageSize));
+  const totalFilteredTaladros = isOfflineMode ? filteredTaladros.length : serverTotalFiltered;
+  const totalDashboardPages = isOfflineMode
+    ? Math.max(1, Math.ceil(totalFilteredTaladros / pageSize))
+    : serverTotalPages;
 
   const paginatedTaladros = useMemo(() => {
+    // ONLINE: el servidor ya paginó (items de la página actual).
+    if (!isOfflineMode) return filteredTaladros;
+    // OFFLINE: paginar en memoria.
     const start = (page - 1) * pageSize;
     return filteredTaladros.slice(start, start + pageSize);
-  }, [filteredTaladros, page, pageSize]);
+  }, [filteredTaladros, page, pageSize, isOfflineMode]);
 
-  // Handlers para búsqueda y paginación
+  // Handlers para bÃºsqueda y paginaciÃ³n
   const handleSearchSubmit = (term: string, isGlobal: boolean) => {
     setSearchTerm(term);
     setIsGlobalSearch(isGlobal);
-    setPage(1);
+    fetchTaladros(1, activeDateRange, term, isGlobal, advancedFilters);
   };
 
   const handleClearSearch = () => {
     setSearchTerm('');
     setIsGlobalSearch(false);
-    setPage(1);
+    fetchTaladros(1, activeDateRange, '', false, advancedFilters);
   };
 
   const handleFilterChange = (filters: { dateRange?: string }) => {
     if (filters.dateRange) {
       setActiveDateRange(filters.dateRange);
-      setPage(1);
+      fetchTaladros(1, filters.dateRange, searchTerm, isGlobalSearch, advancedFilters);
     }
+  };
+
+  const handleAdvancedFiltersChange = (filters: { proyecto: string; geologo: string; diametro: string }) => {
+    setAdvancedFilters(filters);
+    fetchTaladros(1, activeDateRange, searchTerm, isGlobalSearch, filters);
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+    fetchTaladros(newPage, activeDateRange, searchTerm, isGlobalSearch, advancedFilters);
+  };
+
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+    fetchTaladros(1, activeDateRange, searchTerm, isGlobalSearch, advancedFilters);
   };
 
   // Persistir la vista activa y el taladro activo en localStorage
@@ -591,26 +686,62 @@ export default function App() {
     }
   }, [activeTaladro]);
 
-  // Restaurar taladro activo en recarga/refresh de página
+  // Restaurar taladro activo en recarga/refresh de pagina.
+  // Con paginacion server-side la lista local es solo la pagina actual, asi que
+  // se verifica contra el servidor (puede estar en cualquier pagina) - patron Mapeo.
   useEffect(() => {
     if (!activeTaladro && taladros.length > 0) {
       const savedTaladroName = localStorage.getItem('geolog_active_taladro_name');
-      if (savedTaladroName && taladros.some(t => t.name === savedTaladroName)) {
-        handleSelectTaladro(savedTaladroName, false);
-      } else {
+      if (savedTaladroName) {
+        fetch(`${API_BASE}/api/taladros/existe?name=${encodeURIComponent(savedTaladroName)}`)
+          .then(r => r.json())
+          .then(({ exists }) => {
+            if (exists) handleSelectTaladro(savedTaladroName, false);
+            else handleSelectTaladro(taladros[0].name, false);
+          })
+          .catch(() => {
+            // Servidor caido: reabrir solo si esta en la pagina local cargada
+            if (taladros.some(t => t.name === savedTaladroName)) {
+              handleSelectTaladro(savedTaladroName, false);
+            } else if (taladros.length > 0) {
+              handleSelectTaladro(taladros[0].name, false);
+            }
+          });
+      } else if (taladros.length > 0) {
         handleSelectTaladro(taladros[0].name, false);
       }
     }
   }, [taladros, activeTaladro]);
 
-  const fetchTaladros = async () => {
+  const fetchTaladros = async (
+    p?: number,
+    dr?: string,
+    term?: string,
+    globalSearch?: boolean,
+    adv?: { proyecto: string; geologo: string; diametro: string },
+  ) => {
     setDashboardLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/taladros`);
+      // Patrón GEMA-Mapeo: la paginación y los filtros viven en el servidor.
+      const params = buildDashboardQueryParams(dr, term, globalSearch, adv);
+      params.set('page', String(p || page));
+      params.set('page_size', String(pageSize));
+
+      const drActive = dr || activeDateRange;
+      const termActive = term !== undefined ? term : searchTerm;
+      const gSearch = globalSearch !== undefined ? globalSearch : isGlobalSearch;
+      const advActive = adv || advancedFilters;
+
+      const res = await fetch(`${API_BASE}/api/taladros?${params}`);
       if (res.ok) {
         const data = await res.json();
-        setTaladros(data);
+        setTaladros(data.items || []);
+        setServerTotalFiltered(data.total_filtered ?? (data.items || []).length);
+        setServerTotalPages(Math.max(1, data.total_pages || 1));
+        // KPIs filtrados (mismos filtros que la página)
+        fetchDashboardStats(drActive, termActive, gSearch, advActive);
         setSyncStatus('synced');
+        setSyncMessage('Conectado al servidor de base de datos.');
       } else {
         throw new Error("HTTP error " + res.status);
       }
@@ -619,7 +750,7 @@ export default function App() {
       setSyncStatus('offline');
       setSyncMessage("Servidor backend offline. Usando almacenamiento local temporal.");
 
-      // Load offline summaries from localStorage
+      // Load offline summaries from localStorage (cache completo para filtrar en memoria)
       const cached = localStorage.getItem('geolog_taladros_summaries');
       if (cached) {
         setTaladros(JSON.parse(cached));
@@ -681,7 +812,7 @@ export default function App() {
           });
         }
 
-        // Snapshot original de la BD (fuente de verdad para auditoría y dirty detection)
+        // Snapshot original de la BD (fuente de verdad para auditorÃ­a y dirty detection)
         const dbSnapshot = JSON.parse(JSON.stringify(data));
         const dbHash = computeTaladroHash(data);
         setDbSnapshotData(dbSnapshot);
@@ -792,7 +923,7 @@ export default function App() {
           diametro: "HQ3",
           inclinacion: -60.0,
           campana: "2026",
-          fecha_registro: new Date().toISOString().split('T')[0],
+          fecha_registro: toLocalDateStr(new Date()),
           collar_este_proyectado: 0,
           collar_norte_proyectado: 0,
           collar_cota_proyectado: 0,
@@ -823,6 +954,21 @@ export default function App() {
     }
   };
 
+  // Verificación de unicidad de nombre contra el servidor (patrón Mapeo ventanas-check).
+  // Fallback: lista local de la página actual si el servidor no responde.
+  const checkNameExists = useCallback(async (name: string): Promise<boolean> => {
+    const clean = name.trim().toUpperCase();
+    if (!clean) return false;
+    try {
+      const res = await fetch(`${API_BASE}/api/taladros/existe?name=${encodeURIComponent(clean)}`);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      return !!data.exists;
+    } catch (e) {
+      return taladros.some(t => t.name.toUpperCase() === clean);
+    }
+  }, [taladros]);
+
   const handleCreateTaladro = (newTaladro: Taladro, targetView: string = 'collar') => {
     // Solo guarda localmente — NO sube a BD hasta que el usuario presione Guardar
     localStorage.setItem(`geolog_taladro_${newTaladro.name}`, JSON.stringify(newTaladro));
@@ -848,20 +994,20 @@ export default function App() {
     setCurrentView(targetView);
   };
 
-  const handleRenameTaladro = (newName: string) => {
+  const handleRenameTaladro = async (newName: string) => {
     if (!activeTaladro) return;
     const oldName = activeTaladro.name;
     const trimmedNewName = newName.trim().toUpperCase();
     if (!trimmedNewName || oldName === trimmedNewName) return;
 
-    // VALIDACIÓN DE UNICIDAD: Verificar que el nuevo nombre no pertenezca a otro sondaje
-    const isDuplicate = taladros.some(t => t.name.toUpperCase() === trimmedNewName && t.name.toUpperCase() !== oldName.toUpperCase());
+    // VALIDACIÓN DE UNICIDAD: verificar contra el servidor (puede estar en cualquier página)
+    const isDuplicate = await checkNameExists(trimmedNewName);
     if (isDuplicate) {
       alert(`⚠️ El código de taladro '${trimmedNewName}' ya pertenece a otro sondaje registrado en el proyecto. No se permiten nombres duplicados.`);
       return;
     }
 
-    // Siempre usar activeTaladro como base (es el estado más reciente en RAM)
+    // Siempre usar activeTaladro como base (es el estado mÃ¡s reciente en RAM)
     const updatedTal = { ...activeTaladro, name: trimmedNewName };
     setActiveTaladro(updatedTal);
 
@@ -882,7 +1028,7 @@ export default function App() {
     // Mover en localStorage: escribir con nueva clave, borrar la vieja
     localStorage.setItem(`geolog_taladro_${trimmedNewName}`, JSON.stringify(updatedTal));
     localStorage.removeItem(`geolog_taladro_${oldName}`);
-    // El dirty state se recalcula automáticamente por el useEffect de hash
+    // El dirty state se recalcula automÃ¡ticamente por el useEffect de hash
   };
 
   const handleImportExcel = (importedRows: Corrida[], createNewWithName?: string) => {
@@ -894,7 +1040,7 @@ export default function App() {
         diametro: activeTaladro?.diametro || "HQ3",
         inclinacion: activeTaladro?.inclinacion || -60.0,
         campana: activeTaladro?.campana || "2026",
-        fecha_registro: new Date().toISOString().split('T')[0],
+        fecha_registro: toLocalDateStr(new Date()),
         collar_este_proyectado: 0.0,
         collar_norte_proyectado: 0.0,
         collar_cota_proyectado: 0.0,
@@ -911,7 +1057,7 @@ export default function App() {
         discontinuidades: [],
         ensayos_plt: []
       };
-      // Solo local — NO sube a BD (handleCreateTaladro ya no hace POST)
+      // Solo local â€” NO sube a BD (handleCreateTaladro ya no hace POST)
       handleCreateTaladro(newTal, 'lgg');
     } else {
       handleCorridasChange(importedRows);
@@ -936,7 +1082,7 @@ export default function App() {
           diametro: activeTaladro?.diametro || "HQ3",
           inclinacion: activeTaladro?.inclinacion || -60.0,
           campana: activeTaladro?.campana || "2026",
-          fecha_registro: new Date().toISOString().split('T')[0],
+          fecha_registro: toLocalDateStr(new Date()),
           collar_este_proyectado: 0.0,
           collar_norte_proyectado: 0.0,
           collar_cota_proyectado: 0.0,
@@ -1061,8 +1207,8 @@ export default function App() {
       let c_desde = r.corrida_desde !== undefined ? parseFloat(r.corrida_desde) || 0 : 0;
       let c_hasta = r.corrida_hasta !== undefined ? parseFloat(r.corrida_hasta) || 0 : 0;
 
-      // AUTOCOMPLETADO GEOLÓGICO:
-      // Se ignoran datos externos y se extrae la información del taladro actual
+      // AUTOCOMPLETADO GEOLÃ“GICO:
+      // Se ignoran datos externos y se extrae la informaciÃ³n del taladro actual
       let lito1 = 'MZB';
       let lito2 = '-';
       let lito3 = '-';
@@ -1075,7 +1221,7 @@ export default function App() {
         lito3 = (match.lito3 === "-1" || !match.lito3) ? "-" : match.lito3;
       }
 
-      // Se ejecuta la resolución en cascada geomecánica oficial
+      // Se ejecuta la resoluciÃ³n en cascada geomecÃ¡nica oficial
       const resCascade = resolveLithologyCascade(
         lito1,
         lito2,
@@ -1118,7 +1264,7 @@ export default function App() {
       }
 
       return {
-        fecha: r.fecha || new Date().toISOString().split('T')[0],
+        fecha: r.fecha || toLocalDateStr(new Date()),
         nro_muestra: r.nro_muestra || `M${(index + 1).toString().padStart(2, '0')}`,
         nro_caja: parseInt(r.nro_caja) || 1,
         from_m: from,
@@ -1157,13 +1303,12 @@ export default function App() {
   };
 
   const handleDeleteTaladro = async (name: string) => {
-    if (!confirm(`¿Está seguro de que desea eliminar permanentemente el taladro ${name}? Se borrará de la base de datos.`)) {
+    if (!confirm(`Â¿EstÃ¡ seguro de que desea eliminar permanentemente el taladro ${name}? Se borrarÃ¡ de la base de datos.`)) {
       return;
     }
 
     setSyncStatus('saving');
     const updatedSummaries = taladros.filter(t => t.name !== name);
-    setTaladros(updatedSummaries);
     localStorage.setItem('geolog_taladros_summaries', JSON.stringify(updatedSummaries));
     localStorage.removeItem(`geolog_taladro_${name}`);
 
@@ -1173,7 +1318,7 @@ export default function App() {
       });
       if (res.ok) {
         setSyncStatus('synced');
-        setSyncMessage(`Taladro ${name} eliminado con éxito del servidor.`);
+        setSyncMessage(`Taladro ${name} eliminado con Ã©xito del servidor.`);
       } else {
         throw new Error();
       }
@@ -1187,6 +1332,8 @@ export default function App() {
       setDbSnapshotHash(null);
     }
     setCurrentView('dashboard');
+    // Refetch de la página actual (paginación server-side)
+    fetchTaladros(page, activeDateRange, searchTerm, isGlobalSearch, advancedFilters);
   };
 
   const handleSaveActive = async () => {
@@ -1198,7 +1345,7 @@ export default function App() {
     // 1. Actualizar localStorage como respaldo de seguridad
     localStorage.setItem(`geolog_taladro_${activeTaladro.name}`, JSON.stringify(activeTaladro));
 
-    // 2. Actualizar summaries
+    // 2. Actualizar summaries (solo cache offline; la lista online la trae el servidor)
     const summaryIndex = taladros.findIndex(t => t.name === activeTaladro.name);
     if (summaryIndex !== -1) {
       const updatedSummaries = [...taladros];
@@ -1207,12 +1354,11 @@ export default function App() {
         corridas_count: activeTaladro.corridas.length,
         surveys_count: activeTaladro.surveys.length
       };
-      setTaladros(updatedSummaries);
       localStorage.setItem('geolog_taladros_summaries', JSON.stringify(updatedSummaries));
     }
 
     try {
-      // 3. POST atómico al backend (todo o nada)
+      // 3. POST atÃ³mico al backend (todo o nada)
       const res = await fetch(`${API_BASE}/api/taladros`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1231,7 +1377,7 @@ export default function App() {
           localStorage.removeItem(`geolog_taladro_${originalName}`);
         }
 
-        // 5. Calcular auditoría de cambios en comparación con el snapshot original
+        // 5. Calcular auditorÃ­a de cambios en comparaciÃ³n con el snapshot original
         const diffSummary = computeTaladroDiff(dbSnapshotData, activeTaladro);
 
         // 6. Actualizar snapshot hash y snapshot data
@@ -1244,9 +1390,9 @@ export default function App() {
         setOriginalName(activeTaladro.name);
         setSyncStatus('synced');
         updateUnsavedTracker(activeTaladro.name, false);
-        setSyncMessage("Cambios guardados y auditados con éxito en SQL Server.");
+        setSyncMessage("Cambios guardados y auditados con Ã©xito en SQL Server.");
 
-        // 7. Modal de éxito con reporte de auditoría
+        // 7. Modal de Ã©xito con reporte de auditorÃ­a
         setSaveResultModal({
           show: true,
           success: true,
@@ -1255,6 +1401,9 @@ export default function App() {
             : `Sincronización completada para ${activeTaladro.name}.`,
           diffSummary
         });
+
+        // Refetch de la página actual (paginación server-side)
+        fetchTaladros(page, activeDateRange, searchTerm, isGlobalSearch, advancedFilters);
       } else {
         // Error HTTP del servidor (ej. 500)
         const errorData = await res.json().catch(() => ({ detail: "Error interno del servidor." }));
@@ -1264,24 +1413,24 @@ export default function App() {
         setSaveResultModal({
           show: true,
           success: false,
-          message: `No se pudo guardar el taladro ${activeTaladro.name}. Ningún registro fue modificado en la base de datos.`,
+          message: `No se pudo guardar el taladro ${activeTaladro.name}. NingÃºn registro fue modificado en la base de datos.`,
           details: detail
         });
       }
     } catch (e) {
-      // Error de red / conexión
+      // Error de red / conexiÃ³n
       setSyncStatus('unsaved');
-      setSyncMessage("Sin conexión con el servidor.");
+      setSyncMessage("Sin conexiÃ³n con el servidor.");
       setSaveResultModal({
         show: true,
         success: false,
-        message: `No se pudo establecer conexión con el servidor de base de datos.`,
-        details: "Verifique que el backend esté corriendo y que la red esté disponible. Sus datos están preservados en almacenamiento local."
+        message: `No se pudo establecer conexiÃ³n con el servidor de base de datos.`,
+        details: "Verifique que el backend estÃ© corriendo y que la red estÃ© disponible. Sus datos estÃ¡n preservados en almacenamiento local."
       });
     }
   };
 
-  // ─── MANEJADOR DE CONFIRMACIÓN DE GUARDADO (DESDE MODAL) ─────────────────
+  // â”€â”€â”€ MANEJADOR DE CONFIRMACIÃ“N DE GUARDADO (DESDE MODAL) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleConfirmSave = async (scope: 'active' | 'all' = 'active') => {
     setShowSaveConfirmModal(false);
     setIsLoadingTaladro(true);
@@ -1352,6 +1501,8 @@ export default function App() {
             ? `Se guardaron exitosamente ${savedCount} sondaje(s) en SQL Server.`
             : `Sincronización parcial: ${savedCount} guardados, ${errorsCount} con errores.`
         });
+        // Refetch de la página actual (paginación server-side)
+        fetchTaladros(page, activeDateRange, searchTerm, isGlobalSearch, advancedFilters);
       } else {
         // Alcance: Solo Taladro Activo
         await handleSaveActive();
@@ -1361,7 +1512,7 @@ export default function App() {
     }
   };
 
-  // ─── DESCHACAR CAMBIOS NO GUARDADOS (REVERT A BASELINE DE BD) ─────────────
+  // â”€â”€â”€ DESCHACAR CAMBIOS NO GUARDADOS (REVERT A BASELINE DE BD) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleConfirmDiscard = (scope: 'active' | 'all' = 'active') => {
     if (!activeTaladro) return;
     const name = activeTaladro.name;
@@ -1400,38 +1551,39 @@ export default function App() {
         setActiveTaladro(restored);
         localStorage.setItem(`geolog_taladro_${name}`, JSON.stringify(restored));
         setSyncStatus('synced');
-        setSyncMessage(`Cambios descartados. Se restauró la versión de la base de datos para ${name}.`);
+        setSyncMessage(`Cambios descartados. Se restaurÃ³ la versiÃ³n de la base de datos para ${name}.`);
       } else {
         localStorage.removeItem(`geolog_taladro_${name}`);
         const updatedSummaries = taladros.filter(t => t.name !== name);
-        setTaladros(updatedSummaries);
         localStorage.setItem('geolog_taladros_summaries', JSON.stringify(updatedSummaries));
 
         setActiveTaladro(null);
         setDbSnapshotHash(null);
         setCurrentView('dashboard');
         setSyncMessage(`Taladro borrador ${name} descartado.`);
+        // Refetch de la página actual (paginación server-side)
+        fetchTaladros(page, activeDateRange, searchTerm, isGlobalSearch, advancedFilters);
       }
     }
 
     setShowDiscardModal(false);
   };
 
-  // ─── DIRTY STATE DETECTION CON SNAPSHOT HASH (debounced 300ms) ─────────────
+  // â”€â”€â”€ DIRTY STATE DETECTION CON SNAPSHOT HASH (debounced 300ms) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   //
   // Estrategia:
-  //   1. Al cargar de BD → se guarda dbSnapshotHash = hash del estado original
-  //   2. Cada cambio en activeTaladro → debounce 300ms → recalcula hash actual
-  //   3. Si hash actual === dbSnapshotHash → 'synced' (verde)
-  //   4. Si hash actual !== dbSnapshotHash → 'unsaved' (amarillo)
-  //   5. Si dbSnapshotHash === null → taladro nuevo, siempre 'unsaved'
-  //   6. Si el usuario revierte cambios al original → hashes coinciden → verde
+  //   1. Al cargar de BD â†’ se guarda dbSnapshotHash = hash del estado original
+  //   2. Cada cambio en activeTaladro â†’ debounce 300ms â†’ recalcula hash actual
+  //   3. Si hash actual === dbSnapshotHash â†’ 'synced' (verde)
+  //   4. Si hash actual !== dbSnapshotHash â†’ 'unsaved' (amarillo)
+  //   5. Si dbSnapshotHash === null â†’ taladro nuevo, siempre 'unsaved'
+  //   6. Si el usuario revierte cambios al original â†’ hashes coinciden â†’ verde
   //
   // Esto reemplaza el sistema anterior de setSyncStatus('unsaved') manual
   // en cada handler. Ahora los handlers solo actualizan el estado y el
-  // dirty detection es automático y centralizado.
+  // dirty detection es automÃ¡tico y centralizado.
 
-  // ─── SINCRONIZACIÓN AUTOMÁTICA DE SNAPSHOT AL CAMBIAR DE TALADRO ─────────
+  // â”€â”€â”€ SINCRONIZACIÃ“N AUTOMÃTICA DE SNAPSHOT AL CAMBIAR DE TALADRO â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     if (!activeTaladro) {
       if (dbSnapshotData !== null) setDbSnapshotData(null);
@@ -1488,11 +1640,11 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [activeTaladro, dbSnapshotHash, syncStatus, updateUnsavedTracker]);
 
-  // ─── AUTO-SAVE A LOCALSTORAGE (debounced 1s) ──────────────────────────────
+  // â”€â”€â”€ AUTO-SAVE A LOCALSTORAGE (debounced 1s) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   //
-  // Guarda una copia de trabajo en localStorage automáticamente.
-  // Protege contra pérdida de datos por crash del navegador o cierre accidental.
-  // Se ejecuta 1 segundo después del último cambio para no saturar I/O.
+  // Guarda una copia de trabajo en localStorage automÃ¡ticamente.
+  // Protege contra pÃ©rdida de datos por crash del navegador o cierre accidental.
+  // Se ejecuta 1 segundo despuÃ©s del Ãºltimo cambio para no saturar I/O.
 
   useEffect(() => {
     if (!activeTaladro) return;
@@ -1502,10 +1654,10 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [activeTaladro]);
 
-  // ─── VALIDACIÓN QA/QC CON DEBOUNCE (750ms) ───────────────────────────────
+  // â”€â”€â”€ VALIDACIÃ“N QA/QC CON DEBOUNCE (750ms) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   //
-  // Las validaciones NO corren mientras el usuario está escribiendo.
-  // Solo se ejecutan 750ms después del último cambio en el estado.
+  // Las validaciones NO corren mientras el usuario estÃ¡ escribiendo.
+  // Solo se ejecutan 750ms despuÃ©s del Ãºltimo cambio en el estado.
 
   const [validationSnapshot, setValidationSnapshot] = useState<typeof activeTaladro>(null);
 
@@ -1543,14 +1695,14 @@ export default function App() {
       validationSnapshot.ensayos_plt || [],
       true // evaluateAll: siempre evaluar todo (red de seguridad)
     );
-    // Campos obligatorios (VACIO) — filas vacantes ignoradas
+    // Campos obligatorios (VACIO) â€” filas vacantes ignoradas
     const vacios = toVacioAlerts(validateLogueoMandatory(validationSnapshot));
     return [...qaqc, ...vacios];
   }, [validationSnapshot, touchedTick]);
 
   // Mapped field focusing logic from ValidationPanel
   const handleFocusField = (fieldId: string) => {
-    // 1. Redireccionar de inmediato a la pestaña destino
+    // 1. Redireccionar de inmediato a la pestaÃ±a destino
     let targetView = 'lgg';
     let idPrefix = 'lgg-cell';
     const isStruct = fieldId.startsWith('struct-');
@@ -1570,7 +1722,7 @@ export default function App() {
 
     setCurrentView(targetView);
 
-    // 2. Extraer índice y campo de forma genérica (ej. "plt-from_m-12" -> index: 12, fieldName: "from_m")
+    // 2. Extraer Ã­ndice y campo de forma genÃ©rica (ej. "plt-from_m-12" -> index: 12, fieldName: "from_m")
     const parts = fieldId.split('-');
     let index: number | null = null;
     let fieldName = '';
@@ -1589,7 +1741,7 @@ export default function App() {
       }
     }
 
-    // Sincronizar la selección global de fila de inmediato para habilitar los inputs correspondientes
+    // Sincronizar la selecciÃ³n global de fila de inmediato para habilitar los inputs correspondientes
     if (index !== null) {
       setSelectedRowIndex(index);
     }
@@ -1609,7 +1761,7 @@ export default function App() {
         const tdElement = document.getElementById(`${idPrefix}-td-${index}-${fieldName}`);
         if (tdElement) {
           tdElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-          tdElement.click(); // Activa la fila y enfoca automáticamente
+          tdElement.click(); // Activa la fila y enfoca automÃ¡ticamente
         }
       }
     }, 100);
@@ -1621,7 +1773,7 @@ export default function App() {
     const newName = updatedCollar.name.trim().toUpperCase();
 
     if (oldName !== newName && newName.length > 0) {
-      // Siempre usar activeTaladro como base (estado más reciente en RAM)
+      // Siempre usar activeTaladro como base (estado mÃ¡s reciente en RAM)
       // NUNCA usar datos del cache localStorage que pueden estar desactualizados
       const updatedTal = { ...activeTaladro, ...updatedCollar, name: newName };
       localStorage.setItem(`geolog_taladro_${newName}`, JSON.stringify(updatedTal));
@@ -1644,25 +1796,25 @@ export default function App() {
       localStorage.setItem('geolog_taladros_summaries', JSON.stringify(updatedSummaries));
 
       setActiveTaladro(updatedTal);
-      // Dirty state se recalcula automáticamente por el useEffect de hash
+      // Dirty state se recalcula automÃ¡ticamente por el useEffect de hash
     } else {
       setActiveTaladro({
         ...activeTaladro,
         ...updatedCollar
       });
-      // Dirty state se recalcula automáticamente por el useEffect de hash
+      // Dirty state se recalcula automÃ¡ticamente por el useEffect de hash
     }
   };
 
   const handleSurveysChange = (updatedSurveys: Survey[]) => {
     if (!activeTaladro) return;
-    if (activeTaladro.surveys === updatedSurveys) return; // Comparación por referencia O(1)
+    if (activeTaladro.surveys === updatedSurveys) return; // ComparaciÃ³n por referencia O(1)
     setActiveTaladro({ ...activeTaladro, surveys: updatedSurveys });
   };
 
   const handleCorridasChange = (updatedCorridas: Corrida[]) => {
     if (!activeTaladro) return;
-    if (activeTaladro.corridas === updatedCorridas) return; // Comparación por referencia O(1)
+    if (activeTaladro.corridas === updatedCorridas) return; // ComparaciÃ³n por referencia O(1)
 
     // Auto-update structural discontinuities on depth changes
     const updatedDiscs = activeTaladro.discontinuidades.map(disc => {
@@ -1689,13 +1841,13 @@ export default function App() {
 
   const handleDiscontinuidadesChange = (updatedDiscs: Discontinuidad[]) => {
     if (!activeTaladro) return;
-    if (activeTaladro.discontinuidades === updatedDiscs) return; // Comparación por referencia O(1)
+    if (activeTaladro.discontinuidades === updatedDiscs) return; // ComparaciÃ³n por referencia O(1)
     setActiveTaladro({ ...activeTaladro, discontinuidades: updatedDiscs });
   };
 
   const handleEnsayosPltChange = (updatedPlts: EnsayoPlt[]) => {
     if (!activeTaladro) return;
-    if (activeTaladro.ensayos_plt === updatedPlts) return; // Comparación por referencia O(1)
+    if (activeTaladro.ensayos_plt === updatedPlts) return; // ComparaciÃ³n por referencia O(1)
     setActiveTaladro({ ...activeTaladro, ensayos_plt: updatedPlts });
   };
 
@@ -1766,12 +1918,11 @@ export default function App() {
                 activeDateRange={activeDateRange}
                 onSearchSubmit={handleSearchSubmit}
                 onClearSearch={handleClearSearch}
-                onPageChange={(newPage) => setPage(newPage)}
-                onPageSizeChange={(newSize) => {
-                  setPageSize(newSize);
-                  setPage(1);
-                }}
+                onPageChange={handlePageChange}
+                onPageSizeChange={handlePageSizeChange}
                 onFilterChange={handleFilterChange}
+                onAdvancedFiltersChange={handleAdvancedFiltersChange}
+                advancedFilters={advancedFilters}
                 onSelectTaladro={handleSelectTaladro}
                 onCreateTaladro={handleCreateTaladro}
                 onDeleteTaladro={handleDeleteTaladro}
@@ -1780,7 +1931,7 @@ export default function App() {
             </div>
           )}
 
-          {/* 2. VISTAS CORE EN MODO KEEP-ALIVE (Toggles CSS instantáneos sin desmontar DOM) */}
+          {/* 2. VISTAS CORE EN MODO KEEP-ALIVE (Toggles CSS instantÃ¡neos sin desmontar DOM) */}
           {activeTaladro && (
             <>
               {/* Vista Collar y Survey */}
@@ -1792,11 +1943,12 @@ export default function App() {
                   onCollarChange={handleCollarChange}
                   onSurveysChange={handleSurveysChange}
                   existingTaladrosNames={taladros.map(t => t.name)}
+                  checkNameExists={checkNameExists}
                   availableCampanas={availableCampanas}
                 />
               </div>
 
-              {/* Vista Logueo Geotécnico General (LGG) */}
+              {/* Vista Logueo GeotÃ©cnico General (LGG) */}
               <div className={currentView === 'lgg' ? "flex-1 flex flex-col min-h-0" : "hidden"}>
                 <LggView
                   corridas={activeTaladro.corridas}
@@ -1808,6 +1960,7 @@ export default function App() {
                   darkMode={darkMode}
                   activeTaladroName={activeTaladro.name}
                   existingTaladrosNames={taladros.map(t => t.name)}
+                  checkNameExists={checkNameExists}
                   activeTaladroGeologo={activeTaladro.geologo}
                   activeTaladroFecha={activeTaladro.fecha_registro}
                   sidebarCollapsed={sidebarCollapsed}
@@ -1834,7 +1987,7 @@ export default function App() {
                   darkMode={darkMode}
                   sidebarCollapsed={sidebarCollapsed}
                   onFocusField={handleFocusField}
-                  // --- MEJORA: Sincronizar selección de fila con App.tsx ---
+                  // --- MEJORA: Sincronizar selecciÃ³n de fila con App.tsx ---
                   selectedRowIndex={selectedRowIndex}
                   onSelectRow={setSelectedRowIndex}
                 />
@@ -1850,7 +2003,7 @@ export default function App() {
                   alerts={activeAlerts}
                   onImportExcel={handleImportPltExcelData}
                   darkMode={darkMode}
-                  // --- MEJORA: Sincronizar selección de fila con App.tsx ---
+                  // --- MEJORA: Sincronizar selecciÃ³n de fila con App.tsx ---
                   selectedRowIndex={selectedRowIndex}
                   onSelectRow={setSelectedRowIndex}
                 />
@@ -1895,11 +2048,11 @@ export default function App() {
             <div className="flex-1 overflow-y-auto">
               <div className="glass-panel p-6 rounded-xl border border-navy-800 space-y-4 max-w-xl mx-auto text-slate-300">
                 <h2 className="text-lg font-bold text-slate-100 uppercase tracking-wide border-b border-navy-800 pb-2">
-                  Configuración de Parámetros
+                  ConfiguraciÃ³n de ParÃ¡metros
                 </h2>
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between items-center py-2 border-b border-navy-900/60">
-                    <span>Campaña</span>
+                    <span>CampaÃ±a</span>
                     <input
                       type="text"
                       value={activeTaladro.campana}
@@ -1914,12 +2067,12 @@ export default function App() {
                       onChange={(e) => handleCollarChange({ ...activeTaladro, turno: e.target.value })}
                       className="bg-navy-900 border border-navy-700 rounded px-2 py-1 text-slate-200 focus:outline-none"
                     >
-                      <option value="D">Día</option>
+                      <option value="D">DÃ­a</option>
                       <option value="N">Noche</option>
                     </select>
                   </div>
                   <div className="flex justify-between items-center py-2">
-                    <span>Diámetro Predeterminado</span>
+                    <span>DiÃ¡metro Predeterminado</span>
                     <select
                       value={activeTaladro.diametro}
                       onChange={(e) => handleCollarChange({ ...activeTaladro, diametro: e.target.value })}
@@ -1950,19 +2103,19 @@ export default function App() {
                 </div>
                 <div className="space-y-2">
                   <h2 className="text-xl font-bold text-slate-100 uppercase tracking-wider">
-                    Importación y Exportación de Datos
+                    ImportaciÃ³n y ExportaciÃ³n de Datos
                   </h2>
                   <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-500 dark:text-cyan-400 text-xs font-bold uppercase tracking-wider">
                     <Construction size={12} className="animate-spin" />
-                    Módulo En Progreso / In Progress
+                    MÃ³dulo En Progreso / In Progress
                   </div>
                 </div>
                 <p className="text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
-                  Este módulo facilitará la importación directa de datos históricos en formato BCP y la exportación unificada de registros a plantillas estructuradas de geotecnia minera para software especializado como <span className="text-slate-200 font-semibold">Leapfrog</span>, <span className="text-slate-200 font-semibold">gINT</span> y <span className="text-slate-200 font-semibold">Vulcan</span>.
+                  Este mÃ³dulo facilitarÃ¡ la importaciÃ³n directa de datos histÃ³ricos en formato BCP y la exportaciÃ³n unificada de registros a plantillas estructuradas de geotecnia minera para software especializado como <span className="text-slate-200 font-semibold">Leapfrog</span>, <span className="text-slate-200 font-semibold">gINT</span> y <span className="text-slate-200 font-semibold">Vulcan</span>.
                 </p>
                 <div className="pt-4 border-t border-navy-800/60 max-w-md mx-auto">
                   <p className="text-xs text-slate-500">
-                    La conexión duplicada con SQL Server local se encuentra activa. Las rutinas de persistencia normalizadas ya están preparadas en el backend API.
+                    La conexiÃ³n duplicada con SQL Server local se encuentra activa. Las rutinas de persistencia normalizadas ya estÃ¡n preparadas en el backend API.
                   </p>
                 </div>
               </div>
@@ -1970,7 +2123,7 @@ export default function App() {
           )}
         </div>
 
-        {/* Floating validation QA/QC panel (handles its own positioning left/right) — hidden on Carga para Revisión */}
+        {/* Floating validation QA/QC panel (handles its own positioning left/right) â€” hidden on Carga para RevisiÃ³n */}
         {activeTaladro && currentView !== 'revision' && (
           <ValidationPanel
             alerts={activeAlerts}
@@ -2013,7 +2166,7 @@ export default function App() {
         onClose={() => setShowDiscardModal(false)}
       />
 
-      {/* Modal de pre-confirmación de guardado */}
+      {/* Modal de pre-confirmaciÃ³n de guardado */}
       <SaveConfirmModal
         show={showSaveConfirmModal}
         activeTaladroName={activeTaladro?.name || ''}
@@ -2024,19 +2177,19 @@ export default function App() {
         onClose={() => setShowSaveConfirmModal(false)}
       />
 
-      {/* Modal de Carga / Bloqueo a pantalla completa durante la sincronización */}
+      {/* Modal de Carga / Bloqueo a pantalla completa durante la sincronizaciÃ³n */}
       {isLoadingTaladro && (
         <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-navy-950/85 backdrop-blur-md animate-fade-in pointer-events-auto cursor-wait">
           <div className="glass-panel p-8 rounded-2xl border border-navy-800 flex flex-col items-center gap-4 bg-navy-900/95 text-center shadow-2xl max-w-sm">
             <div className="relative w-16 h-16 flex items-center justify-center">
-              {/* Dos spinners concéntricos en dirección opuesta */}
+              {/* Dos spinners concÃ©ntricos en direcciÃ³n opuesta */}
               <div className="absolute inset-0 rounded-full border-4 border-cyan-500/10 border-t-cyan-500 animate-spin" />
               <div className="absolute inset-2 rounded-full border-4 border-emerald-500/10 border-b-emerald-500 animate-spin [animation-duration:1.2s] [animation-direction:reverse]" />
             </div>
             <div className="space-y-1.5">
               <h3 className="text-xs font-black text-slate-100 uppercase tracking-wider">Sincronizando con SQL Server</h3>
               <p className="text-xs text-slate-400 font-semibold leading-relaxed">
-                Guardando datos en la base de datos oficial. Por favor no cambie de pestaña ni cierre la aplicación.
+                Guardando datos en la base de datos oficial. Por favor no cambie de pestaÃ±a ni cierre la aplicaciÃ³n.
               </p>
             </div>
           </div>

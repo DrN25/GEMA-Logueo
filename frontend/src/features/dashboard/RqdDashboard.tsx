@@ -17,7 +17,7 @@ interface Props {
   onSelectTaladro: (name: string) => void;
 }
 
-export default function RqdDashboard({ activeTaladro, taladros }: Props) {
+export default function RqdDashboard({ activeTaladro, taladros: _taladros }: Props) {
   // Pestaña activa por defecto: correlaciones (Priest & Bieniawski)
   const [activeTab, setActiveTab] = useState<'correlaciones' | 'propuesta' | 'lito_rqd' | 'nivel_rqd'>('correlaciones');
 
@@ -97,7 +97,8 @@ export default function RqdDashboard({ activeTaladro, taladros }: Props) {
       }
     };
     fetchAllData();
-  }, [taladros]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const toggleDrill = useCallback((name: string) => {
     setSelectedDrills(prev => {

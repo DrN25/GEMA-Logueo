@@ -1,10 +1,10 @@
 import math
 import re
-from datetime import date, datetime
-from fastapi import APIRouter, HTTPException, Depends
+from datetime import date, datetime, timedelta
+from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from typing import List
+from typing import List, Optional
 
 from app.schemas import TaladroSchema, CorridaSchema, SurveySchema, DiscontinuidadSchema, EnsayoPltSchema
 from app.database import get_db
@@ -90,41 +90,93 @@ def find_corrida_num(profundidad, de, a, corridas) -> int:
 # ──────────────────────────────────────────────────────────────────────────────
 
 @router.get("/dashboard-stats")
-def get_dashboard_stats(db: Session = Depends(get_db)):
-    """Calcula estadísticas geomecánicas reales directo de SQL Server para el Dashboard de Logueo."""
-    try:
-        total_sondajes = db.query(models.Sondaje).count()
+def get_dashboard_stats(
+    fecha_desde: Optional[str] = Query(None, description="YYYY-MM-DD"),
+    fecha_hasta: Optional[str] = Query(None, description="YYYY-MM-DD"),
+    q: Optional[str] = Query(None, description="Buscar por código de sondaje"),
+    search_global: bool = Query(False, description="Ignorar filtro de fecha"),
+    proyecto: Optional[str] = Query(None),
+    geologo: Optional[str] = Query(None),
+    diametro: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Calcula estadísticas geomecánicas reales directo de SQL Server para el Dashboard.
 
-        # Perforación acumulada total y perforación de HOY
+    Acepta los MISMOS filtros que GET /api/taladros (paginado) para que los KPIs
+    reflejen el subconjunto filtrado activo (patrón Mapeo: data.kpis).
+    """
+    try:
+        # ── Subconjunto de sondajes filtrados (misma lógica que el listado) ──
+        sondaje_q = db.query(models.Sondaje.SondajeID)
+
+        if not search_global:
+            if fecha_desde:
+                try:
+                    desde = datetime.strptime(fecha_desde, "%Y-%m-%d")
+                    sondaje_q = sondaje_q.filter(models.Sondaje.FechaRegistro >= desde)
+                except ValueError:
+                    pass
+            if fecha_hasta:
+                try:
+                    hasta = datetime.strptime(fecha_hasta, "%Y-%m-%d") + timedelta(days=1)
+                    sondaje_q = sondaje_q.filter(models.Sondaje.FechaRegistro < hasta)
+                except ValueError:
+                    pass
+
+        if q and q.strip():
+            sondaje_q = sondaje_q.filter(models.Sondaje.CodigoSondaje.ilike(f"%{q.strip()}%"))
+        if proyecto and proyecto.strip():
+            sondaje_q = sondaje_q.filter(models.Sondaje.Proyecto.ilike(f"%{proyecto.strip()}%"))
+        if geologo and geologo.strip():
+            sondaje_q = sondaje_q.filter(models.Sondaje.Geotecnico.ilike(f"%{geologo.strip()}%"))
+        if diametro and diametro.strip():
+            sondaje_q = sondaje_q.filter(models.Sondaje.DiametroPerfora.ilike(f"%{diametro.strip()}%"))
+
+        total_sondajes = sondaje_q.count()
+
+        lgg_q = db.query(models.LogueoGeotecnicoGeneral).filter(
+            models.LogueoGeotecnicoGeneral.SondajeID.in_(sondaje_q)
+        )
+
+        # Perforación acumulada total y perforación de HOY (del subconjunto filtrado)
         perf_total_raw = db.query(
             func.sum(models.LogueoGeotecnicoGeneral.IntervaloA - models.LogueoGeotecnicoGeneral.IntervaloDe)
+        ).filter(
+            models.LogueoGeotecnicoGeneral.SondajeID.in_(sondaje_q)
         ).scalar()
         perf_total = float(perf_total_raw) if perf_total_raw is not None else 0.0
 
         today_start = datetime.combine(date.today(), datetime.min.time())
         today_end = datetime.combine(date.today(), datetime.max.time())
-        
+
         perf_hoy_raw = db.query(
             func.sum(models.LogueoGeotecnicoGeneral.IntervaloA - models.LogueoGeotecnicoGeneral.IntervaloDe)
         ).filter(
+            models.LogueoGeotecnicoGeneral.SondajeID.in_(sondaje_q),
             models.LogueoGeotecnicoGeneral.FechaRegistro >= today_start,
             models.LogueoGeotecnicoGeneral.FechaRegistro <= today_end
         ).scalar()
         perf_hoy = float(perf_hoy_raw) if perf_hoy_raw is not None else 0.0
 
-        # RMR89 Promedio
-        rmr_avg_raw = db.query(func.avg(models.ValidacionRMR.RMR89_Total)).scalar()
+        # RMR89 Promedio (del subconjunto filtrado)
+        rmr_avg_raw = db.query(func.avg(models.ValidacionRMR.RMR89_Total)).filter(
+            models.ValidacionRMR.SondajeID.in_(sondaje_q)
+        ).scalar()
         rmr_avg = float(rmr_avg_raw) if rmr_avg_raw is not None else 0.0
 
         # RQD % Promedio: Suma(Fragmentos>=10cm) / Suma(Avance) * 100
         rqd_avg = 0.0
-        tot_rqd_m_raw = db.query(func.sum(models.LogueoGeotecnicoGeneral.SumaFragmentos10cm)).scalar()
+        tot_rqd_m_raw = db.query(func.sum(models.LogueoGeotecnicoGeneral.SumaFragmentos10cm)).filter(
+            models.LogueoGeotecnicoGeneral.SondajeID.in_(sondaje_q)
+        ).scalar()
         tot_rqd_m = float(tot_rqd_m_raw) if tot_rqd_m_raw is not None else 0.0
         if perf_total > 0.0:
             rqd_avg = min(100.0, max(0.0, (tot_rqd_m / perf_total) * 100.0))
 
-        # Geólogo / Mapeador más reciente
-        last_sondaje = db.query(models.Sondaje).order_by(models.Sondaje.FechaRegistro.desc()).first()
+        # Geólogo / Mapeador más reciente (del subconjunto filtrado)
+        last_sondaje = db.query(models.Sondaje).filter(
+            models.Sondaje.SondajeID.in_(sondaje_q)
+        ).order_by(models.Sondaje.FechaRegistro.desc()).first()
         last_geologo = last_sondaje.Geotecnico if last_sondaje and last_sondaje.Geotecnico else "RD/RB"
 
         return {
@@ -147,35 +199,122 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
         }
 
 @router.get("")
-def list_taladros(db: Session = Depends(get_db)):
-    """Retorna un listado resumido de todos los sondajes cargados en GEMA."""
-    try:
-        sondajes = db.query(models.Sondaje).all()
-        results = []
-        
-        for s in sondajes:
-            collar = s.collar
-            
-            # Metraje perforado total acumulado por este sondaje en LGG
-            perf_total = db.query(
-                func.sum(models.LogueoGeotecnicoGeneral.IntervaloA - models.LogueoGeotecnicoGeneral.IntervaloDe)
-            ).filter_by(SondajeID=s.SondajeID).scalar() or 0.0
+def list_taladros(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=200),
+    fecha_desde: Optional[str] = Query(None, description="YYYY-MM-DD"),
+    fecha_hasta: Optional[str] = Query(None, description="YYYY-MM-DD"),
+    q: Optional[str] = Query(None, description="Buscar por código de sondaje"),
+    search_global: bool = Query(False, description="Ignorar filtro de fecha y buscar en todo el historial"),
+    proyecto: Optional[str] = Query(None),
+    geologo: Optional[str] = Query(None),
+    diametro: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Listado PAGINADO de sondajes con filtros en SQL (patrón GEMA-Mapeo).
 
+    Devuelve solo la página solicitada: {items, total_filtered, total_pages, page, page_size}.
+    Los conteos (corridas, surveys) y el metraje total se calculan con subqueries
+    agregadas (1 sola query, sin N+1).
+    """
+    try:
+        # ── Agregados en una sola consulta (elimina el N+1 del listado anterior) ──
+        lgg_agg = db.query(
+            models.LogueoGeotecnicoGeneral.SondajeID.label("sid"),
+            func.sum(
+                models.LogueoGeotecnicoGeneral.IntervaloA - models.LogueoGeotecnicoGeneral.IntervaloDe
+            ).label("perf_total"),
+            func.count().label("corridas_count"),
+        ).group_by(models.LogueoGeotecnicoGeneral.SondajeID).subquery()
+
+        survey_agg = db.query(
+            models.Survey.SondajeID.label("sid"),
+            func.count().label("surveys_count"),
+        ).group_by(models.Survey.SondajeID).subquery()
+
+        query = (
+            db.query(
+                models.Sondaje,
+                lgg_agg.c.perf_total,
+                lgg_agg.c.corridas_count,
+                survey_agg.c.surveys_count,
+            )
+            .outerjoin(lgg_agg, lgg_agg.c.sid == models.Sondaje.SondajeID)
+            .outerjoin(survey_agg, survey_agg.c.sid == models.Sondaje.SondajeID)
+        )
+
+        # ── Filtros (search_global=true ignora el rango de fechas, como Mapeo) ──
+        if not search_global:
+            if fecha_desde:
+                try:
+                    desde = datetime.strptime(fecha_desde, "%Y-%m-%d")
+                    query = query.filter(models.Sondaje.FechaRegistro >= desde)
+                except ValueError:
+                    pass
+            if fecha_hasta:
+                try:
+                    hasta = datetime.strptime(fecha_hasta, "%Y-%m-%d") + timedelta(days=1)
+                    query = query.filter(models.Sondaje.FechaRegistro < hasta)
+                except ValueError:
+                    pass
+
+        if q and q.strip():
+            query = query.filter(models.Sondaje.CodigoSondaje.ilike(f"%{q.strip()}%"))
+
+        if proyecto and proyecto.strip():
+            query = query.filter(models.Sondaje.Proyecto.ilike(f"%{proyecto.strip()}%"))
+        if geologo and geologo.strip():
+            query = query.filter(models.Sondaje.Geotecnico.ilike(f"%{geologo.strip()}%"))
+        if diametro and diametro.strip():
+            query = query.filter(models.Sondaje.DiametroPerfora.ilike(f"%{diametro.strip()}%"))
+
+        # ── Total + paginación ──
+        total_filtered = query.count()
+        total_pages = max(1, (total_filtered + page_size - 1) // page_size)
+
+        items = (
+            query.order_by(models.Sondaje.FechaRegistro.desc(), models.Sondaje.SondajeID.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+            .all()
+        )
+
+        results = []
+        for s, perf_total, corridas_count, surveys_count in items:
             results.append({
                 "name": s.CodigoSondaje,
-                "proyecto": s.Spacer if hasattr(s, 'Spacer') else (s.Spacer if hasattr(s, 'Spacer') else (s.Proyecto if s.Proyecto else "Proyecto A")),
-                "geologo": s.Geotecnico if s.Geotecnico else "RD/RB",
-                "diametro": s.DiametroPerfora if s.DiametroPerfora else "HQ3",
-                "inclinacion": s.InclinacionTaladro if s.InclinacionTaladro else -60.0,
-                "fecha_registro": s.FechaRegistro.strftime("%Y-%m-%d") if s.FechaRegistro else "2026-06-29",
-                "corridas_count": db.query(models.LogueoGeotecnicoGeneral).filter_by(SondajeID=s.SondajeID).count(),
-                "surveys_count": db.query(models.Survey).filter_by(SondajeID=s.SondajeID).count(),
-                "perf_total": round(float(perf_total), 2)
+                "proyecto": s.Proyecto or "Proyecto A",
+                "geologo": s.Geotecnico or "RD/RB",
+                "diametro": s.DiametroPerfora or "HQ3",
+                "inclinacion": float(s.InclinacionTaladro) if s.InclinacionTaladro is not None else -60.0,
+                "fecha_registro": s.FechaRegistro.strftime("%Y-%m-%d") if s.FechaRegistro else "",
+                "corridas_count": corridas_count or 0,
+                "surveys_count": surveys_count or 0,
+                "perf_total": round(float(perf_total or 0.0), 2)
             })
-        return results
+
+        return {
+            "items": results,
+            "total_filtered": total_filtered,
+            "total_pages": total_pages,
+            "page": page,
+            "page_size": page_size,
+        }
     except Exception as e:
-        print("[!] Backend SQL Server no disponible en GET /api/taladros:", e)
-        return []
+        print("[!] Error en GET /api/taladros:", e)
+        return {
+            "items": [],
+            "total_filtered": 0,
+            "total_pages": 0,
+            "page": page,
+            "page_size": page_size,
+        }
+
+@router.get("/existe")
+def check_taladro_existe(name: str = Query(..., description="Código de sondaje a verificar"), db: Session = Depends(get_db)):
+    """Verifica si un código de sondaje ya existe (COUNT ligero, patrón Mapeo /ventanas-check)."""
+    exists = db.query(models.Sondaje).filter(models.Sondaje.CodigoSondaje == name.strip()).first() is not None
+    return {"name": name.strip(), "exists": exists}
 
 @router.get("/{name}", response_model=TaladroSchema)
 def get_taladro(name: str, db: Session = Depends(get_db)):

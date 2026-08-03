@@ -39,6 +39,7 @@ interface CollarSurveyFormProps {
   onCollarChange: (collar: Collar) => void;
   onSurveysChange: (surveys: Survey[]) => void;
   existingTaladrosNames?: string[];
+  checkNameExists?: (name: string) => Promise<boolean>;
   availableCampanas?: string[];
 }
 
@@ -49,6 +50,7 @@ export default function CollarSurveyForm({
   onCollarChange,
   onSurveysChange,
   existingTaladrosNames = [],
+  checkNameExists,
   availableCampanas = ["Campaña 2020", "Campaña 2021", "Campaña 2022", "Campaña 2023", "Campaña 2024", "Campaña 2025", "Campaña 2026"]
 }: CollarSurveyFormProps) {
 
@@ -92,12 +94,32 @@ export default function CollarSurveyForm({
   const cleanTempName = tempName.trim().toUpperCase();
   const currentCode = (safeCollar.name || '').trim().toUpperCase();
 
+  // Verificación de unicidad contra el servidor (debounce 200ms, patrón Mapeo),
+  // con fallback a la lista local de la página actual.
+  const [serverDuplicate, setServerDuplicate] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!cleanTempName || cleanTempName === currentCode) {
+      setServerDuplicate(false);
+      return;
+    }
+    setServerDuplicate(false);
+    const timer = setTimeout(() => {
+      checkNameExists?.(cleanTempName)
+        .then(exists => { if (!cancelled) setServerDuplicate(exists); })
+        .catch(() => {});
+    }, 200);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [cleanTempName, currentCode, checkNameExists]);
+
   const isDuplicateName = useMemo(() => {
     if (!cleanTempName || cleanTempName === currentCode) return false;
-    return existingTaladrosNames.some(
+    const localDup = existingTaladrosNames.some(
       n => n.trim().toUpperCase() === cleanTempName && n.trim().toUpperCase() !== currentCode
     );
-  }, [cleanTempName, currentCode, existingTaladrosNames]);
+    return localDup || serverDuplicate;
+  }, [cleanTempName, currentCode, existingTaladrosNames, serverDuplicate]);
 
   const isEmptyName = !cleanTempName;
   const isNameChanged = cleanTempName !== currentCode;

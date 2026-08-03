@@ -20,6 +20,7 @@ interface LggViewProps {
   darkMode?: boolean;
   activeTaladroName: string;
   existingTaladrosNames?: string[];
+  checkNameExists?: (name: string) => Promise<boolean>;
   activeTaladroGeologo?: string;
   activeTaladroFecha?: string;
   sidebarCollapsed?: boolean;
