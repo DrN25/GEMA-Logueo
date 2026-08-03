@@ -7,6 +7,7 @@ class SurveySchema(BaseModel):
     azimuth: float = Field(..., description="Azimut (0 a 360 grados)")
 
 class CorridaSchema(BaseModel):
+    id: Optional[int] = None          # LogueoGeneralID (para UPSERT: UPDATE vs INSERT)
     corrida: int
     de: float
     a: float

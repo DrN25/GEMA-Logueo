@@ -704,7 +704,7 @@ export function getStructuralColumns({
       headerBgClass: 'text-emerald-300',
       renderCell: (row) => (
         <div className="text-center font-bold text-slate-400 py-1.5">
-          {row.disc.corrida}
+          {row.originalIndex + 1}
         </div>
       )
     },

@@ -3,6 +3,7 @@ import { calculateRowRmr } from '../../utils/formulaEngine';
 import { resolveLithologyCascade } from '../../utils/catalogData';
 
 export interface Corrida {
+  id?: number;           // LogueoGeneralID (para UPSERT backend)
   corrida: number;
   de: number;
   a: number;
@@ -223,13 +224,16 @@ export function useLggState({
   }, [corridas, corridasEnriquecidas]);
 
   // 5. Inserción de Nueva Fila de Corrida (Consecutiva)
+  // Número interno: max existente + 1 (los históricos de GEMA pueden ser 24941+).
   const addCorridaRow = useCallback(() => {
     const lastRow = corridas[corridas.length - 1];
     const newDe = lastRow ? lastRow.a : 0.0;
     const newA = lastRow ? parseFloat((newDe + 1.5).toFixed(2)) : 1.5;
+    const maxCorrida = corridas.reduce((m, r) => Math.max(m, Number(r.corrida) || 0), 0);
 
     const newRow: Corrida = {
-      corrida: corridas.length + 1,
+      id: undefined,
+      corrida: maxCorrida + 1,
       de: newDe,
       a: newA,
       rec_m: -1,         // <-- Vacío
@@ -263,11 +267,9 @@ export function useLggState({
     onCorridasChange([...corridas, newRow]);
   }, [corridas, onCorridasChange, defaultTurno]);
 
-  // 6. Eliminación de Fila
+  // 6. Eliminación de Fila (NO reindexa: los números internos son estables para el UPSERT)
   const deleteCorridaRow = useCallback((index: number) => {
-    const updated = corridas
-      .filter((_, i) => i !== index)
-      .map((row, i) => ({ ...row, corrida: i + 1 }));
+    const updated = corridas.filter((_, i) => i !== index);
     onCorridasChange(updated);
   }, [corridas, onCorridasChange]);
 
@@ -276,22 +278,18 @@ export function useLggState({
     const original = corridas[index];
     if (!original) return;
 
+    const maxCorrida = corridas.reduce((m, r) => Math.max(m, Number(r.corrida) || 0), 0);
     const cloned: Corrida = {
       ...original,
-      corrida: index + 2,
+      id: undefined,
+      corrida: maxCorrida + 1,
       de: original.a,
       a: parseFloat((original.a + 1.5).toFixed(2))
     };
 
     const updated = [...corridas];
     updated.splice(index + 1, 0, cloned);
-
-    const reindexed = updated.map((item, idx) => ({
-      ...item,
-      corrida: idx + 1
-    }));
-
-    onCorridasChange(reindexed);
+    onCorridasChange(updated);
   }, [corridas, onCorridasChange]);
 
   // 8. Modificación de Celda con Validaciones Geomecánicas Síncronas

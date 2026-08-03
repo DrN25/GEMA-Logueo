@@ -197,11 +197,23 @@ class GemaMigrationEngine:
         self.db.flush()
 
     def migrate_corridas_and_calculate_rmr(self, sondaje_id: int, campana_id: int, geotecnico_id: int, corridas: list):
-        """Inserta las corridas en dbo.LogueoGeotecnicoGeneral y procesa Validación RMR."""
-        # Limpiar registros previos del pozo para evitar duplicados en cascada
-        self.db.query(models.LogueoGeotecnicoGeneral).filter_by(SondajeID=sondaje_id).delete()
-        self.db.query(models.ValidacionRMR).filter_by(SondajeID=sondaje_id).delete()
-        self.db.flush()
+        """Guarda las corridas en dbo.LogueoGeotecnicoGeneral y procesa Validación RMR.
+
+        UPSERT (ya NO delete+insert): los registros existentes se ACTUALIZAN por id
+        (fallback por intervalo de/a) preservando columnas que otros sistemas llenan;
+        solo se eliminan los que el usuario quitó de la lista.
+        """
+        now = datetime.datetime.now()
+        existing = {
+            l.LogueoGeneralID: l
+            for l in self.db.query(models.LogueoGeotecnicoGeneral).filter_by(SondajeID=sondaje_id).all()
+        }
+        existing_rmr = {
+            v.NumeroCorrida: v
+            for v in self.db.query(models.ValidacionRMR).filter_by(SondajeID=sondaje_id).all()
+        }
+        used_ids = set()
+        used_rmr_corridas = set()
 
         seen_intervals = set()
         for c in corridas:
@@ -219,7 +231,23 @@ class GemaMigrationEngine:
                     detail=f"Corrida {c.get('corrida')}: intervalo [{de_val}, {a_val}] duplicado — corrija los valores antes de guardar."
                 )
             seen_intervals.add((de_val, a_val))
-            
+
+            # ── Resolver registro destino (UPDATE por id, fallback por intervalo) ──
+            target = None
+            cid = c.get("id")
+            if cid is not None and cid in existing:
+                target = existing[cid]
+            if target is None:
+                for lid, l in existing.items():
+                    if lid not in used_ids and float(l.IntervaloDe) == de_val and float(l.IntervaloA) == a_val:
+                        target = l
+                        break
+            if target is None:
+                target = models.LogueoGeotecnicoGeneral(SondajeID=sondaje_id, FechaRegistro=now)
+                self.db.add(target)
+            else:
+                used_ids.add(target.LogueoGeneralID)
+
             l1_id = self.resolve_lito(c.get("lito1"))
             l2_id = self.resolve_lito(c.get("lito2"))
             l3_id = self.resolve_lito(c.get("lito3"))
@@ -232,116 +260,131 @@ class GemaMigrationEngine:
             if frf_val is None or frf_val == 0:
                 frf_val = math.floor(round((lrf_val or 0.0) * 100) / 5) + 1 if (lrf_val and lrf_val > 0) else 0
 
-            # 1. Grabar Logueo Geotécnico General (LGG)
-            lgg_row = models.LogueoGeotecnicoGeneral(
-                SondajeID=sondaje_id,
-                NumeroRegistro=int(c.get("corrida")),
-                IntervaloDe=de_val,
-                IntervaloA=a_val,
-                LongitudRecuperada=self.sanitize_val(c.get("rec_m")),
-                SumaFragmentos10cm=self.sanitize_val(c.get("rqd_m")),
-                LongitudRocaFracturada=lrf_val,
-                FRF=frf_val,
-                NumFracturasNaturales=self.sanitize_val(c.get("frac_nat"), int),
-                Litologia1ID=l1_id,
-                Litologia2ID=l2_id,
-                Litologia3ID=l3_id,
-                ResistenciaEstimada=self.normalize_strength(c.get("resistencia")),
-                TipoEstructura1ID=tipo_est1_id,
-                TipoEstructura2ID=tipo_est2_id,
-                NumFracBuz30=self.sanitize_val(c.get("frac_buz30"), int),
-                NumFrac30a60=self.sanitize_val(c.get("frac_buz60"), int),
-                NumFracBuz60=self.sanitize_val(c.get("frac_buz90"), int),
-                Abertura=self.sanitize_val(c.get("abertura")),
-                Rugosidad=self.sanitize_val(c.get("rugosidad"), str),
-                JRC10=self.sanitize_val(c.get("jrc10")),
-                GradoIntemperismo=self.sanitize_val(c.get("intemperismo"), str),
-                TipoRelleno1=self.sanitize_val(c.get("relleno1"), str),
-                TipoRelleno2=self.sanitize_val(c.get("relleno2"), str),
-                EspesorRelleno=self.sanitize_val(c.get("espesor")),
-                PresenciaAgua=self.sanitize_val(c.get("agua_obs"), str),
-                GeotecnicoID=geotecnico_id,
-                Comentarios=c.get("comentarios", ""),
-                CampañaID=campana_id,
-                FechaRegistro=datetime.datetime.now()
-            )
-            self.db.add(lgg_row)
+            # 1. Grabar / actualizar Logueo Geotécnico General (LGG)
+            target.NumeroRegistro = int(c.get("corrida"))
+            target.IntervaloDe = de_val
+            target.IntervaloA = a_val
+            target.LongitudRecuperada = self.sanitize_val(c.get("rec_m"))
+            target.SumaFragmentos10cm = self.sanitize_val(c.get("rqd_m"))
+            target.LongitudRocaFracturada = lrf_val
+            target.FRF = frf_val
+            target.NumFracturasNaturales = self.sanitize_val(c.get("frac_nat"), int)
+            target.Litologia1ID = l1_id
+            target.Litologia2ID = l2_id
+            target.Litologia3ID = l3_id
+            target.ResistenciaEstimada = self.normalize_strength(c.get("resistencia"))
+            target.TipoEstructura1ID = tipo_est1_id
+            target.TipoEstructura2ID = tipo_est2_id
+            target.NumFracBuz30 = self.sanitize_val(c.get("frac_buz30"), int)
+            target.NumFrac30a60 = self.sanitize_val(c.get("frac_buz60"), int)
+            target.NumFracBuz60 = self.sanitize_val(c.get("frac_buz90"), int)
+            target.Abertura = self.sanitize_val(c.get("abertura"))
+            target.Rugosidad = self.sanitize_val(c.get("rugosidad"), str)
+            target.JRC10 = self.sanitize_val(c.get("jrc10"))
+            target.GradoIntemperismo = self.sanitize_val(c.get("intemperismo"), str)
+            target.TipoRelleno1 = self.sanitize_val(c.get("relleno1"), str)
+            target.TipoRelleno2 = self.sanitize_val(c.get("relleno2"), str)
+            target.EspesorRelleno = self.sanitize_val(c.get("espesor"))
+            target.PresenciaAgua = self.sanitize_val(c.get("agua_obs"), str)
+            target.GeotecnicoID = geotecnico_id
+            target.Comentarios = c.get("comentarios", "")
+            target.CampañaID = campana_id
 
             # 2. Computar RMR dinámicamente usando el calculador
+            corrida_num = int(c.get("corrida"))
+            used_rmr_corridas.add(corrida_num)
             rmr_res = calculate_row_rmr(c)
+            v_rmr = existing_rmr.get(corrida_num)
             if "error" not in rmr_res:
                 sc = rmr_res.get("scores", {})
-                v_rmr = models.ValidacionRMR(
-                    SondajeID=sondaje_id,
-                    FechaValidacion=datetime.date.today(),
-                    LogueadorID=geotecnico_id,
-                    NumeroCorrida=int(c.get("corrida")),
-                    Litologia1ID=l1_id,
-                    Litologia2ID=l2_id,
-                    Litologia3ID=l3_id,
-                    IntervaloDe=de_val,
-                    IntervaloA=a_val,
-                    LongitudCorrida=rmr_res.get("perf"),
-                    Recuperacion=self.sanitize_val(c.get("rec_m")),
-                    RecuperacionPorc=rmr_res.get("rec_pct"),
-                    RQD=self.sanitize_val(c.get("rqd_m")),
-                    RQDPorc=rmr_res.get("rqd_pct"),
-                    LongitudTramoFracturado=self.sanitize_val(c.get("lrf_m")),
-                    FRF=rmr_res.get("frf"),
-                    FracturasNaturales=self.sanitize_val(c.get("frac_nat"), int),
-                    TotalFracturas=rmr_res.get("total_frac"),
-                    FF_1m=round(rmr_res.get("total_frac") / max(0.01, rmr_res.get("perf")), 2),
-                    Espaciamiento=rmr_res.get("spacing_mm"),
-                    Resistencia=self.sanitize_val(c.get("resistencia"), str),
-                    TipoEstructura=self.sanitize_val(c.get("tipo_est1"), str),
-                    Abertura=self.sanitize_val(c.get("abertura")),
-                    Rugosidad=self.sanitize_val(c.get("rugosidad"), str),
-                    Relleno=self.sanitize_val(c.get("relleno1"), str),
-                    ClasificacionRelleno=str(sc.get("relleno_76", 1)),
-                    Intemperismo=self.sanitize_val(c.get("intemperismo"), str),
-                    JRC10=self.sanitize_val(c.get("jrc10")),
-                    EspesorRelleno=self.sanitize_val(c.get("espesor")),
-                    PresenciaAgua=rmr_res.get("water_code"),
-                    
-                    # Puntajes RMR'76
-                    RMR76_Resistencia=sc.get("resistencia"),
-                    RMR76_RQD=sc.get("rqd"),
-                    RMR76_Espaciamiento=sc.get("spacing_76"),
-                    RMR76_Abertura=sc.get("abertura_76"),
-                    RMR76_Rugosidad=sc.get("rugosidad_76"),
-                    RMR76_Relleno=sc.get("relleno_76"),
-                    RMR76_Intemperismo=sc.get("weathering_76"),
-                    RMR76_Persistencia=sc.get("persistencia_76"),
-                    RMR76_CondicionJuntas=sc.get("juntas_76"),
-                    RMR76_PresenciaAgua=sc.get("agua_76"),
-                    RMR76_Total=rmr_res.get("rmr_76"),
-                    RMR76_CalidadRoca=rmr_res.get("class_76"),
-                    
-                    # Puntajes RMR'89
-                    RMR89_Resistencia=sc.get("resistencia"),
-                    RMR89_RQD=sc.get("rqd"),
-                    RMR89_Espaciamiento=sc.get("spacing_89"),
-                    RMR89_Abertura=sc.get("abertura_89"),
-                    RMR89_Rugosidad=sc.get("rugosidad_89"),
-                    RMR89_Relleno=sc.get("relleno_89"),
-                    RMR89_Intemperismo=sc.get("weathering_89"),
-                    RMR89_Persistencia=sc.get("persistencia_89"),
-                    RMR89_CondicionJuntas=sc.get("juntas_89"),
-                    RMR89_PresenciaAgua=sc.get("agua_89"),
-                    RMR89_Total=rmr_res.get("rmr_89"),
-                    RMR89_CalidadRoca=rmr_res.get("class_89"),
-                    
-                    LitologiaFinal=c.get("lito1", "LMT"),
-                    CampañaID=campana_id,
-                    FechaRegistro=datetime.datetime.now()
-                )
-                self.db.add(v_rmr)
+                if v_rmr is None:
+                    v_rmr = models.ValidacionRMR(
+                        SondajeID=sondaje_id,
+                        CampañaID=campana_id,
+                        FechaRegistro=now,
+                    )
+                    self.db.add(v_rmr)
+                v_rmr.FechaValidacion = datetime.date.today()
+                v_rmr.LogueadorID = geotecnico_id
+                v_rmr.NumeroCorrida = corrida_num
+                v_rmr.Litologia1ID = l1_id
+                v_rmr.Litologia2ID = l2_id
+                v_rmr.Litologia3ID = l3_id
+                v_rmr.IntervaloDe = de_val
+                v_rmr.IntervaloA = a_val
+                v_rmr.LongitudCorrida = rmr_res.get("perf")
+                v_rmr.Recuperacion = self.sanitize_val(c.get("rec_m"))
+                v_rmr.RecuperacionPorc = rmr_res.get("rec_pct")
+                v_rmr.RQD = self.sanitize_val(c.get("rqd_m"))
+                v_rmr.RQDPorc = rmr_res.get("rqd_pct")
+                v_rmr.LongitudTramoFracturado = self.sanitize_val(c.get("lrf_m"))
+                v_rmr.FRF = rmr_res.get("frf")
+                v_rmr.FracturasNaturales = self.sanitize_val(c.get("frac_nat"), int)
+                v_rmr.TotalFracturas = rmr_res.get("total_frac")
+                v_rmr.FF_1m = round(rmr_res.get("total_frac") / max(0.01, rmr_res.get("perf")))  # Solo enteros (Reglas.md)
+                v_rmr.Espaciamiento = rmr_res.get("spacing_mm")
+                v_rmr.Resistencia = self.sanitize_val(c.get("resistencia"), str)
+                v_rmr.TipoEstructura = self.sanitize_val(c.get("tipo_est1"), str)
+                v_rmr.Abertura = self.sanitize_val(c.get("abertura"))
+                v_rmr.Rugosidad = self.sanitize_val(c.get("rugosidad"), str)
+                v_rmr.Relleno = self.sanitize_val(c.get("relleno1"), str)
+                v_rmr.ClasificacionRelleno = str(sc.get("relleno_76", 1))
+                v_rmr.Intemperismo = self.sanitize_val(c.get("intemperismo"), str)
+                v_rmr.JRC10 = self.sanitize_val(c.get("jrc10"))
+                v_rmr.EspesorRelleno = self.sanitize_val(c.get("espesor"))
+                v_rmr.PresenciaAgua = rmr_res.get("water_code")
+
+                # Puntajes RMR'76
+                v_rmr.RMR76_Resistencia = sc.get("resistencia")
+                v_rmr.RMR76_RQD = sc.get("rqd")
+                v_rmr.RMR76_Espaciamiento = sc.get("spacing_76")
+                v_rmr.RMR76_Abertura = sc.get("abertura_76")
+                v_rmr.RMR76_Rugosidad = sc.get("rugosidad_76")
+                v_rmr.RMR76_Relleno = sc.get("relleno_76")
+                v_rmr.RMR76_Intemperismo = sc.get("weathering_76")
+                v_rmr.RMR76_Persistencia = sc.get("persistencia_76")
+                v_rmr.RMR76_CondicionJuntas = sc.get("juntas_76")
+                v_rmr.RMR76_PresenciaAgua = sc.get("agua_76")
+                v_rmr.RMR76_Total = rmr_res.get("rmr_76")
+                v_rmr.RMR76_CalidadRoca = rmr_res.get("class_76")
+
+                # Puntajes RMR'89
+                v_rmr.RMR89_Resistencia = sc.get("resistencia")
+                v_rmr.RMR89_RQD = sc.get("rqd")
+                v_rmr.RMR89_Espaciamiento = sc.get("spacing_89")
+                v_rmr.RMR89_Abertura = sc.get("abertura_89")
+                v_rmr.RMR89_Rugosidad = sc.get("rugosidad_89")
+                v_rmr.RMR89_Relleno = sc.get("relleno_89")
+                v_rmr.RMR89_Intemperismo = sc.get("weathering_89")
+                v_rmr.RMR89_Persistencia = sc.get("persistencia_89")
+                v_rmr.RMR89_CondicionJuntas = sc.get("juntas_89")
+                v_rmr.RMR89_PresenciaAgua = sc.get("agua_89")
+                v_rmr.RMR89_Total = rmr_res.get("rmr_89")
+                v_rmr.RMR89_CalidadRoca = rmr_res.get("class_89")
+
+                v_rmr.LitologiaFinal = c.get("lito1", "LMT")
+            elif v_rmr is not None:
+                # La corrida quedó incompleta -> su fila de ValidacionRMR no debe existir
+                self.db.delete(v_rmr)
+
+        # 3. DELETE selectivo: solo los registros que el usuario quitó de la lista
+        for lid, l in existing.items():
+            if lid not in used_ids:
+                self.db.delete(l)
+        for cnum, v in existing_rmr.items():
+            if cnum not in used_rmr_corridas:
+                self.db.delete(v)
+
         self.db.flush()
 
     def migrate_discontinuidades(self, sondaje_id: int, campana_id: int, geotecnico_id: int, discontinuidades: list):
-        """Inserta las estructuras puntuales en la tabla corregida dbo.LogueoEstructural."""
-        self.db.query(models.LogueoEstructural).filter_by(SondajeID=sondaje_id).delete()
-        self.db.flush()
+        """Guarda las estructuras puntuales en dbo.LogueoEstructural (UPSERT por id)."""
+        now = datetime.datetime.now()
+        existing = {
+            d.LogueoEstructuralID: d
+            for d in self.db.query(models.LogueoEstructural).filter_by(SondajeID=sondaje_id).all()
+        }
+        used_ids = set()
 
         for d in discontinuidades:
             de_val = self.sanitize_val(d.get("de"))
@@ -351,46 +394,67 @@ class GemaMigrationEngine:
                     status_code=400,
                     detail=f"Discontinuidad en profundidad {d.get('profundidad')}: los campos 'de' y 'a' son obligatorios y no pueden estar vacíos."
                 )
+            # ── Resolver registro destino (UPDATE por id; id=0/sin id -> INSERT) ──
+            target = None
+            did = d.get("id")
+            if did and did in existing:
+                target = existing[did]
+                used_ids.add(did)
+            if target is None:
+                target = models.LogueoEstructural(SondajeID=sondaje_id, FechaRegistro=now)
+                self.db.add(target)
+
             l1_id = self.resolve_lito(d.get("litologia"))
             l2_id = self.resolve_lito(d.get("litologia2")) # Mapeado de litología secundaria
             l3_id = self.resolve_lito(d.get("litologia3")) # Mapeado de litología terciaria
             tipo_est_id = self.resolve_estructura(d.get("tipo_estructura"))
-            
-            struct = models.LogueoEstructural(
-                SondajeID=sondaje_id,
-                IntervaloDe=de_val,
-                IntervaloA=a_val,
-                Profundidad=self.sanitize_val(d.get("profundidad")),
-                Litologia1ID=l1_id,
-                Litologia2ID=l2_id,
-                Litologia3ID=l3_id,
-                TipoEstructuraID=tipo_est_id,
-                Alpha=self.sanitize_val(d.get("alfa")),
-                Beta=self.sanitize_val(d.get("beta")),
-                Dip=self.sanitize_val(d.get("dip")),
-                Azimuth=self.sanitize_val(d.get("azimuth")),
-                Forma=self.sanitize_val(d.get("forma"), str),
-                Rugosidad=self.sanitize_val(d.get("rugosidad"), str),
-                JRC10=self.sanitize_val(d.get("jrc10")),
-                Abertura=self.sanitize_val(d.get("abertura")),
-                GradoIntemperismo=self.sanitize_val(d.get("weathering"), str),
-                EspesorRelleno=self.sanitize_val(d.get("espesor")),
-                TipoRelleno1=self.sanitize_val(d.get("relleno1"), str),
-                TipoRelleno2=self.sanitize_val(d.get("relleno2"), str),
-                DurezaParedEstructura=self.normalize_strength(d.get("dureza_pared")),
-                PresenciaAgua=self.sanitize_val(d.get("agua"), str),
-                GeotecnicoID=self.resolve_geotecnico(d.get("geotecnico")),
-                IntervaloComentario=d.get("comentario", ""),
-                CampañaID=campana_id,
-                FechaRegistro=datetime.datetime.now()
-            )
-            self.db.add(struct)
+
+            target.IntervaloDe = de_val
+            target.IntervaloA = a_val
+            target.Profundidad = self.sanitize_val(d.get("profundidad"))
+            target.Litologia1ID = l1_id
+            target.Litologia2ID = l2_id
+            target.Litologia3ID = l3_id
+            target.TipoEstructuraID = tipo_est_id
+            target.Alpha = self.sanitize_val(d.get("alfa"))
+            target.Beta = self.sanitize_val(d.get("beta"))
+            target.Dip = self.sanitize_val(d.get("dip"))
+            target.Azimuth = self.sanitize_val(d.get("azimuth"))
+            target.Forma = self.sanitize_val(d.get("forma"), str)
+            target.Rugosidad = self.sanitize_val(d.get("rugosidad"), str)
+            target.JRC10 = self.sanitize_val(d.get("jrc10"))
+            target.Abertura = self.sanitize_val(d.get("abertura"))
+            target.GradoIntemperismo = self.sanitize_val(d.get("weathering"), str)
+            target.EspesorRelleno = self.sanitize_val(d.get("espesor"))
+            target.TipoRelleno1 = self.sanitize_val(d.get("relleno1"), str)
+            target.TipoRelleno2 = self.sanitize_val(d.get("relleno2"), str)
+            target.DurezaParedEstructura = self.normalize_strength(d.get("dureza_pared"))
+            target.PresenciaAgua = self.sanitize_val(d.get("agua"), str)
+            target.GeotecnicoID = self.resolve_geotecnico(d.get("geotecnico"))
+            target.IntervaloComentario = d.get("comentario", "")
+            target.CampañaID = campana_id
+
+        # DELETE selectivo: solo los que el usuario quitó de la lista
+        for lid, d in existing.items():
+            if lid not in used_ids:
+                self.db.delete(d)
         self.db.flush()
 
     def migrate_ensayos_plt(self, sondaje_id: int, campana_id: int, ensayos_plt: list):
-        """Inserta y calcula automáticamente los ensayos PLT con validación física."""
-        self.db.query(models.EnsayoPLT).filter_by(SondajeID=sondaje_id).delete()
-        self.db.flush()
+        """Guarda los ensayos PLT (UPSERT por id).
+
+        Los ensayos EXISTENTES se actualizan SOLO en los campos que la app maneja:
+        las columnas de otros sistemas (UsuarioRegistro, DenominacionISRM, DominioID,
+        VentanaID, LithoModelo2022, ZonaGeomecanica, Nivel, SectorGeotecnicoID,
+        FactorK_Valor, FuenteExcel_Fila...) se PRESERVAN intactas.
+        Solo se eliminan los ensayos que el usuario quitó de la lista.
+        """
+        now = datetime.datetime.now()
+        existing = {
+            p.EnsayoPLT_ID: p
+            for p in self.db.query(models.EnsayoPLT).filter_by(SondajeID=sondaje_id).all()
+        }
+        used_ids = set()
 
         for plt in ensayos_plt:
             l1_str = plt.get("litologia_1")
@@ -402,37 +466,50 @@ class GemaMigrationEngine:
             l3_id = self.resolve_lito(l3_str)
             
             # Recuperar factor K dinámicamente del catálogo de GEMA
-            factor_k_id, factor_k_val = self.resolve_factor_k_and_id(l1_str, l2_str, l3_str)
+            factor_k_id, _factor_k_val = self.resolve_factor_k_and_id(l1_str, l2_str, l3_str)
             
             # Conversión de mm a cm de diámetro antes de grabar
             d_mm_val = self.sanitize_val(plt.get("d_mm"), float)
             d_cm_val = (d_mm_val / 10.0) if d_mm_val else None
 
-            db_plt = models.EnsayoPLT(
-                CodigoMuestra=f"{plt.get('nro_muestra')}", # Autogenerado de forma interna
-                CampañaID=campana_id,
-                LitologiaID_1=l1_id,
-                LitologiaID_2=l2_id,
-                LitologiaID_3=l3_id,
-                SondajeID=sondaje_id,
-                NroMuestra=plt.get("nro_muestra"),
-                NroCaja=plt.get("nro_caja"),
-                From_m=self.sanitize_val(plt.get("from_m")),
-                To_m=self.sanitize_val(plt.get("to_m")),
-                LongCorrida_m=self.sanitize_val(plt.get("long_de_corrida_m")),
-                LongMuestra_mm=self.sanitize_val(plt.get("long_de_muestra_mm")),
-                Espesor_D_cm=d_cm_val,
-                FuerzaP_kN=self.sanitize_val(plt.get("p_instr_kn")),
-                Is_MPa=self.sanitize_val(plt.get("is_mpa")),
-                FactorCorr=self.sanitize_val(plt.get("fact_corr")),
-                Is50_MPa=self.sanitize_val(plt.get("is_50_mpa")),
-                UCS_MPa=self.sanitize_val(plt.get("ucs")),
-                FactorK_ID=factor_k_id,
-                TipoLitologico=plt.get("tipo_litologico"),
-                EjecutadoPor=plt.get("ejecutadoPor"),
-                Observaciones=plt.get("observaciones"),
-                OrigenPLT="REGULAR",
-                FechaRegistro=datetime.datetime.now()
-            )
-            self.db.add(db_plt)
+            # ── Resolver registro destino (UPDATE por id; sin id -> INSERT) ──
+            target = None
+            pid = plt.get("id")
+            if pid and pid in existing:
+                target = existing[pid]
+                used_ids.add(pid)
+            if target is None:
+                target = models.EnsayoPLT(
+                    SondajeID=sondaje_id,
+                    OrigenPLT="REGULAR",
+                    FechaRegistro=now,
+                )
+                self.db.add(target)
+
+            target.CodigoMuestra = f"{plt.get('nro_muestra')}"  # Autogenerado de forma interna
+            target.CampañaID = campana_id
+            target.LitologiaID_1 = l1_id
+            target.LitologiaID_2 = l2_id
+            target.LitologiaID_3 = l3_id
+            target.NroMuestra = plt.get("nro_muestra")
+            target.NroCaja = plt.get("nro_caja")
+            target.From_m = self.sanitize_val(plt.get("from_m"))
+            target.To_m = self.sanitize_val(plt.get("to_m"))
+            target.LongCorrida_m = self.sanitize_val(plt.get("long_de_corrida_m"))
+            target.LongMuestra_mm = self.sanitize_val(plt.get("long_de_muestra_mm"))
+            target.Espesor_D_cm = d_cm_val
+            target.FuerzaP_kN = self.sanitize_val(plt.get("p_instr_kn"))
+            target.Is_MPa = self.sanitize_val(plt.get("is_mpa"))
+            target.FactorCorr = self.sanitize_val(plt.get("fact_corr"))
+            target.Is50_MPa = self.sanitize_val(plt.get("is_50_mpa"))
+            target.UCS_MPa = self.sanitize_val(plt.get("ucs"))
+            target.FactorK_ID = factor_k_id
+            target.TipoLitologico = plt.get("tipo_litologico")
+            target.EjecutadoPor = plt.get("ejecutadoPor")
+            target.Observaciones = plt.get("observaciones")
+
+        # DELETE selectivo: solo los ensayos que el usuario quitó de la lista
+        for pid, p in existing.items():
+            if pid not in used_ids:
+                self.db.delete(p)
         self.db.flush()

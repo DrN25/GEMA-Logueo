@@ -152,7 +152,7 @@ export function getLggColumns({
       isSticky: true,
       stickyLeft: 0,
       headerBgClass: stickyHeader,
-      renderCell: (row) => <div className="text-center font-bold text-slate-400 py-1.5">{row.corrida}</div>
+      renderCell: (row) => <div className="text-center font-bold text-slate-400 py-1.5">{row.originalIndex + 1}</div>
     },
     {
       key: 'taladro' as any,

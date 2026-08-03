@@ -20,10 +20,15 @@ export const ROUGHNESS_RATINGS_89: Record<number, number> = {
 };
 
 export const FILLING_CLASSES: Record<string, number> = {
-  'ca': 1, 'sand': 1, 'ch': 1, 'cl': 1, 'gy': 1, 'RXF': 1, 'GOU': 1, 'PAT': 1,
-  'FBX': 2, 'SIO': 2, 'QZ': 2, 'SU': 2, 'OX': 2, 'ep': 2,
-  'cwf': 3
+  'ca': 1, 'sand': 1, 'ch': 1, 'cl': 1, 'gy': 1, 'rxf': 1, 'gou': 1, 'pat': 1,
+  'CA': 1, 'SAND': 1, 'CH': 1, 'CL': 1, 'GY': 1, 'RXF': 1, 'GOU': 1, 'PAT': 1,
+  'fbx': 2, 'sio': 2, 'qz': 2, 'su': 2, 'ox': 2, 'ep': 2,
+  'FBX': 2, 'SIO': 2, 'QZ': 2, 'SU': 2, 'OX': 2, 'EP': 2,
+  'cwf': 3, 'CWF': 3
 };
+
+// Normalización case-insensitive para códigos de catálogo (ca/CA, cwf/CWF...)
+const normCode = (v: any): string => String(v ?? '').trim().toUpperCase();
 
 export function calculateRqdRating(rqdPct: number): number {
   if (rqdPct < 0) return 3;
@@ -66,7 +71,7 @@ export function calculateApertureRating89(apertureMm: number): number {
 }
 
 export function calculateFillingRating76(fillingCode: string, thicknessMm: number): number {
-  const fClass = FILLING_CLASSES[fillingCode] || 1;
+  const fClass = FILLING_CLASSES[normCode(fillingCode)] || 1;
   if (thicknessMm === 0 || fClass === 3) return 5;
   if (fClass === 2) {
     return thicknessMm <= 5 ? 4 : 2;
@@ -76,7 +81,7 @@ export function calculateFillingRating76(fillingCode: string, thicknessMm: numbe
 }
 
 export function calculateFillingRating89(fillingCode: string, thicknessMm: number): number {
-  const fClass = FILLING_CLASSES[fillingCode] || 1;
+  const fClass = FILLING_CLASSES[normCode(fillingCode)] || 1;
   if (thicknessMm === 0 || fClass === 3) return 6;
   if (fClass === 2) {
     return thicknessMm <= 5 ? 4 : 2;
@@ -147,12 +152,12 @@ export function calculateRowRmr(row: any, waterTableM: number = 97.0) {
     const total_frac = frac_nat + frf;
     const spacing_mm = Math.round(total_frac > 0 ? (perf / total_frac) * 1000 : perf * 1000);
 
-    const strength = row.resistencia;
+    const strength = normCode(row.resistencia);
     const aperture = parseFloat(row.abertura);
     const roughness = parseInt(row.rugosidad);
     const filling = row.relleno1;
     const thickness = parseFloat(row.espesor);
-    const weathering = row.intemperismo;
+    const weathering = normCode(row.intemperismo);
 
     const s_score = STRENGTH_RATINGS[strength] || 0;
     const rqd_score = calculateRqdRating(rqd_pct);

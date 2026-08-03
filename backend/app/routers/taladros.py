@@ -358,6 +358,7 @@ def get_taladro(name: str, db: Session = Depends(get_db)):
         calculated_small_frag = max(0.0, round(rec_val - rqd_val - lrf_val, 2))
 
         corridas_list.append(CorridaSchema(
+            id=c.LogueoGeneralID,
             corrida=c.NumeroRegistro,
             de=float(c.IntervaloDe),
             a=float(c.IntervaloA),

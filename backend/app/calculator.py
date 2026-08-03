@@ -67,8 +67,14 @@ def calculate_aperture_rating_89(aperture_mm: float) -> int:
     elif aperture_mm <= 5.0: return 1
     return 0
 
+def _norm_code(val) -> str:
+    """Normaliza códigos de catálogo a mayúsculas (ca/CA, cwf/CWF, r4/R4...)."""
+    if val is None:
+        return ""
+    return str(val).strip().upper()
+
 def calculate_filling_rating_76(filling_code: str, thickness_mm: float) -> int:
-    f_class = FILLING_CLASSES.get(filling_code, 1)
+    f_class = FILLING_CLASSES.get(_norm_code(filling_code), 1)
     if thickness_mm == 0 or f_class == 3:
         return 5
     if f_class == 2:  # Relleno Duro
@@ -77,7 +83,7 @@ def calculate_filling_rating_76(filling_code: str, thickness_mm: float) -> int:
         return 2 if thickness_mm <= 5 else 0
 
 def calculate_filling_rating_89(filling_code: str, thickness_mm: float) -> int:
-    f_class = FILLING_CLASSES.get(filling_code, 1)
+    f_class = FILLING_CLASSES.get(_norm_code(filling_code), 1)
     if thickness_mm == 0 or f_class == 3:
         return 6
     if f_class == 2:  # Relleno Duro
@@ -117,11 +123,24 @@ def calculate_row_rmr(data: Dict[str, Any], water_table_m: float = 97.0) -> Dict
         if perf > 1.6:
             return {"error": "Longitud de corrida excede 1.6m"}
 
-        # Validar que los campos de metraje y fracturas no estén vacíos (-1 / None / "")
-        required_core = ("rec_m", "rqd_m", "lrf_m", "frac_nat")
-        for key in required_core:
+        # Validar que TODOS los campos requeridos estén completos (-1 / None / "")
+        # Mismos 17 campos que el frontend (formulaEngine.calculateRowRmr) para que
+        # nunca se persista un RMR que el usuario no vio. lito3 NO se exige
+        # (combinaciones sin lito3 son válidas).
+        required_numeric = (
+            "de", "a", "rec_m", "rqd_m", "lrf_m", "small_frag_m",
+            "frac_nat", "abertura", "rugosidad", "jrc10", "espesor",
+        )
+        required_string = (
+            "lito1", "resistencia", "tipo_est1", "intemperismo", "relleno1", "agua_obs",
+        )
+        for key in required_numeric:
             v = data.get(key)
             if v is None or v == -1 or (isinstance(v, str) and v.strip() in ("", "-1")):
+                return {"error": "Fila incompleta: campo obligatorio vacío"}
+        for key in required_string:
+            v = data.get(key)
+            if v is None or v == -1 or (isinstance(v, str) and v.strip() in ("", "-1", "-")):
                 return {"error": "Fila incompleta: campo obligatorio vacío"}
 
         rec_m = float(data.get("rec_m", 0.0))
@@ -141,12 +160,12 @@ def calculate_row_rmr(data: Dict[str, Any], water_table_m: float = 97.0) -> Dict
         total_frac = frac_nat + frf
         spacing_mm = round((perf / total_frac * 1000) if total_frac > 0 else perf * 1000)
         
-        strength = data.get("resistencia", "R4")
+        strength = _norm_code(data.get("resistencia", "R4"))
         aperture = float(data.get("abertura", 0.0))
         roughness = int(data.get("rugosidad", 1))
         filling = data.get("relleno1", "cwf")
         thickness = float(data.get("espesor", 0.0))
-        weathering = data.get("intemperismo", "UWF")
+        weathering = _norm_code(data.get("intemperismo", "UWF"))
         
         # 1. Resistencia Matrix Score
         s_score = STRENGTH_RATINGS.get(strength, 0)
