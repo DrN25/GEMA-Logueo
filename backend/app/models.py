@@ -29,7 +29,7 @@ class Sondaje(Base):
     __tablename__ = "Sondajes"
     __table_args__ = {"schema": "dbo"}
 
-    SondajeID = Column(Integer, primary_key=True, autoincrement=True)
+    SondajeID = Column(Integer, primary_key=True, autoincrement=False)
     CodigoSondaje = Column(String(50), unique=True, nullable=False)
     CampañaID = Column(Integer, ForeignKey("dbo.Campañas.CampañaID"), nullable=False)
     DiametroPerfora = Column(String(10), nullable=True)

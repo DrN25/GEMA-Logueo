@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta
 from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from typing import List, Optional
 
 from app.schemas import TaladroSchema, CorridaSchema, SurveySchema, DiscontinuidadSchema, EnsayoPltSchema
@@ -339,6 +340,7 @@ def get_taladro(name: str, db: Session = Depends(get_db)):
     db_surveys = db.query(models.Survey).filter_by(SondajeID=s.SondajeID).order_by(models.Survey.Profundidad).all()
     for srv in db_surveys:
         surveys_list.append(SurveySchema(
+            id=srv.SurveyID,
             depth=float(srv.Profundidad),
             dip=float(srv.Inclinacion),
             azimuth=float(srv.Azimut)
@@ -513,40 +515,54 @@ def get_taladro(name: str, db: Session = Depends(get_db)):
 
 @router.post("")
 def save_taladro(taladro: TaladroSchema, db: Session = Depends(get_db)):
-    """Crea o actualiza un taladro migrándolo de forma directa al esquema físico de GEMA."""
-    try:
-        engine = GemaMigrationEngine(db)
-        
-        # 1. Guardar Sondaje y Collar (Soporta fallback de proyectados internos)
-        sondaje_id = engine.migrate_sondaje_collar(taladro.dict())
-        campana_id = engine.resolve_campana(taladro.campana or "2020")
-        geotecnico_id = engine.resolve_geotecnico(taladro.geologo or "RD/RB")
-        
-        # 2. Guardar Surveys / Trayectorias
-        surveys_list = [s.dict() for s in taladro.surveys]
-        engine.migrate_surveys(sondaje_id, surveys_list)
-        
-        # 3. Guardar Corridas y calcular RMR en ValidaciónRMR
-        corridas_list = [c.dict() for c in taladro.corridas]
-        engine.migrate_corridas_and_calculate_rmr(sondaje_id, campana_id, geotecnico_id, corridas_list)
-        
-        # 4. Guardar Discontinuidades Estructurales
-        discontinuidades_list = [d.dict() for d in taladro.discontinuidades]
-        engine.migrate_discontinuidades(sondaje_id, campana_id, geotecnico_id, discontinuidades_list)
-        
-        # 5. Guardar Ensayos PLT
-        plt_list = [p.dict() for p in taladro.ensayos_plt]
-        engine.migrate_ensayos_plt(sondaje_id, campana_id, plt_list)
-        
-        db.commit()
-        return {"status": "success", "message": f"Taladro {taladro.name} migrado y guardado con éxito en GEMA"}
-        
-    except HTTPException:
-        db.rollback()
-        raise
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Fallo en migración de guardado: {str(e)}")
+    """Crea o actualiza un taladro migrándolo de forma directa al esquema físico de GEMA.
+
+    Retry automático: si el INSERT de un sondaje NUEVO colisiona por PK (dos guardados
+    simultáneos leyendo el mismo MAX(SondajeID), ya que la tabla no es IDENTITY), se
+    reintenta 1 vez — el segundo intento calcula el MAX actualizado y no vuelve a colisionar.
+    """
+    for attempt in range(2):
+        try:
+            engine = GemaMigrationEngine(db)
+
+            # 1. Guardar Sondaje y Collar (Soporta fallback de proyectados internos)
+            sondaje_id = engine.migrate_sondaje_collar(taladro.dict())
+            campana_id = engine.resolve_campana(taladro.campana or "2020")
+            geotecnico_id = engine.resolve_geotecnico(taladro.geologo or "RD/RB")
+
+            # 2. Guardar Surveys / Trayectorias
+            surveys_list = [s.dict() for s in taladro.surveys]
+            engine.migrate_surveys(sondaje_id, surveys_list)
+
+            # 3. Guardar Corridas y calcular RMR en ValidaciónRMR
+            corridas_list = [c.dict() for c in taladro.corridas]
+            engine.migrate_corridas_and_calculate_rmr(sondaje_id, campana_id, geotecnico_id, corridas_list)
+
+            # 4. Guardar Discontinuidades Estructurales
+            discontinuidades_list = [d.dict() for d in taladro.discontinuidades]
+            engine.migrate_discontinuidades(sondaje_id, campana_id, geotecnico_id, discontinuidades_list)
+
+            # 5. Guardar Ensayos PLT
+            plt_list = [p.dict() for p in taladro.ensayos_plt]
+            engine.migrate_ensayos_plt(sondaje_id, campana_id, plt_list)
+
+            db.commit()
+            return {"status": "success", "message": f"Taladro {taladro.name} migrado y guardado con éxito en GEMA"}
+
+        except IntegrityError as ie:
+            db.rollback()
+            err_str = str(ie.orig).lower()
+            is_pk_sondaje = ("primary key" in err_str) or ("unique constraint" in err_str and "sondajeid" in err_str)
+            if attempt == 0 and is_pk_sondaje:
+                continue  # colisión de ID concurrente -> reintento con el MAX actualizado
+            raise HTTPException(status_code=500, detail=f"Fallo en migración de guardado: {str(ie.orig)}")
+
+        except HTTPException:
+            db.rollback()
+            raise
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=f"Fallo en migración de guardado: {str(e)}")
 
 @router.delete("/{name}")
 def delete_taladro(name: str, db: Session = Depends(get_db)):

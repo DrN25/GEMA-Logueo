@@ -4,6 +4,7 @@ import ExcelImportModal from '../../components/common/ExcelImportModal';
 import type { ValidationAlert } from '../../utils/qaqcValidator';
 
 interface Survey {
+  id?: number;   // SurveyID (para UPSERT backend)
   depth: number;
   dip: number;
   azimuth: number;

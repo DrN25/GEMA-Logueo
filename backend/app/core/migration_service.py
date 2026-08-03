@@ -1,6 +1,7 @@
 import datetime
 import math
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from fastapi import HTTPException
 from app import models
 from app.calculator import calculate_row_rmr
@@ -127,7 +128,12 @@ class GemaMigrationEngine:
 
         resolved_turno_id = self.resolve_turno(data.get("turno", "D"))
         if not sondaje:
+            # La tabla dbo.Sondajes de GEMA NO tiene SondajeID como IDENTITY:
+            # el ID debe generarse explícitamente (MAX + 1), igual que el sistema
+            # original de GEMA. (Evidencia: DDL real + error 515 en INSERT.)
+            max_id = self.db.query(func.max(models.Sondaje.SondajeID)).scalar() or 0
             sondaje = models.Sondaje(
+                SondajeID=int(max_id) + 1,
                 CodigoSondaje=sondaje_code,
                 CampañaID=camp_id,
                 DiametroPerfora=data.get("diametro", "HQ"),
@@ -181,19 +187,36 @@ class GemaMigrationEngine:
         return sondaje.SondajeID
 
     def migrate_surveys(self, sondaje_id: int, surveys: list):
-        """Persiste las trayectorias de Survey en la tabla dbo.Survey."""
-        self.db.query(models.Survey).filter_by(SondajeID=sondaje_id).delete()
-        self.db.flush()
+        """Guarda las trayectorias de Survey (UPSERT por id, como el resto de tablas).
+
+        Ya NO delete+insert: los surveys existentes se actualizan por SurveyID y
+        solo se eliminan los que el usuario quitó de la lista. Así, columnas que
+        otros sistemas puedan agregar a futuro en dbo.Survey se preservan.
+        """
+        now = datetime.datetime.now()
+        existing = {
+            s.SurveyID: s
+            for s in self.db.query(models.Survey).filter_by(SondajeID=sondaje_id).all()
+        }
+        used_ids = set()
 
         for s in surveys:
-            survey = models.Survey(
-                SondajeID=sondaje_id,
-                Profundidad=self.sanitize_val(s.get("depth")) or 0.0,
-                Inclinacion=self.sanitize_val(s.get("dip")) or 0.0,
-                Azimut=self.sanitize_val(s.get("azimuth")) or 0.0,
-                FechaRegistro=datetime.datetime.now()
-            )
-            self.db.add(survey)
+            target = None
+            sid = s.get("id")
+            if sid and sid in existing:
+                target = existing[sid]
+                used_ids.add(sid)
+            if target is None:
+                target = models.Survey(SondajeID=sondaje_id, FechaRegistro=now)
+                self.db.add(target)
+            target.Profundidad = self.sanitize_val(s.get("depth")) or 0.0
+            target.Inclinacion = self.sanitize_val(s.get("dip")) or 0.0
+            target.Azimut = self.sanitize_val(s.get("azimuth")) or 0.0
+
+        # DELETE selectivo: solo los que el usuario quitó de la lista
+        for sid, s in existing.items():
+            if sid not in used_ids:
+                self.db.delete(s)
         self.db.flush()
 
     def migrate_corridas_and_calculate_rmr(self, sondaje_id: int, campana_id: int, geotecnico_id: int, corridas: list):

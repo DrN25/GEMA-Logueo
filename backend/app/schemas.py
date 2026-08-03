@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 
 class SurveySchema(BaseModel):
+    id: Optional[int] = None          # SurveyID (para UPSERT: UPDATE vs INSERT)
     depth: float = Field(..., description="Profundidad de la lectura de survey en metros")
     dip: float = Field(..., description="Dip / Inclinación (0 a 90 grados)")
     azimuth: float = Field(..., description="Azimut (0 a 360 grados)")

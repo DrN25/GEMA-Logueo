@@ -31,6 +31,7 @@ import { computeTaladroHash } from './utils/hashUtils';
 import { computeTaladroDiff, computeAllTaladrosDiff, type TaladroDiffSummary } from './utils/diffUtils';
 
 interface Survey {
+  id?: number;   // SurveyID (para UPSERT backend)
   depth: number;
   dip: number;
   azimuth: number;
