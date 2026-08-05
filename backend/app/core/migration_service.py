@@ -289,6 +289,7 @@ class GemaMigrationEngine:
             target.IntervaloA = a_val
             target.LongitudRecuperada = self.sanitize_val(c.get("rec_m"))
             target.SumaFragmentos10cm = self.sanitize_val(c.get("rqd_m"))
+            target.SmallFrag_m = self.sanitize_val(c.get("small_frag_m"))
             target.LongitudRocaFracturada = lrf_val
             target.FRF = frf_val
             target.NumFracturasNaturales = self.sanitize_val(c.get("frac_nat"), int)

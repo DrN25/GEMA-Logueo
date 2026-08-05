@@ -37,7 +37,6 @@ class CorridaSchema(BaseModel):
     relleno2: Optional[str] = "-1"
     espesor: float
     agua_obs: str
-    turno: Optional[str] = "D"
     comentarios: Optional[str] = ""
 
 class DiscontinuidadSchema(BaseModel):
@@ -64,7 +63,6 @@ class DiscontinuidadSchema(BaseModel):
     geotecnico: str
     comentario: Optional[str] = ""
     corrida: int
-    tipo: str = "Natural"
 
 class EnsayoPltSchema(BaseModel):
     id: Optional[int] = None

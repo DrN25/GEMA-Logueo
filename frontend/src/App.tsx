@@ -66,7 +66,6 @@ interface Corrida {
   relleno2?: string;
   espesor: number;
   agua_obs: string;
-  turno?: string;
   comentarios?: string;
 }
 
@@ -92,7 +91,6 @@ interface Discontinuidad {
   geotecnico: string;
   comentario?: string;
   corrida: number;
-  tipo: string;
   lito1?: string;
   lito2?: string;
   lito3?: string;
@@ -1172,7 +1170,6 @@ export default function App() {
         geotecnico: row.geotecnico || activeTaladro.geologo || '',
         comentario: row.comentario || '',
         corrida,
-        tipo: row.tipo || 'Natural'
       };
     });
 

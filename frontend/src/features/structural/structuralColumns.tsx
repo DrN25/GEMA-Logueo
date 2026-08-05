@@ -34,7 +34,6 @@ export interface Discontinuidad {
   geotecnico: string;
   comentario?: string;
   corrida: number;
-  tipo: string;
   lito1?: string;
   lito2?: string;
   lito3?: string;
@@ -707,37 +706,6 @@ export function getStructuralColumns({
           {row.originalIndex + 1}
         </div>
       )
-    },
-    {
-      key: 'tipo' as any,
-      label: 'Tipo',
-      width: 'w-32',
-      type: 'select',
-      headerBgClass: 'text-emerald-300',
-      renderCell: (row, _idx, isSelected) => {
-        if (!isSelected) {
-          return (
-            <span className="text-slate-350 block text-center truncate py-1.5 font-bold">
-              {row.disc.tipo}
-            </span>
-          );
-        }
-        return (
-          <select
-            id={`struct-cell-${row.originalIndex}-tipo`}
-            value={row.disc.tipo}
-            onChange={(e) => handleCellChange(row.originalIndex, 'tipo', e.target.value)}
-            onKeyDown={(e) => handleKeyDown(e, row.originalIndex, 'tipo')}
-            className="w-full bg-transparent border-0 px-2 py-1 text-cyan-200 focus:outline-none cursor-pointer text-center font-bold text-xs"
-          >
-            {['Natural', 'Mecánica'].map(opt => (
-              <option key={opt} value={opt} className="bg-navy-950 text-slate-200">
-                {opt}
-              </option>
-            ))}
-          </select>
-        );
-      }
     },
     {
       key: 'accion' as any,

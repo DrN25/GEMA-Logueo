@@ -64,7 +64,6 @@ interface Discontinuidad {
   geotecnico: string;
   comentario?: string;
   corrida: number;
-  tipo: string;
 }
 
 interface EnsayoPlt {

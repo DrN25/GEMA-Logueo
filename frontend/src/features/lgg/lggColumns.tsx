@@ -740,7 +740,7 @@ export function getLggColumns({
       width: 'w-24',
       type: 'readonly',
       headerBgClass: defaultHeader,
-      renderCell: (row) => <span className="w-full block px-2 py-1.5 text-center text-slate-400 font-medium">{row.turno ? lastRowGeologo(row.originalIndex) : "RD/RB"}</span>
+      renderCell: (row) => <span className="w-full block px-2 py-1.5 text-center text-slate-400 font-medium">{lastRowGeologo(row.originalIndex)}</span>
     },
     {
       key: 'fecha' as any,
@@ -749,33 +749,6 @@ export function getLggColumns({
       type: 'readonly',
       headerBgClass: defaultHeader,
       renderCell: (row) => <span className="w-full block px-2 py-1.5 text-center text-slate-400 font-medium">{lastRowFecha(row.originalIndex)}</span>
-    },
-    {
-      key: 'turno',
-      label: 'Turno',
-      width: 'w-16',
-      type: 'select',
-      headerBgClass: defaultHeader,
-      renderCell: (row, _idx, isSelected) => {
-        if (!isSelected) {
-          return (
-            <span className="text-slate-300 block text-center truncate py-1.5 font-semibold select-all">
-              {row.turno || 'D'}
-            </span>
-          );
-        }
-        return (
-          <select
-            id={`lgg-cell-${row.originalIndex}-turno`}
-            value={row.turno || 'D'}
-            onChange={(e) => handleCellChange(row.originalIndex, 'turno', e.target.value)}
-            className="w-full bg-transparent border-0 py-1 text-center text-slate-300 focus:outline-none cursor-pointer focus:ring-1 focus:ring-blue-500 rounded text-xs"
-          >
-            <option value="D" className={isDark ? "bg-navy-950 text-slate-300" : "bg-white text-slate-800"}>Día</option>
-            <option value="N" className={isDark ? "bg-navy-950 text-slate-300" : "bg-white text-slate-800"}>Noche</option>
-          </select>
-        );
-      }
     },
     {
       key: 'comentarios',

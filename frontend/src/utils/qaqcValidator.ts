@@ -281,8 +281,7 @@ export function validateStructuralQAQC(discontinuidades: any[], corridas: any[])
         { key: 'relleno1', label: 'Relleno 1' },
         { key: 'dureza_pared', label: 'Dureza pared' },
         { key: 'agua', label: 'Presen. Agua' },
-        { key: 'geotecnico', label: 'Geotécnico' },
-        { key: 'tipo', label: 'Tipo' }
+        { key: 'geotecnico', label: 'Geotécnico' }
       ];
 
       mandatoryStructFields.forEach(f => {

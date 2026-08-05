@@ -111,8 +111,7 @@ export const MANDATORY_FIELD_RULES: MandatoryFieldRules = {
     dureza_pared: true,
     agua: true,
     geotecnico: true,
-    comentario: false,
-    tipo: false       // No persistible en BD
+    comentario: false
   },
   pltEnsayos: {
     fecha: true,
@@ -156,8 +155,8 @@ export const MANDATORY_FIELD_RULES: MandatoryFieldRules = {
 
 /** Claves que se excluyen de la detección de vacante (siempre tienen valor o no son datos). */
 const VACANCY_IGNORE_KEYS: Record<string, string[]> = {
-  corridas: ['de', 'a', 'turno', 'comentarios', 'orientacion', 'offset', 'small_frag_m'],
-  discontinuities: ['id', 'de', 'a', 'corrida', 'litologia', 'lito1', 'lito2', 'lito3', 'tipo', 'comentario'],
+  corridas: ['de', 'a', 'comentarios', 'orientacion', 'offset', 'small_frag_m'],
+  discontinuities: ['id', 'de', 'a', 'corrida', 'litologia', 'lito1', 'lito2', 'lito3', 'comentario'],
 };
 
 /** Claves donde el valor 0 también se considera "vacío" (placeholders de fila nueva). */

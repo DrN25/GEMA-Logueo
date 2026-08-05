@@ -40,7 +40,7 @@ const EDITABLE_COLS: (keyof Corrida)[] = [
   'frac_nat', 'lito1', 'lito2', 'lito3', 'resistencia', 'orientacion', 'offset',
   'tipo_est1', 'tipo_est2', 'frac_buz30', 'frac_buz60', 'frac_buz90',
   'abertura', 'rugosidad', 'jrc10', 'intemperismo', 'relleno1', 'relleno2',
-  'espesor', 'agua_obs', 'turno', 'comentarios'
+  'espesor', 'agua_obs', 'comentarios'
 ];
 
 const SUB_TABS = [

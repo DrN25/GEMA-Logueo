@@ -101,7 +101,6 @@ export default function ValidationPanel({ alerts, onFocusField }: ValidationPane
         case 'agua': column = 'Presen. Agua'; break;
         case 'geotecnico': column = 'Geotécnico'; break;
         case 'comentario': column = 'Comentario'; break;
-        case 'tipo': column = 'Tipo'; break;
       }
       return { tab: 'LG EST', column };
     }

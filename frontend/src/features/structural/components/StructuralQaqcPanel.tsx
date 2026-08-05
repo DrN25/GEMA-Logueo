@@ -2,7 +2,6 @@ import {
   AlertOctagon,
   AlertTriangle,
   CheckCircle,
-  Activity,
   Layers,
   ArrowRight,
   ShieldAlert,
@@ -64,7 +63,6 @@ export default function StructuralQaqcPanel({
         case 'agua': column = 'Presencia Agua'; break;
         case 'geotecnico': column = 'Geotécnico'; break;
         case 'comentario': column = 'Comentario'; break;
-        case 'tipo': column = 'Tipo (Nat/Mec)'; break;
       }
       return { column };
     };
@@ -72,8 +70,6 @@ export default function StructuralQaqcPanel({
     // --- Calculations ---
     const totalEstrucs = safeDiscs.length;
 
-    let naturalCount = 0;
-    let mecanicaCount = 0;
     let sumAlfa = 0;
     let validAlfaCount = 0;
     let sumBeta = 0;
@@ -82,12 +78,6 @@ export default function StructuralQaqcPanel({
     let validJrcCount = 0;
 
     safeDiscs.forEach(d => {
-      if (d.tipo === 'Natural') {
-        naturalCount++;
-      } else {
-        mecanicaCount++;
-      }
-
       const alfaVal = safeFloat(d.alfa, -1);
       if (alfaVal !== -1) {
         sumAlfa += alfaVal;
@@ -139,26 +129,6 @@ export default function StructuralQaqcPanel({
             <div className="mt-4">
               <span className="text-2xl font-black text-slate-100">{totalEstrucs}</span>
               <span className="text-xs text-slate-500 block mt-1">Registros estructurales</span>
-            </div>
-          </div>
-
-          {/* Natural vs Mechanical */}
-          <div className="glass-panel p-4 rounded-xl border border-navy-800/40 bg-navy-900/10 flex flex-col justify-between shadow-md">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Origen Juntas</span>
-              <Activity size={16} className="text-emerald-400" />
-            </div>
-            <div className="mt-4">
-              <div className="flex gap-4">
-                <div>
-                  <span className="text-lg font-extrabold text-emerald-400">{naturalCount}</span>
-                  <span className="text-[10px] text-slate-500 block">Naturales</span>
-                </div>
-                <div>
-                  <span className="text-lg font-extrabold text-blue-400">{mecanicaCount}</span>
-                  <span className="text-[10px] text-slate-500 block">Mecánicas</span>
-                </div>
-              </div>
             </div>
           </div>
 

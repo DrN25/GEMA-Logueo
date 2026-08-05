@@ -59,7 +59,6 @@ const EXPORT_FIELDS: ExportField[] = [
   { key: 'agua_obs', label: 'Presencia de Agua (ISRM)', isCheck: false, group: 'Discontinuidades y Relleno' },
   { key: 'geologo', label: 'Geotécnico', isCheck: false, group: 'Administración y Notas' },
   { key: 'fecha', label: 'Fecha', isCheck: false, group: 'Administración y Notas' },
-  { key: 'turno', label: 'Turno', isCheck: false, group: 'Administración y Notas' },
   { key: 'comentarios', label: 'Comentarios', isCheck: false, group: 'Administración y Notas' },
   { key: 'rmr76', label: 'RMR\'76', isCheck: false, group: 'Cálculos de RMR' },
   { key: 'rmr89', label: 'RMR\'89', isCheck: false, group: 'Cálculos de RMR' }
@@ -209,9 +208,8 @@ export default function LggExportModal({
       case 'espesor': return clean(row.espesor, true);
       case 'check_abert_rell': return errAbertRell ? '✘' : '✔';
       case 'agua_obs': return clean(row.agua_obs);
-      case 'geologo': return row.turno ? lastRowGeologo() : 'RD/RB';
+      case 'geologo': return lastRowGeologo();
       case 'fecha': return lastRowFecha();
-      case 'turno': return clean(row.turno);
       case 'comentarios': return clean(row.comentarios);
       case 'rmr76': return rmrRes.error || rmrRes.rmr_76 === undefined ? 'ERR' : rmrRes.rmr_76;
       case 'rmr89': return rmrRes.error || rmrRes.rmr_89 === undefined ? 'ERR' : rmrRes.rmr_89;

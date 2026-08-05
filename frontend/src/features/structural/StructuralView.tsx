@@ -31,7 +31,7 @@ interface StructuralViewProps {
 const EDITABLE_COLS: (keyof Discontinuidad)[] = [
   'profundidad', 'tipo_estructura', 'alfa', 'beta', 'forma', 'rugosidad',
   'jrc10', 'abertura', 'weathering', 'espesor', 'relleno1', 'relleno2',
-  'dureza_pared', 'agua', 'geotecnico', 'comentario', 'tipo'
+  'dureza_pared', 'agua', 'geotecnico', 'comentario'
 ];
 
 const SUB_TABS = [
@@ -150,8 +150,7 @@ export default function StructuralView({
           'Presen. Agua (ISRM)': disc.agua,
           'Geotécnico': disc.geotecnico,
           'Comentario': disc.comentario || '',
-          'Corrida': disc.corrida,
-          'Tipo': disc.tipo
+          'Corrida': disc.corrida
         };
       });
 

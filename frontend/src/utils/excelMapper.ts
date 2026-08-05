@@ -253,8 +253,7 @@ export const EXPECTED_STRUCT_FIELDS: MappingField[] = [
   { key: 'dureza_pared', label: 'Dureza Pared (ISRM)', required: false, synonyms: ['durezadepared', 'durezadepareddeestructura', 'durezapared', 'wallstrength', 'dureza'] },
   { key: 'agua', label: 'Presen. Agua (ISRM)', required: false, synonyms: ['presenaguaisrm', 'presenciadeaguaisrm', 'agua', 'aguaobs', 'water'] },
   { key: 'geotecnico', label: 'Geotécnico', required: false, synonyms: ['geotecnico', 'geologo', 'loggedby', 'geotechnician'] },
-  { key: 'comentario', label: 'Comentario / Intervalo', required: false, synonyms: ['comentarios', 'comentario', 'intervalocomentario', 'observacion', 'observaciones', 'remarks'] },
-  { key: 'tipo', label: 'Tipo (Nat/Mec)', required: false, synonyms: ['tipo', 'type', 'tipodejunta', 'juntatipo'] }
+  { key: 'comentario', label: 'Comentario / Intervalo', required: false, synonyms: ['comentarios', 'comentario', 'intervalocomentario', 'observacion', 'observaciones', 'remarks'] }
 ];
 
 export const EXPECTED_RMR_FIELDS: MappingField[] = [

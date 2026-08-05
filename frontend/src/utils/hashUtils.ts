@@ -126,7 +126,6 @@ export function extractPersistible(taladro: any): any {
       geotecnico: toStr(d.geotecnico),
       comentario: toStr(d.comentario),
       corrida: toNum(d.corrida),
-      tipo: toStr(d.tipo, 'Natural'),
     })),
     ensayos_plt: (taladro.ensayos_plt || []).map((p: any) => ({
       fecha: toStr(p.fecha),

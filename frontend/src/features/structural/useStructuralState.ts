@@ -13,7 +13,7 @@ interface UseStructuralStateProps {
 const EDITABLE_COLS: (keyof Discontinuidad)[] = [
   'profundidad', 'tipo_estructura', 'alfa', 'beta', 'forma', 'rugosidad',
   'jrc10', 'abertura', 'weathering', 'espesor', 'relleno1', 'relleno2',
-  'dureza_pared', 'agua', 'geotecnico', 'comentario', 'tipo'
+  'dureza_pared', 'agua', 'geotecnico', 'comentario'
 ];
 
 export function useStructuralState({
@@ -239,8 +239,7 @@ export function useStructuralState({
       agua: "-1",           // <-- Vacío
       geotecnico: "",
       comentario: "",
-      corrida: matchingCorrida ? matchingCorrida.corrida : 0,
-      tipo: "Natural"
+      corrida: matchingCorrida ? matchingCorrida.corrida : 0
     };
 
     onDiscontinuidadesChange([...discontinuidades, newRow]);
@@ -265,7 +264,6 @@ export function useStructuralState({
       relleno1: prevRow.relleno1,
       relleno2: prevRow.relleno2,
       agua: prevRow.agua,
-      tipo: prevRow.tipo,
       forma: prevRow.forma,
       rugosidad: prevRow.rugosidad,
       profundidad: prevRow.profundidad,

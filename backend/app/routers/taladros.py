@@ -355,9 +355,6 @@ def get_taladro(name: str, db: Session = Depends(get_db)):
         rqd_val = float(c.SumaFragmentos10cm) if c.SumaFragmentos10cm is not None else 0.0
         lrf_val = float(c.LongitudRocaFracturada) if c.LongitudRocaFracturada is not None else 0.0
         frf_val = int(c.FRF) if c.FRF is not None else calc_frf(lrf_val)
-        
-        # Reconstrucción matemática del balance de fragmentos del testigo
-        calculated_small_frag = max(0.0, round(rec_val - rqd_val - lrf_val, 2))
 
         corridas_list.append(CorridaSchema(
             id=c.LogueoGeneralID,
@@ -368,7 +365,7 @@ def get_taladro(name: str, db: Session = Depends(get_db)):
             rqd_m=rqd_val,
             lrf_m=lrf_val,
             frf=frf_val,
-            small_frag_m=calculated_small_frag, # Campo calculado dinámicamente
+            small_frag_m=float(c.SmallFrag_m) if c.SmallFrag_m is not None else -1.0,
             lito1=lito_map.get(c.Litologia1ID) or "-1",
             lito2=lito_map.get(c.Litologia2ID) or "-1",
             lito3=lito_map.get(c.Litologia3ID) or "-1",
@@ -389,7 +386,6 @@ def get_taladro(name: str, db: Session = Depends(get_db)):
             relleno2=c.TipoRelleno2 or "-1",
             espesor=float(c.EspesorRelleno) if c.EspesorRelleno is not None else -1.0,
             agua_obs=c.PresenciaAgua or "-1",
-            turno="D",
             comentarios=c.Comentarios or ""
         ))
 
@@ -442,8 +438,7 @@ def get_taladro(name: str, db: Session = Depends(get_db)):
             agua=d.PresenciaAgua or "-1",
             geotecnico=geotecnico_map.get(d.GeotecnicoID) or "-1",
             comentario=d.IntervaloComentario or "",
-            corrida=corrida_num,
-            tipo="Natural"
+            corrida=corrida_num
         ))
 
     # 4. Recuperar Ensayos PLT
