@@ -574,7 +574,7 @@ export default function Dashboard({
 
               {/* Taladros Registrados en BD */}
               {!loading && taladros.map(t => {
-                const isPending = pendingTaladroNames.includes(t.name);
+                const isPending = pendingTaladroNames.some(p => p.trim().toUpperCase() === t.name.trim().toUpperCase());
                 return (
                   <tr
                     key={t.name}

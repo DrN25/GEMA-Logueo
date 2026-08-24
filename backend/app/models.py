@@ -125,7 +125,6 @@ class LogueoGeotecnicoGeneral(Base):
     IntervaloA = Column(Numeric(10, 2), nullable=False)
     LongitudRecuperada = Column(Numeric(10, 2), nullable=True)
     SumaFragmentos10cm = Column(Numeric(10, 2), nullable=True)
-    SmallFrag_m = Column(Numeric(10, 2), nullable=True)  # Longitud de fragmentos < 10cm (migración add_SmallFrag.sql)
     LongitudRocaFracturada = Column(Numeric(10, 2), nullable=True)
     FRF = Column(Numeric(10, 2), nullable=True)
     NumFracturasNaturales = Column(Integer, nullable=True)
