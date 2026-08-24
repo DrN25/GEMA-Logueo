@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Construction,
   Database
@@ -29,6 +29,26 @@ import { resolveLithologyCascade } from './utils/catalogData';
 import { calculateRowRmr } from './utils/formulaEngine';
 import { computeTaladroHash } from './utils/hashUtils';
 import { computeTaladroDiff, computeAllTaladrosDiff, type TaladroDiffSummary } from './utils/diffUtils';
+import {
+  addPendingTaladro,
+  removePendingTaladro,
+  getUnsavedTaladros,
+  safeSetItem,
+  evictTaladro,
+  getCachedTaladroRaw,
+  setCachedTaladro,
+  setCachedSnapshotData,
+  setCachedSnapshotHash,
+  getTaladroStorageKey,
+  getSnapshotStorageKey
+} from './utils/storageManager';
+import {
+  isTaladroPending,
+  discardLocalTaladro,
+  getLocalOnlyPendingSummaries,
+  getPendingTaladroNames,
+  verifyTaladroNameCollisions
+} from './utils/taladroRegistry';
 
 interface Survey {
   id?: number;   // SurveyID (para UPSERT backend)
@@ -51,7 +71,6 @@ interface Corrida {
   lito3?: string;
   resistencia: string;
   orientacion: string;
-  offset?: number;
   tipo_est1: string;
   tipo_est2?: string;
   frac_nat: number;
@@ -185,16 +204,18 @@ export default function App() {
   });
   const [taladros, setTaladros] = useState<TaladroSummary[]>([]);
   const [activeTaladro, setActiveTaladro] = useState<Taladro | null>(() => {
-    const savedName = localStorage.getItem('geolog_active_taladro_name');
-    if (savedName) {
-      const cachedStr = localStorage.getItem(`geolog_taladro_${savedName}`);
-      if (cachedStr) {
-        try {
+    try {
+      const savedName = localStorage.getItem('geolog_active_taladro_name');
+      if (savedName) {
+        const cachedStr = getCachedTaladroRaw(savedName);
+        if (cachedStr) {
           const parsed = JSON.parse(cachedStr);
           if (!parsed.ensayos_plt) parsed.ensayos_plt = [];
           return parsed;
-        } catch (e) {}
+        }
       }
+    } catch (e) {
+      console.warn("Error al restaurar taladro activo desde localStorage:", e);
     }
     return null;
   });
@@ -209,9 +230,9 @@ export default function App() {
   const [showCatalogsModal, setShowCatalogsModal] = useState<boolean>(false);
   const [showFormulasModal, setShowFormulasModal] = useState<boolean>(false);
 
-  // CatÃ¡logo de CampaÃ±as dinÃ¡mico desde la BD
+  // Catálogo de Campañas dinámico desde la BD
   const [availableCampanas, setAvailableCampanas] = useState<string[]>([
-    "CampaÃ±a 2020", "CampaÃ±a 2021", "CampaÃ±a 2022", "CampaÃ±a 2023", "CampaÃ±a 2024", "CampaÃ±a 2025", "CampaÃ±a 2026"
+    "Campaña 2020", "Campaña 2021", "Campaña 2022", "Campaña 2023", "Campaña 2024", "Campaña 2025", "Campaña 2026"
   ]);
 
   useEffect(() => {
@@ -232,7 +253,7 @@ export default function App() {
     }
   };
 
-  // Estados del Dashboard: KPIs, paginaciÃ³n, filtros de fecha y bÃºsqueda por botÃ³n
+  // Estados del Dashboard: KPIs, paginación, filtros de fecha y búsqueda por botón
   const [dashboardKpis, setDashboardKpis] = useState<any>(null);
   const [dashboardLoading, setDashboardLoading] = useState<boolean>(false);
   const [page, setPage] = useState<number>(() => {
@@ -277,8 +298,7 @@ export default function App() {
     }
   });
 
-  // Filtros avanzados del dashboard (proyecto / geÃ³logo / diÃ¡metro) â€” se aplican
-  // en el pipeline de filtrado ANTES de la paginaciÃ³n para mantener coherencia.
+  // Filtros avanzados del dashboard (proyecto / geólogo / diámetro)
   const [advancedFilters, setAdvancedFilters] = useState<{ proyecto: string; geologo: string; diametro: string }>({
     proyecto: '',
     geologo: '',
@@ -289,7 +309,7 @@ export default function App() {
   const [serverTotalFiltered, setServerTotalFiltered] = useState<number>(0);
   const [serverTotalPages, setServerTotalPages] = useState<number>(1);
 
-  // Persistir parÃ¡metros de dashboard en localStorage
+  // Persistir parámetros de dashboard en localStorage
   useEffect(() => {
     try {
       localStorage.setItem('geolog_dashboard_page', String(page));
@@ -326,36 +346,37 @@ export default function App() {
 
   const [isLoadingTaladro, setIsLoadingTaladro] = useState<boolean>(false);
 
-  // â”€â”€â”€ SNAPSHOT HASH: DetecciÃ³n inteligente de dirty state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // dbSnapshotHash guarda el hash del estado del taladro tal como estÃ¡ en la BD.
-  // null = taladro nuevo que nunca ha existido en BD (siempre dirty).
+  // Snapshot y Hash del estado del taladro en BD
   const [dbSnapshotHash, setDbSnapshotHash] = useState<number | null>(() => {
-    const savedName = localStorage.getItem('geolog_active_taladro_name');
-    if (savedName) {
-      const savedHash = localStorage.getItem(`geolog_snapshot_hash_${savedName}`);
-      if (savedHash) {
-        const parsed = Number(savedHash);
-        return isNaN(parsed) ? null : parsed;
+    try {
+      const savedName = localStorage.getItem('geolog_active_taladro_name');
+      if (savedName) {
+        const savedHash = localStorage.getItem(`geolog_snapshot_hash_${savedName}`);
+        if (savedHash) {
+          const parsed = Number(savedHash);
+          return isNaN(parsed) ? null : parsed;
+        }
       }
-    }
-    return null;
-  });
-  const [dbSnapshotData, setDbSnapshotData] = useState<Taladro | null>(() => {
-    const savedName = localStorage.getItem('geolog_active_taladro_name');
-    if (savedName) {
-      const cachedSnapshot = localStorage.getItem(`geolog_snapshot_data_${savedName}`);
-      if (cachedSnapshot) {
-        try {
-          const parsed = JSON.parse(cachedSnapshot);
-          if (!parsed.ensayos_plt) parsed.ensayos_plt = [];
-          return parsed;
-        } catch (e) {}
-      }
-    }
+    } catch (e) {}
     return null;
   });
 
-  // Modal de resultado de guardado con reporte de auditorÃ­a
+  const [dbSnapshotData, setDbSnapshotData] = useState<Taladro | null>(() => {
+    try {
+      const savedName = localStorage.getItem('geolog_active_taladro_name');
+      if (savedName) {
+        const cachedSnapshot = localStorage.getItem(`geolog_snapshot_data_${savedName}`);
+        if (cachedSnapshot) {
+          const parsed = JSON.parse(cachedSnapshot);
+          if (!parsed.ensayos_plt) parsed.ensayos_plt = [];
+          return parsed;
+        }
+      }
+    } catch (e) {}
+    return null;
+  });
+
+  // Modal de resultado de guardado con reporte de auditoría
   const [saveResultModal, setSaveResultModal] = useState<{
     show: boolean;
     success: boolean;
@@ -364,41 +385,28 @@ export default function App() {
     diffSummary?: TaladroDiffSummary | null;
   }>({ show: false, success: false, message: '' });
 
-  // Modal de pre-confirmaciÃ³n de guardado
+  // Modal de pre-confirmación de guardado
   const [showSaveConfirmModal, setShowSaveConfirmModal] = useState<boolean>(false);
 
-  // Modal de confirmaciÃ³n para descartar cambios
+  // Modal de confirmación para descartar cambios
   const [showDiscardModal, setShowDiscardModal] = useState<boolean>(false);
 
   // Contador reactivo de taladros con cambios pendientes
   const [unsavedTaladrosCount, setUnsavedTaladrosCount] = useState<number>(() => {
-    try {
-      const list = JSON.parse(localStorage.getItem('geolog_unsaved_taladros') || '[]');
-      return Array.isArray(list) ? list.length : 0;
-    } catch (e) {
-      return 0;
-    }
+    return getUnsavedTaladros().length;
   });
 
-  // Helper para mantener la lista real de taladros con cambios pendientes en localStorage y React state
-  const updateUnsavedTracker = useCallback((name: string, isUnsaved: boolean) => {
-    try {
-      const list: string[] = JSON.parse(localStorage.getItem('geolog_unsaved_taladros') || '[]');
-      let newList = list;
-      if (isUnsaved) {
-        if (!list.includes(name)) {
-          newList = [...list, name];
-          localStorage.setItem('geolog_unsaved_taladros', JSON.stringify(newList));
-        }
-      } else {
-        if (list.includes(name)) {
-          newList = list.filter(n => n !== name);
-          localStorage.setItem('geolog_unsaved_taladros', JSON.stringify(newList));
-        }
-      }
-      setUnsavedTaladrosCount(newList.length);
-    } catch (e) {}
-  }, []);
+  // Resúmenes de borradores locales puros (que NO existen en BD)
+  const pendingTaladroSummaries = useMemo(
+    () => getLocalOnlyPendingSummaries(taladros.map(t => t.name)),
+    [taladros, activeTaladro, syncStatus]
+  );
+
+  // Nombres de TODOS los taladros pendientes (para marcar badge BORRADOR en filas de BD)
+  const pendingTaladroNames = useMemo(
+    () => getPendingTaladroNames(),
+    [activeTaladro, syncStatus]
+  );
 
   // Initialize Dark Mode Class
   useEffect(() => {
@@ -470,7 +478,7 @@ export default function App() {
     fetchTaladros();
   }, []);
 
-  // Filtrado y paginaciÃ³n en memoria para resiliencia offline/online
+  // Filtrado y paginación en memoria para resiliencia offline/online
   // Fecha local YYYY-MM-DD (evita el desfase UTC de toISOString en zonas negativas)
   const toLocalDateStr = (d: Date) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -541,7 +549,7 @@ export default function App() {
     return list;
   }, [taladros, activeDateRange, searchTerm, isGlobalSearch, advancedFilters, isOfflineMode]);
 
-  // â”€â”€â”€ CÃLCULO DINÃMICO DE KPIS PARA EL DASHBOARD â”€â”€â”€
+  // ─── CÁLCULO DINÁMICO DE KPIS PARA EL DASHBOARD ───
   const computedDashboardKpis = useMemo(() => {
     if (dashboardKpis) return dashboardKpis;
     const list = filteredTaladros;
@@ -778,7 +786,7 @@ export default function App() {
   const handleSelectTaladro = async (name: string, shouldSwitchView: boolean = true) => {
     setIsLoadingTaladro(true);
     try {
-      const res = await fetch(`${API_BASE}/api/taladros/${name}`);
+      const res = await fetch(`${API_BASE}/api/taladros/${encodeURIComponent(name)}`);
       if (res.ok) {
         const data = await res.json();
         if (!data.ensayos_plt) data.ensayos_plt = [];
@@ -811,21 +819,20 @@ export default function App() {
           });
         }
 
-        // Snapshot original de la BD (fuente de verdad para auditorÃ­a y dirty detection)
+        // Snapshot original de la BD (fuente de verdad para auditoría y dirty detection)
         const dbSnapshot = JSON.parse(JSON.stringify(data));
         const dbHash = computeTaladroHash(data);
         setDbSnapshotData(dbSnapshot);
         setDbSnapshotHash(dbHash);
-        localStorage.setItem(`geolog_snapshot_data_${data.name}`, JSON.stringify(dbSnapshot));
-        localStorage.setItem(`geolog_snapshot_hash_${data.name}`, String(dbHash));
+        setCachedSnapshotData(data.name, dbSnapshot);
+        setCachedSnapshotHash(data.name, dbHash);
 
         // Verificar si existe un borrador con cambios pendientes en localStorage
         let taladroToActivate = data;
         let isUnsaved = false;
         try {
-          const unsavedList: string[] = JSON.parse(localStorage.getItem('geolog_unsaved_taladros') || '[]');
-          if (unsavedList.includes(name)) {
-            const cachedDraftStr = localStorage.getItem(`geolog_taladro_${name}`);
+          if (isTaladroPending(name)) {
+            const cachedDraftStr = getCachedTaladroRaw(name);
             if (cachedDraftStr) {
               const cachedDraft = JSON.parse(cachedDraftStr);
               if (!cachedDraft.ensayos_plt) cachedDraft.ensayos_plt = [];
@@ -840,28 +847,29 @@ export default function App() {
         }
 
         if (!isUnsaved) {
-          // Si el taladro no tiene modificaciones pendientes, resguardar la copia limpia de BD y desmarcar en tracker
-          localStorage.setItem(`geolog_taladro_${name}`, JSON.stringify(data));
-          updateUnsavedTracker(name, false);
+          // Si el taladro no tiene modificaciones pendientes, resguardar copia limpia y desmarcar en pending
+          setCachedTaladro(name, data);
+          removePendingTaladro(name);
         } else {
-          updateUnsavedTracker(name, true);
+          addPendingTaladro(name);
         }
 
         setActiveTaladro(taladroToActivate);
         setOriginalName(data.name);
         setSyncStatus(isUnsaved ? 'unsaved' : 'synced');
+        setUnsavedTaladrosCount(getUnsavedTaladros().length);
         if (shouldSwitchView) {
           setCurrentView('collar');
         }
         setSelectedRowIndex(0);
       } else {
-        throw new Error();
+        throw new Error("HTTP " + res.status);
       }
     } catch (e) {
       console.warn("Loading taladro offline for name: ", name);
-      const cachedTaladro = localStorage.getItem(`geolog_taladro_${name}`);
-      if (cachedTaladro) {
-        const parsed = JSON.parse(cachedTaladro);
+      const cachedDraftStr = getCachedTaladroRaw(name);
+      if (cachedDraftStr) {
+        const parsed = JSON.parse(cachedDraftStr);
         if (!parsed.ensayos_plt) parsed.ensayos_plt = [];
 
         if (parsed.corridas && parsed.discontinuidades) {
@@ -902,18 +910,23 @@ export default function App() {
           }
         } catch (err) {}
 
+        const isPureLocal = !dbSnapshot;
         if (!dbSnapshot) {
-          dbSnapshot = JSON.parse(JSON.stringify(parsed));
-          dbHash = computeTaladroHash(parsed);
+          dbHash = null;
         }
 
-        const isUnsaved = computeTaladroHash(parsed) !== dbHash;
+        const isUnsaved = isPureLocal || (computeTaladroHash(parsed) !== dbHash);
         setDbSnapshotData(dbSnapshot);
         setDbSnapshotHash(dbHash);
         setActiveTaladro(parsed);
-        setOriginalName(parsed.name);
+        setOriginalName(isPureLocal ? null : parsed.name);
         setSyncStatus(isUnsaved ? 'unsaved' : 'synced');
-        updateUnsavedTracker(name, isUnsaved);
+        if (isUnsaved) {
+          addPendingTaladro(name);
+        } else {
+          removePendingTaladro(name);
+        }
+        setUnsavedTaladrosCount(getUnsavedTaladros().length);
       } else {
         const defaultTal: Taladro = {
           name,
@@ -942,7 +955,10 @@ export default function App() {
         setActiveTaladro(defaultTal);
         setOriginalName(null);
         setDbSnapshotHash(null);
+        setDbSnapshotData(null);
         setSyncStatus('unsaved');
+        addPendingTaladro(name);
+        setUnsavedTaladrosCount(getUnsavedTaladros().length);
       }
       if (shouldSwitchView) {
         setCurrentView('collar');
@@ -953,8 +969,6 @@ export default function App() {
     }
   };
 
-  // Verificación de unicidad de nombre contra el servidor (patrón Mapeo ventanas-check).
-  // Fallback: lista local de la página actual si el servidor no responde.
   const checkNameExists = useCallback(async (name: string): Promise<boolean> => {
     const clean = name.trim().toUpperCase();
     if (!clean) return false;
@@ -969,8 +983,8 @@ export default function App() {
   }, [taladros]);
 
   const handleCreateTaladro = (newTaladro: Taladro, targetView: string = 'collar') => {
-    // Solo guarda localmente — NO sube a BD hasta que el usuario presione Guardar
-    localStorage.setItem(`geolog_taladro_${newTaladro.name}`, JSON.stringify(newTaladro));
+    setCachedTaladro(newTaladro.name, newTaladro);
+    addPendingTaladro(newTaladro.name);
 
     const newSummary: TaladroSummary = {
       name: newTaladro.name,
@@ -985,11 +999,14 @@ export default function App() {
 
     const updatedSummaries = [...taladros.filter(t => t.name !== newTaladro.name), newSummary];
     setTaladros(updatedSummaries);
-    localStorage.setItem('geolog_taladros_summaries', JSON.stringify(updatedSummaries));
+    safeSetItem('geolog_taladros_summaries', JSON.stringify(updatedSummaries));
 
     setActiveTaladro(newTaladro);
-    setOriginalName(null); // Nuevo: nunca ha existido en BD
-    setDbSnapshotHash(null); // null → siempre dirty hasta primer guardado exitoso
+    setOriginalName(null);
+    setDbSnapshotHash(null);
+    setDbSnapshotData(null);
+    setSyncStatus('unsaved');
+    setUnsavedTaladrosCount(getUnsavedTaladros().length);
     setCurrentView(targetView);
   };
 
@@ -999,14 +1016,12 @@ export default function App() {
     const trimmedNewName = newName.trim().toUpperCase();
     if (!trimmedNewName || oldName === trimmedNewName) return;
 
-    // VALIDACIÓN DE UNICIDAD: verificar contra el servidor (puede estar en cualquier página)
     const isDuplicate = await checkNameExists(trimmedNewName);
     if (isDuplicate) {
       alert(`⚠️ El código de taladro '${trimmedNewName}' ya pertenece a otro sondaje registrado en el proyecto. No se permiten nombres duplicados.`);
       return;
     }
 
-    // Siempre usar activeTaladro como base (es el estado mÃ¡s reciente en RAM)
     const updatedTal = { ...activeTaladro, name: trimmedNewName };
     setActiveTaladro(updatedTal);
 
@@ -1022,12 +1037,16 @@ export default function App() {
       return t;
     });
     setTaladros(updatedSummaries);
-    localStorage.setItem('geolog_taladros_summaries', JSON.stringify(updatedSummaries));
+    safeSetItem('geolog_taladros_summaries', JSON.stringify(updatedSummaries));
 
-    // Mover en localStorage: escribir con nueva clave, borrar la vieja
-    localStorage.setItem(`geolog_taladro_${trimmedNewName}`, JSON.stringify(updatedTal));
-    localStorage.removeItem(`geolog_taladro_${oldName}`);
-    // El dirty state se recalcula automÃ¡ticamente por el useEffect de hash
+    setCachedTaladro(trimmedNewName, updatedTal);
+    localStorage.removeItem(getTaladroStorageKey(oldName));
+
+    if (isTaladroPending(oldName)) {
+      removePendingTaladro(oldName);
+      addPendingTaladro(trimmedNewName);
+    }
+    setUnsavedTaladrosCount(getUnsavedTaladros().length);
   };
 
   const handleImportExcel = (importedRows: Corrida[], createNewWithName?: string) => {
@@ -1301,24 +1320,48 @@ export default function App() {
   };
 
   const handleDeleteTaladro = async (name: string) => {
-    if (!confirm(`Â¿EstÃ¡ seguro de que desea eliminar permanentemente el taladro ${name}? Se borrarÃ¡ de la base de datos.`)) {
+    const isPureLocal = !localStorage.getItem(getSnapshotStorageKey(name));
+    const confirmMsg = isPureLocal
+      ? `¿Está seguro de que desea descartar el borrador local ${name}?`
+      : `¿Está seguro de que desea eliminar permanentemente el taladro ${name}? Se borrará de la base de datos.`;
+
+    if (!confirm(confirmMsg)) {
+      return;
+    }
+
+    if (isPureLocal) {
+      discardLocalTaladro(name);
+      const updatedSummaries = taladros.filter(t => t.name !== name);
+      setTaladros(updatedSummaries);
+      safeSetItem('geolog_taladros_summaries', JSON.stringify(updatedSummaries));
+
+      if (activeTaladro?.name === name) {
+        setActiveTaladro(null);
+        setDbSnapshotHash(null);
+        setDbSnapshotData(null);
+      }
+      setUnsavedTaladrosCount(getUnsavedTaladros().length);
+      setCurrentView('dashboard');
+      fetchTaladros(page, activeDateRange, searchTerm, isGlobalSearch, advancedFilters);
       return;
     }
 
     setSyncStatus('saving');
     const updatedSummaries = taladros.filter(t => t.name !== name);
-    localStorage.setItem('geolog_taladros_summaries', JSON.stringify(updatedSummaries));
-    localStorage.removeItem(`geolog_taladro_${name}`);
+    safeSetItem('geolog_taladros_summaries', JSON.stringify(updatedSummaries));
+    evictTaladro(name);
+    removePendingTaladro(name);
+    setUnsavedTaladrosCount(getUnsavedTaladros().length);
 
     try {
-      const res = await fetch(`${API_BASE}/api/taladros/${name}`, {
+      const res = await fetch(`${API_BASE}/api/taladros/${encodeURIComponent(name)}`, {
         method: 'DELETE'
       });
       if (res.ok) {
         setSyncStatus('synced');
-        setSyncMessage(`Taladro ${name} eliminado con Ã©xito del servidor.`);
+        setSyncMessage(`Taladro ${name} eliminado con éxito del servidor.`);
       } else {
-        throw new Error();
+        throw new Error("HTTP " + res.status);
       }
     } catch (e) {
       setSyncStatus('offline');
@@ -1328,22 +1371,47 @@ export default function App() {
     if (activeTaladro?.name === name) {
       setActiveTaladro(null);
       setDbSnapshotHash(null);
+      setDbSnapshotData(null);
     }
     setCurrentView('dashboard');
-    // Refetch de la página actual (paginación server-side)
     fetchTaladros(page, activeDateRange, searchTerm, isGlobalSearch, advancedFilters);
   };
 
   const handleSaveActive = async () => {
     if (!activeTaladro) return;
 
+    // QA/QC Validation check before saving
+    const mandatoryErrors = validateLogueoMandatory(activeTaladro);
+    if (mandatoryErrors.length > 0) {
+      setSaveResultModal({
+        show: true,
+        success: false,
+        message: `No se puede guardar ${activeTaladro.name}: existen ${mandatoryErrors.length} campos obligatorios vacíos.`,
+        details: mandatoryErrors.map(e => `${e.fieldLabel || e.fieldKey}: ${e.message}`).join('\n')
+      });
+      return;
+    }
+
+    // Name collision check if renaming
+    if (originalName && originalName !== activeTaladro.name) {
+      const check = await verifyTaladroNameCollisions([activeTaladro.name], API_BASE, taladros.map(t => t.name));
+      if (!check.ok) {
+        setSaveResultModal({
+          show: true,
+          success: false,
+          message: `No se puede guardar: el código de taladro '${activeTaladro.name}' ya existe en el proyecto.`
+        });
+        return;
+      }
+    }
+
     setSyncStatus('saving');
     setSyncMessage("Sincronizando con SQL Server...");
 
-    // 1. Actualizar localStorage como respaldo de seguridad
-    localStorage.setItem(`geolog_taladro_${activeTaladro.name}`, JSON.stringify(activeTaladro));
+    // 1. Actualizar localStorage como respaldo seguro con safeSetItem
+    setCachedTaladro(activeTaladro.name, activeTaladro);
 
-    // 2. Actualizar summaries (solo cache offline; la lista online la trae el servidor)
+    // 2. Actualizar summaries
     const summaryIndex = taladros.findIndex(t => t.name === activeTaladro.name);
     if (summaryIndex !== -1) {
       const updatedSummaries = [...taladros];
@@ -1352,11 +1420,11 @@ export default function App() {
         corridas_count: activeTaladro.corridas.length,
         surveys_count: activeTaladro.surveys.length
       };
-      localStorage.setItem('geolog_taladros_summaries', JSON.stringify(updatedSummaries));
+      safeSetItem('geolog_taladros_summaries', JSON.stringify(updatedSummaries));
     }
 
     try {
-      // 3. POST atÃ³mico al backend (todo o nada)
+      // 3. POST atómico al backend (todo o nada)
       const res = await fetch(`${API_BASE}/api/taladros`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1367,15 +1435,14 @@ export default function App() {
         // 4. Si hubo rename, borrar el viejo en BD y en localStorage
         if (originalName && originalName !== activeTaladro.name) {
           try {
-            await fetch(`${API_BASE}/api/taladros/${originalName}`, { method: 'DELETE' });
+            await fetch(`${API_BASE}/api/taladros/${encodeURIComponent(originalName)}`, { method: 'DELETE' });
           } catch (delErr) {
             console.error("Failed to delete old taladro after rename:", delErr);
           }
-          // Limpiar la clave vieja de localStorage
-          localStorage.removeItem(`geolog_taladro_${originalName}`);
+          discardLocalTaladro(originalName);
         }
 
-        // 5. Calcular auditorÃ­a de cambios en comparaciÃ³n con el snapshot original
+        // 5. Calcular auditoría de cambios
         const diffSummary = computeTaladroDiff(dbSnapshotData, activeTaladro);
 
         // 6. Actualizar snapshot hash y snapshot data
@@ -1383,14 +1450,15 @@ export default function App() {
         const newHash = computeTaladroHash(activeTaladro);
         setDbSnapshotData(newSnapshot);
         setDbSnapshotHash(newHash);
-        localStorage.setItem(`geolog_snapshot_data_${activeTaladro.name}`, JSON.stringify(newSnapshot));
-        localStorage.setItem(`geolog_snapshot_hash_${activeTaladro.name}`, String(newHash));
+        setCachedSnapshotData(activeTaladro.name, newSnapshot);
+        setCachedSnapshotHash(activeTaladro.name, newHash);
         setOriginalName(activeTaladro.name);
         setSyncStatus('synced');
-        updateUnsavedTracker(activeTaladro.name, false);
-        setSyncMessage("Cambios guardados y auditados con Ã©xito en SQL Server.");
+        removePendingTaladro(activeTaladro.name);
+        setUnsavedTaladrosCount(getUnsavedTaladros().length);
+        setSyncMessage("Cambios guardados y auditados con éxito en SQL Server.");
 
-        // 7. Modal de Ã©xito con reporte de auditorÃ­a
+        // 7. Modal de éxito con reporte de auditoría
         setSaveResultModal({
           show: true,
           success: true,
@@ -1400,10 +1468,9 @@ export default function App() {
           diffSummary
         });
 
-        // Refetch de la página actual (paginación server-side)
+        // Refetch de la página actual
         fetchTaladros(page, activeDateRange, searchTerm, isGlobalSearch, advancedFilters);
       } else {
-        // Error HTTP del servidor (ej. 500)
         const errorData = await res.json().catch(() => ({ detail: "Error interno del servidor." }));
         const detail = errorData.detail || "Error de consistencia o restricciones en la base de datos.";
         setSyncStatus('unsaved');
@@ -1411,38 +1478,37 @@ export default function App() {
         setSaveResultModal({
           show: true,
           success: false,
-          message: `No se pudo guardar el taladro ${activeTaladro.name}. NingÃºn registro fue modificado en la base de datos.`,
+          message: `No se pudo guardar el taladro ${activeTaladro.name}. Ningún registro fue modificado en la base de datos.`,
           details: detail
         });
       }
     } catch (e) {
-      // Error de red / conexiÃ³n
       setSyncStatus('unsaved');
-      setSyncMessage("Sin conexiÃ³n con el servidor.");
+      setSyncMessage("Sin conexión con el servidor.");
       setSaveResultModal({
         show: true,
         success: false,
-        message: `No se pudo establecer conexiÃ³n con el servidor de base de datos.`,
-        details: "Verifique que el backend estÃ© corriendo y que la red estÃ© disponible. Sus datos estÃ¡n preservados en almacenamiento local."
+        message: `No se pudo establecer conexión con el servidor de base de datos.`,
+        details: "Verifique que el backend esté corriendo y que la red esté disponible. Sus datos están preservados en almacenamiento local."
       });
     }
   };
 
-  // â”€â”€â”€ MANEJADOR DE CONFIRMACIÃ“N DE GUARDADO (DESDE MODAL) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── MANEJADOR DE CONFIRMACIÓN DE GUARDADO (DESDE MODAL) ─────────────────────
   const handleConfirmSave = async (scope: 'active' | 'all' = 'active') => {
     setShowSaveConfirmModal(false);
     setIsLoadingTaladro(true);
 
     try {
       if (scope === 'all') {
-        // Guardar todos los taladros con cambios pendientes registrados
-        let unsavedNames: string[] = [];
-        try {
-          unsavedNames = JSON.parse(localStorage.getItem('geolog_unsaved_taladros') || '[]');
-        } catch (e) {}
-
+        let unsavedNames = getUnsavedTaladros();
         if (activeTaladro && !unsavedNames.includes(activeTaladro.name)) {
           unsavedNames.push(activeTaladro.name);
+        }
+
+        if (unsavedNames.length === 0) {
+          setIsLoadingTaladro(false);
+          return;
         }
 
         setSyncStatus('saving');
@@ -1452,9 +1518,9 @@ export default function App() {
         let errorsCount = 0;
 
         for (const name of unsavedNames) {
-          let taladroData = name === activeTaladro?.name ? activeTaladro : null;
+          let taladroData: Taladro | null = (activeTaladro && activeTaladro.name === name) ? activeTaladro : null;
           if (!taladroData) {
-            const cachedStr = localStorage.getItem(`geolog_taladro_${name}`);
+            const cachedStr = getCachedTaladroRaw(name);
             if (cachedStr) {
               try {
                 taladroData = JSON.parse(cachedStr);
@@ -1463,6 +1529,13 @@ export default function App() {
           }
 
           if (taladroData) {
+            // Verificar obligatorios
+            const mandatory = validateLogueoMandatory(taladroData);
+            if (mandatory.length > 0) {
+              errorsCount++;
+              continue;
+            }
+
             try {
               const res = await fetch(`${API_BASE}/api/taladros`, {
                 method: 'POST',
@@ -1471,11 +1544,11 @@ export default function App() {
               });
               if (res.ok) {
                 savedCount++;
-                updateUnsavedTracker(name, false);
+                removePendingTaladro(name);
                 const dbSnapshot = JSON.parse(JSON.stringify(taladroData));
                 const dbHash = computeTaladroHash(taladroData);
-                localStorage.setItem(`geolog_snapshot_data_${name}`, JSON.stringify(dbSnapshot));
-                localStorage.setItem(`geolog_snapshot_hash_${name}`, String(dbHash));
+                setCachedSnapshotData(name, dbSnapshot);
+                setCachedSnapshotHash(name, dbHash);
               } else {
                 errorsCount++;
               }
@@ -1485,12 +1558,13 @@ export default function App() {
           }
         }
 
-        if (activeTaladro) {
+        if (activeTaladro && isTaladroPending(activeTaladro.name) === false) {
           const newHash = computeTaladroHash(activeTaladro);
           setDbSnapshotData(JSON.parse(JSON.stringify(activeTaladro)));
           setDbSnapshotHash(newHash);
           setSyncStatus('synced');
         }
+        setUnsavedTaladrosCount(getUnsavedTaladros().length);
 
         setSaveResultModal({
           show: true,
@@ -1499,10 +1573,8 @@ export default function App() {
             ? `Se guardaron exitosamente ${savedCount} sondaje(s) en SQL Server.`
             : `Sincronización parcial: ${savedCount} guardados, ${errorsCount} con errores.`
         });
-        // Refetch de la página actual (paginación server-side)
         fetchTaladros(page, activeDateRange, searchTerm, isGlobalSearch, advancedFilters);
       } else {
-        // Alcance: Solo Taladro Activo
         await handleSaveActive();
       }
     } finally {
@@ -1510,78 +1582,73 @@ export default function App() {
     }
   };
 
-  // â”€â”€â”€ DESCHACAR CAMBIOS NO GUARDADOS (REVERT A BASELINE DE BD) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── DESCARTAR CAMBIOS NO GUARDADOS (REVERT A BASELINE DE BD) ────────────────
   const handleConfirmDiscard = (scope: 'active' | 'all' = 'active') => {
-    if (!activeTaladro) return;
-    const name = activeTaladro.name;
-
     if (scope === 'all') {
-      // 1. Limpiar todos los borradores temporales de localStorage
-      const keysToRemove: string[] = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k && k.startsWith('geolog_taladro_')) {
-          keysToRemove.push(k);
+      const unsavedNames = getUnsavedTaladros();
+      for (const name of unsavedNames) {
+        const snap = localStorage.getItem(getSnapshotStorageKey(name));
+        if (snap) {
+          try {
+            const parsedSnap = JSON.parse(snap);
+            setCachedTaladro(name, parsedSnap);
+            removePendingTaladro(name);
+          } catch (e) {
+            discardLocalTaladro(name);
+          }
+        } else {
+          discardLocalTaladro(name);
         }
       }
-      keysToRemove.forEach(k => localStorage.removeItem(k));
-      localStorage.removeItem('geolog_unsaved_taladros');
-      setUnsavedTaladrosCount(0);
 
-      // 2. Revertir el taladro activo si existe en BD
-      if (dbSnapshotData) {
-        const restored = JSON.parse(JSON.stringify(dbSnapshotData));
-        setActiveTaladro(restored);
-        localStorage.setItem(`geolog_taladro_${name}`, JSON.stringify(restored));
-        setSyncStatus('synced');
-        setSyncMessage("Todos los borradores y cambios locales del sistema han sido descartados.");
-      } else {
-        setActiveTaladro(null);
-        setDbSnapshotHash(null);
-        setCurrentView('dashboard');
-        setSyncMessage("Todos los borradores locales han sido descartados.");
+      if (activeTaladro) {
+        if (dbSnapshotData) {
+          const restored = JSON.parse(JSON.stringify(dbSnapshotData));
+          setActiveTaladro(restored);
+          setCachedTaladro(activeTaladro.name, restored);
+          setSyncStatus('synced');
+          setSyncMessage("Cambios revertidos al estado original de la base de datos.");
+        } else {
+          setActiveTaladro(null);
+          setDbSnapshotHash(null);
+          setDbSnapshotData(null);
+          setCurrentView('dashboard');
+          setSyncMessage("Todos los borradores locales han sido descartados.");
+        }
       }
+      setUnsavedTaladrosCount(0);
+      fetchTaladros(page, activeDateRange, searchTerm, isGlobalSearch, advancedFilters);
     } else {
-      // Alcance: Solo Taladro Activo
-      updateUnsavedTracker(name, false);
+      if (!activeTaladro) return;
+      const name = activeTaladro.name;
+      removePendingTaladro(name);
+
       if (dbSnapshotData) {
         const restored = JSON.parse(JSON.stringify(dbSnapshotData));
         setActiveTaladro(restored);
-        localStorage.setItem(`geolog_taladro_${name}`, JSON.stringify(restored));
+        setCachedTaladro(name, restored);
         setSyncStatus('synced');
-        setSyncMessage(`Cambios descartados. Se restaurÃ³ la versiÃ³n de la base de datos para ${name}.`);
+        setSyncMessage(`Cambios descartados. Se restauró la versión de la base de datos para ${name}.`);
       } else {
-        localStorage.removeItem(`geolog_taladro_${name}`);
+        discardLocalTaladro(name);
         const updatedSummaries = taladros.filter(t => t.name !== name);
-        localStorage.setItem('geolog_taladros_summaries', JSON.stringify(updatedSummaries));
+        setTaladros(updatedSummaries);
+        safeSetItem('geolog_taladros_summaries', JSON.stringify(updatedSummaries));
 
         setActiveTaladro(null);
         setDbSnapshotHash(null);
+        setDbSnapshotData(null);
         setCurrentView('dashboard');
         setSyncMessage(`Taladro borrador ${name} descartado.`);
-        // Refetch de la página actual (paginación server-side)
         fetchTaladros(page, activeDateRange, searchTerm, isGlobalSearch, advancedFilters);
       }
+      setUnsavedTaladrosCount(getUnsavedTaladros().length);
     }
 
     setShowDiscardModal(false);
   };
 
-  // â”€â”€â”€ DIRTY STATE DETECTION CON SNAPSHOT HASH (debounced 300ms) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  //
-  // Estrategia:
-  //   1. Al cargar de BD â†’ se guarda dbSnapshotHash = hash del estado original
-  //   2. Cada cambio en activeTaladro â†’ debounce 300ms â†’ recalcula hash actual
-  //   3. Si hash actual === dbSnapshotHash â†’ 'synced' (verde)
-  //   4. Si hash actual !== dbSnapshotHash â†’ 'unsaved' (amarillo)
-  //   5. Si dbSnapshotHash === null â†’ taladro nuevo, siempre 'unsaved'
-  //   6. Si el usuario revierte cambios al original â†’ hashes coinciden â†’ verde
-  //
-  // Esto reemplaza el sistema anterior de setSyncStatus('unsaved') manual
-  // en cada handler. Ahora los handlers solo actualizan el estado y el
-  // dirty detection es automÃ¡tico y centralizado.
-
-  // â”€â”€â”€ SINCRONIZACIÃ“N AUTOMÃTICA DE SNAPSHOT AL CAMBIAR DE TALADRO â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── SINCRONIZACIÓN AUTOMÁTICA DE SNAPSHOT AL CAMBIAR DE TALADRO ──────────────
   useEffect(() => {
     if (!activeTaladro) {
       if (dbSnapshotData !== null) setDbSnapshotData(null);
@@ -1590,7 +1657,7 @@ export default function App() {
     }
 
     if (!dbSnapshotData || dbSnapshotData.name.toUpperCase() !== activeTaladro.name.toUpperCase()) {
-      const cachedStr = localStorage.getItem(`geolog_snapshot_data_${activeTaladro.name}`);
+      const cachedStr = localStorage.getItem(getSnapshotStorageKey(activeTaladro.name));
       if (cachedStr) {
         try {
           const parsed = JSON.parse(cachedStr);
@@ -1600,62 +1667,50 @@ export default function App() {
         } catch (e) {}
       }
 
-      const isExistingInProject = taladros.some(t => t.name.toUpperCase() === activeTaladro.name.toUpperCase());
-      if (isExistingInProject) {
-        const snap = JSON.parse(JSON.stringify(activeTaladro));
-        const hash = computeTaladroHash(snap);
-        setDbSnapshotData(snap);
-        setDbSnapshotHash(hash);
-        localStorage.setItem(`geolog_snapshot_data_${activeTaladro.name}`, JSON.stringify(snap));
-        localStorage.setItem(`geolog_snapshot_hash_${activeTaladro.name}`, String(hash));
-      } else {
-        setDbSnapshotData(null);
-        setDbSnapshotHash(null);
-      }
+      setDbSnapshotData(null);
+      setDbSnapshotHash(null);
     }
-  }, [activeTaladro, dbSnapshotData, taladros]);
+  }, [activeTaladro?.name]);
 
+  // ─── DIRTY STATE DETECTION CON SNAPSHOT HASH (debounced 300ms) ───────────────
   useEffect(() => {
     if (!activeTaladro) {
       setSyncStatus('synced');
       return;
     }
-    // Si el taladro nunca ha estado en BD, siempre es dirty
+    // Si el taladro nunca ha estado en BD (borrador puro), siempre es dirty
     if (dbSnapshotHash === null) {
       setSyncStatus('unsaved');
-      updateUnsavedTracker(activeTaladro.name, true);
+      addPendingTaladro(activeTaladro.name);
+      setUnsavedTaladrosCount(getUnsavedTaladros().length);
       return;
     }
-    // No recalcular si estamos en medio de un guardado
     if (syncStatus === 'saving') return;
 
     const timer = setTimeout(() => {
       const currentHash = computeTaladroHash(activeTaladro);
       const isDirty = currentHash !== dbSnapshotHash;
       setSyncStatus(isDirty ? 'unsaved' : 'synced');
-      updateUnsavedTracker(activeTaladro.name, isDirty);
+      if (isDirty) {
+        addPendingTaladro(activeTaladro.name);
+      } else {
+        removePendingTaladro(activeTaladro.name);
+      }
+      setUnsavedTaladrosCount(getUnsavedTaladros().length);
     }, 300);
     return () => clearTimeout(timer);
-  }, [activeTaladro, dbSnapshotHash, syncStatus, updateUnsavedTracker]);
+  }, [activeTaladro, dbSnapshotHash]);
 
-  // â”€â”€â”€ AUTO-SAVE A LOCALSTORAGE (debounced 1s) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  //
-  // Guarda una copia de trabajo en localStorage automÃ¡ticamente.
-  // Protege contra pÃ©rdida de datos por crash del navegador o cierre accidental.
-  // Se ejecuta 1 segundo despuÃ©s del Ãºltimo cambio para no saturar I/O.
-
+  // ─── AUTO-SAVE A LOCALSTORAGE (debounced 1s) ─────────────────────────────────
   useEffect(() => {
     if (!activeTaladro) return;
     const timer = setTimeout(() => {
-      localStorage.setItem(`geolog_taladro_${activeTaladro.name}`, JSON.stringify(activeTaladro));
+      setCachedTaladro(activeTaladro.name, activeTaladro);
     }, 1000);
     return () => clearTimeout(timer);
   }, [activeTaladro]);
 
-  // â”€â”€â”€ VALIDACIÃ“N QA/QC CON DEBOUNCE (750ms) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  //
-  // Las validaciones NO corren mientras el usuario estÃ¡ escribiendo.
-  // Solo se ejecutan 750ms despuÃ©s del Ãºltimo cambio en el estado.
+  // ─── VALIDACIÓN QA/QC CON DEBOUNCE (750ms) ──────────────────────────────────
 
   const [validationSnapshot, setValidationSnapshot] = useState<typeof activeTaladro>(null);
 
@@ -1925,6 +1980,8 @@ export default function App() {
                 onCreateTaladro={handleCreateTaladro}
                 onDeleteTaladro={handleDeleteTaladro}
                 availableCampanas={availableCampanas}
+                pendingTaladros={pendingTaladroSummaries}
+                pendingTaladroNames={pendingTaladroNames}
               />
             </div>
           )}

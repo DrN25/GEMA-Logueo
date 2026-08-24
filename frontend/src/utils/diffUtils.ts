@@ -8,7 +8,8 @@
  * - Cambios en datos generales del Collar
  */
 
-import { extractPersistible } from './hashUtils';
+import { extractPersistible } from './hashUtils.ts';
+import { getUnsavedTaladros } from './storageManager.ts';
 
 export interface ModuleDiff {
   added: number;
@@ -267,10 +268,7 @@ export function computeAllTaladrosDiff(
   let totalDeleted = 0;
 
   // 1. Obtener el registro de taladros con cambios no guardados
-  let registeredUnsaved: string[] = [];
-  try {
-    registeredUnsaved = JSON.parse(localStorage.getItem('geolog_unsaved_taladros') || '[]');
-  } catch (e) {}
+  let registeredUnsaved: string[] = getUnsavedTaladros();
 
   // 2. Evaluar el taladro activo en RAM
   if (activeTaladro && activeSnapshot) {

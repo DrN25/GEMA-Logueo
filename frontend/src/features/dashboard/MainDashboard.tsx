@@ -22,6 +22,9 @@ import {
   RotateCcw
 } from 'lucide-react';
 
+import type { PendingTaladroSummary } from '../../utils/taladroRegistry';
+import { TALADRO_SOURCE_LABELS } from '../../utils/taladroRegistry';
+
 export interface TaladroSummary {
   name: string;
   proyecto: string;
@@ -54,6 +57,8 @@ interface DashboardProps {
   searchTerm: string;
   isGlobalSearch: boolean;
   activeDateRange: string;
+  pendingTaladros?: PendingTaladroSummary[];
+  pendingTaladroNames?: string[];
   onSearchSubmit: (term: string, isGlobal: boolean) => void;
   onClearSearch: () => void;
   onPageChange: (page: number) => void;
@@ -86,6 +91,8 @@ export default function Dashboard({
   searchTerm,
   isGlobalSearch,
   activeDateRange,
+  pendingTaladros = [],
+  pendingTaladroNames = [],
   onSearchSubmit,
   onClearSearch,
   onPageChange,
@@ -505,48 +512,58 @@ export default function Dashboard({
                   ))}
                 </tr>
               ))}
-              {!loading && taladros.map(t => (
+
+              {/* Taladros Borradores Locales Pendientes (no existen en BD) */}
+              {!loading && pendingTaladros.length > 0 && pendingTaladros.map(pt => (
                 <tr
-                  key={t.name}
-                  onClick={() => onSelectTaladro(t.name)}
-                  className="hover:bg-navy-900/20 cursor-pointer transition-colors h-11"
+                  key={`pend-${pt.name}`}
+                  onClick={() => onSelectTaladro(pt.name)}
+                  className="bg-amber-500/[0.04] hover:bg-navy-900/40 cursor-pointer transition-colors h-11"
                 >
                   <td className="py-2.5 px-4 font-black text-slate-100 tracking-wide">
                     <div className="flex items-center gap-2">
-                      <MapPin size={13} className="text-cyan-400" />
-                      <span>{t.name}</span>
+                      <MapPin size={13} className="text-amber-400" />
+                      <span>{pt.name}</span>
+                      {TALADRO_SOURCE_LABELS.local && (
+                        <span
+                          className="text-[9px] bg-amber-500/15 border border-amber-500/30 text-amber-400 font-black px-1.5 py-0.5 rounded uppercase tracking-wider"
+                          title="Este taladro aún no se ha guardado en la base de datos (Borrador local)."
+                        >
+                          {TALADRO_SOURCE_LABELS.local}
+                        </span>
+                      )}
                     </div>
                   </td>
-                  <td className="py-2.5 px-4 text-slate-400 text-[10px]">{t.fecha_registro}</td>
-                  <td className="py-2.5 px-4 text-slate-400">{t.proyecto || 'Proyecto A'}</td>
+                  <td className="py-2.5 px-4 text-slate-400 text-[10px]">{pt.fecha_registro || '—'}</td>
+                  <td className="py-2.5 px-4 text-slate-400">{pt.proyecto || '—'}</td>
                   <td className="py-2.5 px-4 text-center text-slate-300 font-bold">
-                    {(t.perf_total || 0).toFixed(1)} m
+                    {(pt.perf_total || 0).toFixed(1)} m
                   </td>
                   <td className="py-2.5 px-4 text-slate-400">
                     <div className="flex items-center gap-1.5">
                       <User size={12} className="text-slate-500" />
-                      <span>{t.geologo}</span>
+                      <span>{pt.geologo || '—'}</span>
                     </div>
                   </td>
-                  <td className="py-2.5 px-4 text-center text-slate-300 font-semibold">{t.diametro}</td>
-                  <td className="py-2.5 px-4 text-center text-slate-400">{t.inclinacion}&deg;</td>
+                  <td className="py-2.5 px-4 text-center text-slate-300 font-semibold">{pt.diametro || '—'}</td>
+                  <td className="py-2.5 px-4 text-center text-slate-400">{pt.inclinacion}&deg;</td>
                   <td className="py-2.5 px-4 text-center">
-                    <span className="bg-navy-900 border border-navy-800 text-cyan-400 px-2 py-0.5 rounded text-xs font-bold">
-                      {t.corridas_count}
+                    <span className="bg-navy-900 border border-amber-500/30 text-amber-400 px-2 py-0.5 rounded text-xs font-bold">
+                      {pt.corridas_count}
                     </span>
                   </td>
                   <td className="py-2.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
                     <div className="flex gap-2 justify-center">
                       <button
-                        onClick={() => onSelectTaladro(t.name)}
-                        className="bg-cyan-500/10 border border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-400 font-bold transition-all shadow-sm active:scale-95 px-3 py-1.5 rounded-lg text-xs"
+                        onClick={() => onSelectTaladro(pt.name)}
+                        className="bg-amber-500/10 border border-amber-500/40 text-amber-400 hover:bg-amber-500/20 hover:border-amber-400 font-bold transition-all shadow-sm active:scale-95 px-3 py-1.5 rounded-lg text-xs"
                       >
                         Ingresar
                       </button>
                       <button
-                        onClick={() => onDeleteTaladro(t.name)}
+                        onClick={() => onDeleteTaladro(pt.name)}
                         className="p-1.5 rounded-lg border border-red-500/20 bg-red-500/5 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all active:scale-90"
-                        title="Eliminar taladro"
+                        title="Descartar borrador"
                       >
                         <Trash2 size={13} />
                       </button>
@@ -554,13 +571,77 @@ export default function Dashboard({
                   </td>
                 </tr>
               ))}
-              {!loading && taladros.length === 0 && (
+
+              {/* Taladros Registrados en BD */}
+              {!loading && taladros.map(t => {
+                const isPending = pendingTaladroNames.includes(t.name);
+                return (
+                  <tr
+                    key={t.name}
+                    onClick={() => onSelectTaladro(t.name)}
+                    className="hover:bg-navy-900/20 cursor-pointer transition-colors h-11"
+                  >
+                    <td className="py-2.5 px-4 font-black text-slate-100 tracking-wide">
+                      <div className="flex items-center gap-2">
+                        <MapPin size={13} className="text-cyan-400" />
+                        <span>{t.name}</span>
+                        {isPending && (
+                          <span
+                            className="text-[9px] bg-amber-500/15 border border-amber-500/30 text-amber-400 font-black px-1.5 py-0.5 rounded uppercase tracking-wider"
+                            title="Taladro con cambios sin guardar."
+                          >
+                            BORRADOR
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-4 text-slate-400 text-[10px]">{t.fecha_registro}</td>
+                    <td className="py-2.5 px-4 text-slate-400">{t.proyecto || 'Proyecto A'}</td>
+                    <td className="py-2.5 px-4 text-center text-slate-300 font-bold">
+                      {(t.perf_total || 0).toFixed(1)} m
+                    </td>
+                    <td className="py-2.5 px-4 text-slate-400">
+                      <div className="flex items-center gap-1.5">
+                        <User size={12} className="text-slate-500" />
+                        <span>{t.geologo}</span>
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-4 text-center text-slate-300 font-semibold">{t.diametro}</td>
+                    <td className="py-2.5 px-4 text-center text-slate-400">{t.inclinacion}&deg;</td>
+                    <td className="py-2.5 px-4 text-center">
+                      <span className="bg-navy-900 border border-navy-800 text-cyan-400 px-2 py-0.5 rounded text-xs font-bold">
+                        {t.corridas_count}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex gap-2 justify-center">
+                        <button
+                          onClick={() => onSelectTaladro(t.name)}
+                          className="bg-cyan-500/10 border border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-400 font-bold transition-all shadow-sm active:scale-95 px-3 py-1.5 rounded-lg text-xs"
+                        >
+                          Ingresar
+                        </button>
+                        <button
+                          onClick={() => onDeleteTaladro(t.name)}
+                          className="p-1.5 rounded-lg border border-red-500/20 bg-red-500/5 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all active:scale-90"
+                          title="Eliminar taladro"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+
+              {!loading && taladros.length === 0 && pendingTaladros.length === 0 && (
                 <tr>
                   <td colSpan={9} className="py-12 text-center text-slate-500 text-xs font-semibold">
                     No se encontraron taladros en este rango. {activeDateRange === 'hoy' ? 'Registra el primero del día.' : 'Prueba cambiando el filtro de fecha o búsqueda.'}
                   </td>
                 </tr>
-              )}            </tbody>
+              )}
+            </tbody>
           </table>
         </div>
 

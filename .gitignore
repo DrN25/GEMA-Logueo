@@ -45,3 +45,5 @@ venv/
 *.pyc
 __pycache__/
 backend/uploads/*
+
+cloudflared.exe
