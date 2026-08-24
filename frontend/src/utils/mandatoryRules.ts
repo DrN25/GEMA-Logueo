@@ -159,10 +159,10 @@ const VACANCY_IGNORE_KEYS: Record<string, string[]> = {
   discontinuities: ['id', 'de', 'a', 'corrida', 'litologia', 'lito1', 'lito2', 'lito3', 'comentario'],
 };
 
-/** Claves donde el valor 0 también se considera "vacío" (placeholders de fila nueva). */
+/** Claves donde el valor 0 también se considera "vacío" (placeholders de fila nueva en collar). */
 const VACANCY_ZERO_KEYS: Record<string, string[]> = {
-  surveys: ['depth', 'dip', 'azimuth'],
-  discontinuities: ['profundidad'],
+  surveys: [],
+  discontinuities: [],
 };
 
 // ---------------------------------------------------------------------------
@@ -348,11 +348,12 @@ export function validateLogueoMandatory(taladro: any): MissingFieldIssue[] {
   const h = taladro.collar && typeof taladro.collar === 'object'
     ? { ...taladro, ...taladro.collar }
     : taladro;
+  const zeroEmptyCollarKeys = ['collar_este', 'collar_norte', 'collar_cota', 'prof_final_eoh'];
   for (const [key, isRequired] of Object.entries(MANDATORY_FIELD_RULES.collar)) {
     if (!isRequired) continue;
     const val = getFieldValue(h, key);
-    // El collar usa 0 como convención de vacío (fromCollarInputValue)
-    if (isBlankOrZero(val)) {
+    const isFieldEmpty = zeroEmptyCollarKeys.includes(key) ? isBlankOrZero(val) : isBlank(val);
+    if (isFieldEmpty) {
       issues.push({
         section: 'COLLAR',
         fieldKey: key,
@@ -368,7 +369,7 @@ export function validateLogueoMandatory(taladro: any): MissingFieldIssue[] {
     if (isVacantRow(row, 'surveys')) return;
     for (const [key, isRequired] of Object.entries(MANDATORY_FIELD_RULES.surveys)) {
       if (!isRequired) continue;
-      if (isBlankOrZero(getFieldValue(row, key))) {
+      if (isBlank(getFieldValue(row, key))) {
         issues.push({
           section: 'SURVEY',
           fieldKey: key,

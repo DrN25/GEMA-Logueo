@@ -262,6 +262,62 @@ for (const row of decisionTable) {
   });
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 4. BOUNDARY & ZERO VALUE VALIDATION (Valores Límite y Cero)
+// ─────────────────────────────────────────────────────────────────────────────
+console.log('\n--- 4. BOUNDARY & ZERO VALUE VALIDATION ---');
+
+await test('Validación Survey: depth=0, dip=0, azimuth=0 NO debe generar error de campo obligatorio', () => {
+  const taladroWithZeroSurvey = {
+    name: 'FEGT26-001',
+    proyecto: 'Proyecto Test',
+    geologo: 'GEOLOGO',
+    diametro: 'HQ',
+    inclinacion: -60,
+    campana: 'Campaña 2026',
+    collar_este: 500000,
+    collar_norte: 8000000,
+    collar_cota: 4000,
+    prof_final_eoh: 150,
+    corridas: [],
+    surveys: [
+      { depth: 0, dip: 0, azimuth: 0 }
+    ],
+    discontinuidades: [],
+    ensayos_plt: []
+  };
+
+  const issues = mr.validateLogueoMandatory(taladroWithZeroSurvey);
+  const surveyIssues = issues.filter(i => i.section === 'SURVEY');
+  assert.equal(surveyIssues.length, 0, `No debe haber errores de campos obligatorios en survey con 0m: ${JSON.stringify(surveyIssues)}`);
+});
+
+await test('Validación Survey: depth=-1 (vacío) SÍ debe generar error de campo obligatorio', () => {
+  const taladroWithEmptySurvey = {
+    name: 'FEGT26-001',
+    proyecto: 'Proyecto Test',
+    geologo: 'GEOLOGO',
+    diametro: 'HQ',
+    inclinacion: -60,
+    campana: 'Campaña 2026',
+    collar_este: 500000,
+    collar_norte: 8000000,
+    collar_cota: 4000,
+    prof_final_eoh: 150,
+    corridas: [],
+    surveys: [
+      { depth: -1, dip: -60, azimuth: 180 }
+    ],
+    discontinuidades: [],
+    ensayos_plt: []
+  };
+
+  const issues = mr.validateLogueoMandatory(taladroWithEmptySurvey);
+  const surveyIssues = issues.filter(i => i.section === 'SURVEY' && i.fieldKey === 'depth');
+  assert.equal(surveyIssues.length, 1, 'Debe detectar depth vacío');
+});
+
 console.log(`\n===============================================================`);
 console.log(`TODAS LAS ${passedTests} PRUEBAS FORMALES DE QA PASARON CON ÉXITO (100%)`);
 console.log(`===============================================================\n`);
+
