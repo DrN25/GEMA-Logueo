@@ -427,125 +427,190 @@ def export_plt_regulares_to_excel(diag: Dict[str, Any], output_path: str):
     ws_cat.auto_filter.ref = f"B5:{last_col_letter}{r_cat - 1}"
 
     # =========================================================================
-    # --- HOJA: 🗂️ CELDAS ÚNICAS PLT (MUESTRAS Y ENSAYOS REGULARES) ---
+    # --- HOJA: 🗂️ TALADROS ÚNICOS PLT (CONSOLIDADO 1 FILA POR TALADRO) ---
     # =========================================================================
-    ws_samples = wb.create_sheet(title="🗂️ Celdas Únicas PLT")
-    ws_samples.views.sheetView[0].showGridLines = True
+    ws_plt_taladros = wb.create_sheet(title="🗂️ Taladros Únicos PLT")
+    ws_plt_taladros.views.sheetView[0].showGridLines = True
 
-    ws_samples.cell(row=2, column=2, value="REGISTRO DE CELDAS Y MUESTRAS ÚNICAS EVALUADAS — PLT REGULARES").font = font_title
-    ws_samples.cell(
+    ws_plt_taladros.cell(row=2, column=2, value="CONSOLIDADO DE TALADROS ÚNICOS EVALUADOS — ENSAYOS PLT REGULARES").font = font_title
+    ws_plt_taladros.cell(
         row=3, column=2,
-        value="Consolidado exclusivo de muestras y tramos con observaciones, alertas o discrepancias QA/QC detectadas."
+        value="Resumen ejecutivo de sondajes con estadísticas de ensayos de carga puntual, calidad geomecánica y cruce con Logueo General."
     ).font = font_subtitle
 
-    c_back_samples = ws_samples.cell(row=2, column=16)
+    c_back_samples = ws_plt_taladros.cell(row=2, column=16)
     c_back_samples.value = '=HYPERLINK("#' + "'📋 Catálogo de Errores'" + '!B2", "⬅ Volver al Catálogo de Errores")'
     c_back_samples.font = s["font_back_link"]
     c_back_samples.alignment = alignment_right
 
-    headers_samples = [
-        "Fila Excel", "Taladro", "Muestra", "Campaña", "Desde (m)", "Hasta (m)", "Longitud (m)",
-        "Lito 1", "Lito 2", "Lito 3", "Tipo Litológico", "Factor K",
-        "Carga P (kN)", "D (mm)", "Is(50) (MPa)", "UCS (MPa)", "ISRM (PLT)", "Estado QA/QC", "N° Incidencias"
+    headers_plt_dh = [
+        "N°", "Taladro", "Campaña", "Desde Mín (m)", "Hasta Máx (m)", "Metraje Muestreado (m)",
+        "Total Muestras", "Carga P Prom (kN)", "Diámetro D Prom (mm)", "Is(50) Prom (MPa)", "UCS Prom (MPa)",
+        "Litología Dominante", "Muestras con Incidencias", "Estado QA/QC", "Cruce con LGG"
     ]
 
-    for c_idx, h_text in enumerate(headers_samples, start=2):
-        cell = ws_samples.cell(row=5, column=c_idx, value=h_text)
+    for c_idx, h_text in enumerate(headers_plt_dh, start=2):
+        cell = ws_plt_taladros.cell(row=5, column=c_idx, value=h_text)
         cell.font = font_header
         cell.fill = fill_primary
         cell.alignment = alignment_center
         cell.border = border_thin
 
-    unique_samples = [s for s in diag.get("unique_samples_plt", []) if s.get("estado") != "CONFORME" or s.get("incidencias_cant", 0) > 0]
-    r_samp = 6
+    # Indexar corridas LGG por taladro
+    lgg_runs_by_dh = defaultdict(int)
+    for l_item in diag.get("unique_runs_lgg", []):
+        t_clean = str(l_item.get("taladro", "")).strip().upper()
+        if t_clean:
+            lgg_runs_by_dh[t_clean] += 1
 
-    for s_item in unique_samples:
-        ws_samples.cell(row=r_samp, column=2, value=s_item.get("row_index")).alignment = alignment_center
-        ws_samples.cell(row=r_samp, column=3, value=s_item.get("taladro")).alignment = alignment_left
-        ws_samples.cell(row=r_samp, column=4, value=s_item.get("muestra")).alignment = alignment_center
-        ws_samples.cell(row=r_samp, column=5, value=s_item.get("campana")).alignment = alignment_center
-        
-        c_from = ws_samples.cell(row=r_samp, column=6, value=s_item.get("from_m"))
-        c_from.alignment = alignment_right
-        if s_item.get("from_m") is not None: c_from.number_format = '0.00'
+    # Agrupar muestras de PLT por taladro
+    plt_by_dh = defaultdict(lambda: {
+        "muestras": 0, "desde_min": 999999.0, "hasta_max": -1.0, "campana": "S/C",
+        "p_sum": 0.0, "p_cnt": 0, "d_sum": 0.0, "d_cnt": 0,
+        "is50_sum": 0.0, "is50_cnt": 0, "ucs_sum": 0.0, "ucs_cnt": 0,
+        "litos": Counter(), "alertas": 0, "advertencias": 0, "anom_total": 0
+    })
 
-        c_to = ws_samples.cell(row=r_samp, column=7, value=s_item.get("to_m"))
-        c_to.alignment = alignment_right
-        if s_item.get("to_m") is not None: c_to.number_format = '0.00'
+    for s_item in diag.get("unique_samples_plt", []):
+        t_clean = str(s_item.get("taladro", "")).strip().upper()
+        if not t_clean:
+            continue
+        st = plt_by_dh[t_clean]
+        st["muestras"] += 1
+        f_m = s_item.get("from_m")
+        t_m = s_item.get("to_m")
+        if f_m is not None: st["desde_min"] = min(st["desde_min"], float(f_m))
+        if t_m is not None: st["hasta_max"] = max(st["hasta_max"], float(t_m))
 
-        c_len = ws_samples.cell(row=r_samp, column=8, value=s_item.get("longitud_m"))
-        c_len.alignment = alignment_right
-        if s_item.get("longitud_m") is not None: c_len.number_format = '0.00'
+        if st["campana"] == "S/C" and s_item.get("campana"):
+            st["campana"] = str(s_item.get("campana"))
 
-        ws_samples.cell(row=r_samp, column=9, value=s_item.get("lito1")).alignment = alignment_center
-        ws_samples.cell(row=r_samp, column=10, value=s_item.get("lito2")).alignment = alignment_center
-        ws_samples.cell(row=r_samp, column=11, value=s_item.get("lito3")).alignment = alignment_center
-        ws_samples.cell(row=r_samp, column=12, value=s_item.get("tipo_litologico")).alignment = alignment_left
-        ws_samples.cell(row=r_samp, column=13, value=s_item.get("factor_k")).alignment = alignment_center
+        p = s_item.get("p_kn")
+        if p is not None: st["p_sum"] += float(p); st["p_cnt"] += 1
 
-        c_p = ws_samples.cell(row=r_samp, column=14, value=s_item.get("p_kn"))
-        c_p.alignment = alignment_right
-        if s_item.get("p_kn") is not None: c_p.number_format = '#,##0.00'
+        d = s_item.get("d_mm")
+        if d is not None: st["d_sum"] += float(d); st["d_cnt"] += 1
 
-        c_d = ws_samples.cell(row=r_samp, column=15, value=s_item.get("d_mm"))
+        is50 = s_item.get("is50_mpa")
+        if is50 is not None: st["is50_sum"] += float(is50); st["is50_cnt"] += 1
+
+        ucs = s_item.get("ucs_mpa")
+        if ucs is not None: st["ucs_sum"] += float(ucs); st["ucs_cnt"] += 1
+
+        l1 = str(s_item.get("lito1") or "").strip()
+        if l1: st["litos"][l1] += 1
+
+        n_inc = s_item.get("incidencias_cant") or 0
+        if n_inc > 0:
+            st["anom_total"] += 1
+        if s_item.get("estado") == "NO CONFORME":
+            st["alertas"] += 1
+        elif s_item.get("estado") == "CON OBSERVACIONES":
+            st["advertencias"] += 1
+
+    r_plt_dh = 6
+    for idx_dh, (t_name, data_dh) in enumerate(sorted(plt_by_dh.items()), start=1):
+        ws_plt_taladros.cell(row=r_plt_dh, column=2, value=idx_dh).alignment = alignment_center
+        ws_plt_taladros.cell(row=r_plt_dh, column=3, value=t_name).alignment = alignment_left
+        ws_plt_taladros.cell(row=r_plt_dh, column=4, value=data_dh["campana"]).alignment = alignment_center
+
+        c_d = ws_plt_taladros.cell(row=r_plt_dh, column=5, value=data_dh["desde_min"] if data_dh["desde_min"] != 999999.0 else 0)
         c_d.alignment = alignment_right
-        if s_item.get("d_mm") is not None: c_d.number_format = '#,##0.00'
+        c_d.number_format = '0.00'
 
-        c_is = ws_samples.cell(row=r_samp, column=16, value=s_item.get("is50_mpa"))
-        c_is.alignment = alignment_right
-        if s_item.get("is50_mpa") is not None: c_is.number_format = '0.00'
+        c_h = ws_plt_taladros.cell(row=r_plt_dh, column=6, value=data_dh["hasta_max"] if data_dh["hasta_max"] != -1.0 else 0)
+        c_h.alignment = alignment_right
+        c_h.number_format = '0.00'
 
-        c_ucs = ws_samples.cell(row=r_samp, column=17, value=s_item.get("ucs_mpa"))
+        metraje = max(0, data_dh["hasta_max"] - data_dh["desde_min"]) if data_dh["hasta_max"] != -1.0 else 0
+        c_met = ws_plt_taladros.cell(row=r_plt_dh, column=7, value=metraje)
+        c_met.alignment = alignment_right
+        c_met.number_format = '0.00'
+
+        ws_plt_taladros.cell(row=r_plt_dh, column=8, value=data_dh["muestras"]).alignment = alignment_center
+
+        p_prom = (data_dh["p_sum"] / data_dh["p_cnt"]) if data_dh["p_cnt"] > 0 else 0
+        c_p = ws_plt_taladros.cell(row=r_plt_dh, column=9, value=p_prom)
+        c_p.alignment = alignment_right
+        c_p.number_format = '0.00'
+
+        d_prom = (data_dh["d_sum"] / data_dh["d_cnt"]) if data_dh["d_cnt"] > 0 else 0
+        c_d_p = ws_plt_taladros.cell(row=r_plt_dh, column=10, value=d_prom)
+        c_d_p.alignment = alignment_right
+        c_d_p.number_format = '0.00'
+
+        is50_prom = (data_dh["is50_sum"] / data_dh["is50_cnt"]) if data_dh["is50_cnt"] > 0 else 0
+        c_is50 = ws_plt_taladros.cell(row=r_plt_dh, column=11, value=is50_prom)
+        c_is50.alignment = alignment_right
+        c_is50.number_format = '0.00'
+
+        ucs_prom = (data_dh["ucs_sum"] / data_dh["ucs_cnt"]) if data_dh["ucs_cnt"] > 0 else 0
+        c_ucs = ws_plt_taladros.cell(row=r_plt_dh, column=12, value=ucs_prom)
         c_ucs.alignment = alignment_right
-        if s_item.get("ucs_mpa") is not None: c_ucs.number_format = '0.00'
+        c_ucs.number_format = '0.00'
 
-        ws_samples.cell(row=r_samp, column=18, value=s_item.get("isrm")).alignment = alignment_center
-        
-        c_st = ws_samples.cell(row=r_samp, column=19, value=s_item.get("estado"))
+        lito_dom = data_dh["litos"].most_common(1)[0][0] if data_dh["litos"] else "—"
+        ws_plt_taladros.cell(row=r_plt_dh, column=13, value=lito_dom).alignment = alignment_center
+
+        ws_plt_taladros.cell(row=r_plt_dh, column=14, value=data_dh["anom_total"]).alignment = alignment_center
+
+        if data_dh["alertas"] > 0:
+            est_qa = "NO CONFORME"
+            fill_st = fill_accent_red
+        elif data_dh["advertencias"] > 0:
+            est_qa = "CON OBSERVACIONES"
+            fill_st = fill_accent_orange
+        else:
+            est_qa = "CONFORME"
+            fill_st = fill_accent_green
+
+        c_st = ws_plt_taladros.cell(row=r_plt_dh, column=15, value=est_qa)
         c_st.alignment = alignment_center
         c_st.font = font_bold
-        if s_item.get("estado") == "CONFORME":
-            c_st.fill = fill_accent_green
-        elif s_item.get("estado") == "NO CONFORME":
-            c_st.fill = fill_accent_red
+        c_st.fill = fill_st
+
+        # Cruce con LGG
+        n_lgg = lgg_runs_by_dh.get(t_name, 0)
+        c_cruce = ws_plt_taladros.cell(row=r_plt_dh, column=16)
+        c_cruce.alignment = alignment_center
+        c_cruce.font = font_bold
+        if n_lgg > 0:
+            c_cruce.value = f"COINCIDE ({n_lgg} corridas LGG)"
+            c_cruce.fill = fill_accent_green
         else:
-            c_st.fill = fill_accent_yellow
+            c_cruce.value = "❌ FALTANTE EN LGG"
+            c_cruce.fill = fill_accent_red
 
-        c_cnt = ws_samples.cell(row=r_samp, column=20, value=s_item.get("incidencias_cant", 0))
-        c_cnt.alignment = alignment_right
-        c_cnt.number_format = '#,##0'
-
-        for col_idx in range(2, 21):
-            cell = ws_samples.cell(row=r_samp, column=col_idx)
+        for col_idx in range(2, 17):
+            cell = ws_plt_taladros.cell(row=r_plt_dh, column=col_idx)
             cell.border = border_thin
             if cell.font != font_bold:
                 cell.font = font_regular
-            if r_samp % 2 == 0 and col_idx != 19:
+            if r_plt_dh % 2 == 0 and col_idx not in (15, 16):
                 cell.fill = fill_zebra
 
-        r_samp += 1
+        r_plt_dh += 1
 
-    if r_samp > 6:
-        ws_samples.auto_filter.ref = f"B5:T{r_samp - 1}"
+    if r_plt_dh > 6:
+        ws_plt_taladros.auto_filter.ref = f"B5:P{r_plt_dh - 1}"
 
-    # Autoajuste de columnas en Celdas Únicas PLT
-    for col in ws_samples.iter_cols(min_col=2, max_col=20, min_row=5, max_row=min(r_samp, 100)):
+    for col in ws_plt_taladros.iter_cols(min_col=2, max_col=16, min_row=5, max_row=min(r_plt_dh, 100)):
         max_len = max(len(str(cell.value or '')) for cell in col)
         col_letter = get_column_letter(col[0].column)
-        ws_samples.column_dimensions[col_letter].width = max(11, min(max_len + 3, 26))
+        ws_plt_taladros.column_dimensions[col_letter].width = max(12, min(max_len + 3, 30))
 
     # =========================================================================
-    # --- HOJA OPCIONAL: 🗂️ CELDAS ÚNICAS LGG (SI SE CARGÓ EL LOGUEO) ---
+    # --- HOJA: 🗂️ TALADROS ÚNICOS LGG (CONSOLIDADO 1 FILA POR TALADRO vs PLT) ---
     # =========================================================================
-    unique_lgg = [l for l in diag.get("unique_runs_lgg", []) if l.get("estado") != "CONFORME" or l.get("muestras_plt_cant", 0) > 0]
-    if unique_lgg:
-        ws_lgg_sheet = wb.create_sheet(title="🗂️ Celdas Únicas LGG")
+    unique_lgg_runs = diag.get("unique_runs_lgg", [])
+    if unique_lgg_runs:
+        ws_lgg_sheet = wb.create_sheet(title="🗂️ Taladros Únicos LGG")
         ws_lgg_sheet.views.sheetView[0].showGridLines = True
 
-        ws_lgg_sheet.cell(row=2, column=2, value="REGISTRO DE CORRIDAS ÚNICAS EVALUADAS — LOGUEO GENERAL (LGG)").font = font_title
+        ws_lgg_sheet.cell(row=2, column=2, value="CONSOLIDADO DE TALADROS ÚNICOS — LOGUEO GENERAL vs PLT").font = font_title
         ws_lgg_sheet.cell(
             row=3, column=2,
-            value="Listado de corridas geomecánicas oficiales de sondajes DDH cruzadas contra la planilla de ensayos PLT."
+            value="Verificación de cobertura de ensayos PLT sobre todos los sondajes perforados en Logueo General."
         ).font = font_subtitle
 
         c_back_lgg = ws_lgg_sheet.cell(row=2, column=11)
@@ -553,64 +618,101 @@ def export_plt_regulares_to_excel(diag: Dict[str, Any], output_path: str):
         c_back_lgg.font = s["font_back_link"]
         c_back_lgg.alignment = alignment_right
 
-        headers_lgg = [
-            "N°", "Taladro", "Desde (m)", "Hasta (m)", "Longitud (m)",
-            "Lito 1", "Lito 2", "Lito 3", "Resistencia ISRM", "Muestras PLT Asociadas"
+        headers_lgg_dh_plt = [
+            "N°", "Taladro", "Campaña", "Desde Mín (m)", "Hasta Máx (m)", "Metraje Perforado (m)",
+            "Total Corridas", "Muestras PLT Ensayadas", "Estado de Muestreo PLT", "Cruce con PLT"
         ]
 
-        for c_idx, h_text in enumerate(headers_lgg, start=2):
+        for c_idx, h_text in enumerate(headers_lgg_dh_plt, start=2):
             cell = ws_lgg_sheet.cell(row=5, column=c_idx, value=h_text)
             cell.font = font_header
             cell.fill = fill_primary
             cell.alignment = alignment_center
             cell.border = border_thin
 
-        r_lgg = 6
-        for idx_lgg, l_item in enumerate(unique_lgg, start=1):
-            ws_lgg_sheet.cell(row=r_lgg, column=2, value=idx_lgg).alignment = alignment_center
-            ws_lgg_sheet.cell(row=r_lgg, column=3, value=l_item.get("taladro")).alignment = alignment_left
-            
-            c_fd = ws_lgg_sheet.cell(row=r_lgg, column=4, value=l_item.get("desde_m"))
-            c_fd.alignment = alignment_right
-            if l_item.get("desde_m") is not None: c_fd.number_format = '0.00'
+        # Agrupar LGG por taladro
+        lgg_dh_map = defaultdict(lambda: {
+            "corridas": 0, "desde_min": 999999.0, "hasta_max": -1.0, "campana": "S/C"
+        })
 
-            c_th = ws_lgg_sheet.cell(row=r_lgg, column=5, value=l_item.get("hasta_m"))
-            c_th.alignment = alignment_right
-            if l_item.get("hasta_m") is not None: c_th.number_format = '0.00'
+        for run in unique_lgg_runs:
+            t_clean = str(run.get("taladro", "")).strip().upper()
+            if not t_clean:
+                continue
+            st = lgg_dh_map[t_clean]
+            st["corridas"] += 1
+            d = run.get("desde_m") if run.get("desde_m") is not None else run.get("de")
+            h = run.get("hasta_m") if run.get("hasta_m") is not None else run.get("a")
+            if d is not None: st["desde_min"] = min(st["desde_min"], float(d))
+            if h is not None: st["hasta_max"] = max(st["hasta_max"], float(h))
+            if st["campana"] == "S/C":
+                import re
+                m_c = re.search(r'FE[A-Z]{2}(\d{2})-', t_clean)
+                if m_c:
+                    st["campana"] = f"20{m_c.group(1)}"
 
-            c_ln = ws_lgg_sheet.cell(row=r_lgg, column=6, value=l_item.get("longitud_m"))
-            c_ln.alignment = alignment_right
-            if l_item.get("longitud_m") is not None: c_ln.number_format = '0.00'
+        r_lgg_row = 6
+        for idx_lgg, (t_name, data_lgg) in enumerate(sorted(lgg_dh_map.items()), start=1):
+            ws_lgg_sheet.cell(row=r_lgg_row, column=2, value=idx_lgg).alignment = alignment_center
+            ws_lgg_sheet.cell(row=r_lgg_row, column=3, value=t_name).alignment = alignment_left
+            ws_lgg_sheet.cell(row=r_lgg_row, column=4, value=data_lgg["campana"]).alignment = alignment_center
 
-            ws_lgg_sheet.cell(row=r_lgg, column=7, value=l_item.get("lito1")).alignment = alignment_center
-            ws_lgg_sheet.cell(row=r_lgg, column=8, value=l_item.get("lito2")).alignment = alignment_center
-            ws_lgg_sheet.cell(row=r_lgg, column=9, value=l_item.get("lito3")).alignment = alignment_center
-            ws_lgg_sheet.cell(row=r_lgg, column=10, value=l_item.get("isrm")).alignment = alignment_center
+            c_d = ws_lgg_sheet.cell(row=r_lgg_row, column=5, value=data_lgg["desde_min"] if data_lgg["desde_min"] != 999999.0 else 0)
+            c_d.alignment = alignment_right
+            c_d.number_format = '0.00'
 
-            c_mcount = ws_lgg_sheet.cell(row=r_lgg, column=11, value=l_item.get("muestras_plt_cant", 0))
-            c_mcount.alignment = alignment_right
-            c_mcount.number_format = '#,##0'
-            if l_item.get("muestras_plt_cant", 0) > 0:
-                c_mcount.font = font_bold
+            c_h = ws_lgg_sheet.cell(row=r_lgg_row, column=6, value=data_lgg["hasta_max"] if data_lgg["hasta_max"] != -1.0 else 0)
+            c_h.alignment = alignment_right
+            c_h.number_format = '0.00'
+
+            metraje_lgg = max(0, data_lgg["hasta_max"] - data_lgg["desde_min"]) if data_lgg["hasta_max"] != -1.0 else 0
+            c_met_lgg = ws_lgg_sheet.cell(row=r_lgg_row, column=7, value=metraje_lgg)
+            c_met_lgg.alignment = alignment_right
+            c_met_lgg.number_format = '0.00'
+
+            ws_lgg_sheet.cell(row=r_lgg_row, column=8, value=data_lgg["corridas"]).alignment = alignment_center
+
+            # Conteo de muestras PLT asociadas a este taladro
+            n_plt_samples = plt_by_dh[t_name]["muestras"] if t_name in plt_by_dh else 0
+            ws_lgg_sheet.cell(row=r_lgg_row, column=9, value=n_plt_samples).alignment = alignment_center
+
+            c_est_m = ws_lgg_sheet.cell(row=r_lgg_row, column=10)
+            c_est_m.alignment = alignment_center
+            c_est_m.font = font_bold
+            if n_plt_samples > 0:
+                c_est_m.value = "ENSAYADO"
+                c_est_m.fill = fill_accent_green
+            else:
+                c_est_m.value = "SIN ENSAYOS PLT"
+                c_est_m.fill = fill_accent_orange
+
+            c_cruce_plt = ws_lgg_sheet.cell(row=r_lgg_row, column=11)
+            c_cruce_plt.alignment = alignment_center
+            c_cruce_plt.font = font_bold
+            if n_plt_samples > 0:
+                c_cruce_plt.value = f"COINCIDE ({n_plt_samples} muestras)"
+                c_cruce_plt.fill = fill_accent_green
+            else:
+                c_cruce_plt.value = "⚠️ SIN ENSAYOS PLT"
+                c_cruce_plt.fill = fill_accent_orange
 
             for col_idx in range(2, 12):
-                cell = ws_lgg_sheet.cell(row=r_lgg, column=col_idx)
+                cell = ws_lgg_sheet.cell(row=r_lgg_row, column=col_idx)
                 cell.border = border_thin
                 if cell.font != font_bold:
                     cell.font = font_regular
-                if r_lgg % 2 == 0:
+                if r_lgg_row % 2 == 0 and col_idx not in (10, 11):
                     cell.fill = fill_zebra
 
-            r_lgg += 1
+            r_lgg_row += 1
 
-        if r_lgg > 6:
-            ws_lgg_sheet.auto_filter.ref = f"B5:K{r_lgg - 1}"
+        if r_lgg_row > 6:
+            ws_lgg_sheet.auto_filter.ref = f"B5:K{r_lgg_row - 1}"
 
-        for col in ws_lgg_sheet.iter_cols(min_col=2, max_col=11, min_row=5, max_row=min(r_lgg, 100)):
+        for col in ws_lgg_sheet.iter_cols(min_col=2, max_col=11, min_row=5, max_row=min(r_lgg_row, 100)):
             max_len = max(len(str(cell.value or '')) for cell in col)
             col_letter = get_column_letter(col[0].column)
-            ws_lgg_sheet.column_dimensions[col_letter].width = max(11, min(max_len + 3, 24))
-
+            ws_lgg_sheet.column_dimensions[col_letter].width = max(12, min(max_len + 3, 30))
 
     # =========================================================================
     # --- HOJA 3: 📑 DETALLE PLANO COMPLETO DE INCIDENCIAS ---

@@ -651,192 +651,273 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
         r_cat += 1
 
     # =========================================================================
-    # --- HOJA: 🗂️ CELDAS ÚNICAS LGG (CORRIDAS EVALUADAS) ---
+    # --- HOJA: 🗂️ TALADROS ÚNICOS LGG (CONSOLIDADO 1 FILA POR TALADRO) ---
     # =========================================================================
-    ws_lgg_celdas = wb.create_sheet(title="🗂️ Celdas Únicas LGG")
-    ws_lgg_celdas.views.sheetView[0].showGridLines = True
+    ws_lgg_taladros = wb.create_sheet(title="🗂️ Taladros Únicos LGG")
+    ws_lgg_taladros.views.sheetView[0].showGridLines = True
 
-    ws_lgg_celdas.cell(row=2, column=2, value="REGISTRO DE CORRIDAS Y CELDAS ÚNICAS EVALUADAS — LOGUEO GENERAL (LGG)").font = font_title
-    ws_lgg_celdas.cell(
+    ws_lgg_taladros.cell(row=2, column=2, value="CONSOLIDADO DE TALADROS ÚNICOS EVALUADOS — LOGUEO GENERAL (LGG)").font = font_title
+    ws_lgg_taladros.cell(
         row=3, column=2,
-        value="Consolidado exclusivo de corridas de logueo general con observaciones, alertas o discrepancias detectadas."
+        value="Resumen ejecutivo de sondajes perforados con estadísticas de corridas, metraje, calidad geomecánica y cruce con Logueo Estructural."
     ).font = font_subtitle
 
-    c_back_lgg = ws_lgg_celdas.cell(row=2, column=15)
+    c_back_lgg = ws_lgg_taladros.cell(row=2, column=15)
     c_back_lgg.value = '=HYPERLINK("#' + "'❌ Catálogo de Errores'" + '!B2", "⬅ Volver al Catálogo de Errores")'
     c_back_lgg.font = Font(name="Segoe UI", size=10, bold=True, color="1B365D", underline="single")
     c_back_lgg.alignment = alignment_right
 
-    headers_lgg_celdas = [
-        "N°", "Fila Excel", "Taladro", "Corrida [De - A]", "Desde (m)", "Hasta (m)", "Longitud (m)",
-        "Recuperación (m)", "RQD (m)", "Litología 1", "Litología 2", "Litología 3", "Resistencia ISRM", "Estado QA/QC"
+    headers_lgg_dh = [
+        "N°", "Taladro", "Campaña", "Desde Mín (m)", "Hasta Máx (m)", "Metraje Total (m)",
+        "Total Corridas", "Recuperación Total (m)", "RQD Total (m)", "Recup Prom (%)", "RQD Prom (%)",
+        "Incidencias LGG", "Estado QA/QC", "Cruce con Estructural"
     ]
 
-    for c_idx, h_text in enumerate(headers_lgg_celdas, start=2):
-        cell = ws_lgg_celdas.cell(row=5, column=c_idx, value=h_text)
+    for c_idx, h_text in enumerate(headers_lgg_dh, start=2):
+        cell = ws_lgg_taladros.cell(row=5, column=c_idx, value=h_text)
         cell.font = font_header
         cell.fill = fill_primary
         cell.alignment = alignment_center
         cell.border = border_thin
 
-    unique_lgg_runs = [r for r in diag.get("unique_lgg_runs", []) if r.get("estado") != "CONFORME"]
-    r_lgg_c = 6
-    for idx_run, run_item in enumerate(unique_lgg_runs, start=1):
-        ws_lgg_celdas.cell(row=r_lgg_c, column=2, value=idx_run).alignment = alignment_center
-        ws_lgg_celdas.cell(row=r_lgg_c, column=3, value=run_item.get("fila_excel", idx_run + 1)).alignment = alignment_center
-        ws_lgg_celdas.cell(row=r_lgg_c, column=4, value=run_item.get("taladro")).alignment = alignment_left
-        ws_lgg_celdas.cell(row=r_lgg_c, column=5, value=run_item.get("corrida")).alignment = alignment_center
+    # Indexar estructuras por taladro para el cruce
+    est_dh_counts = defaultdict(int)
+    for s_item in diag.get("unique_est_structures", []):
+        t_clean = str(s_item.get("taladro", "")).strip().upper()
+        if t_clean:
+            est_dh_counts[t_clean] += 1
 
-        c_d = ws_lgg_celdas.cell(row=r_lgg_c, column=6, value=run_item.get("de"))
+    # Agrupar corridas LGG por taladro
+    lgg_by_dh = defaultdict(lambda: {
+        "corridas": 0, "desde_min": 999999.0, "hasta_max": -1.0, "campana": "S/C",
+        "rec_sum": 0.0, "rqd_sum": 0.0, "len_sum": 0.0, "alertas": 0, "advertencias": 0
+    })
+
+    import re
+    for run_item in diag.get("unique_lgg_runs", []):
+        t_clean = str(run_item.get("taladro", "")).strip().upper()
+        if not t_clean:
+            continue
+        st = lgg_by_dh[t_clean]
+        st["corridas"] += 1
+        d = run_item.get("de")
+        h = run_item.get("a")
+        if d is not None: st["desde_min"] = min(st["desde_min"], float(d))
+        if h is not None: st["hasta_max"] = max(st["hasta_max"], float(h))
+        st["len_sum"] += float(run_item.get("longitud") or 0)
+        st["rec_sum"] += float(run_item.get("rec_m") or 0)
+        st["rqd_sum"] += float(run_item.get("rqd_m") or 0)
+
+        if st["campana"] == "S/C":
+            m_c = re.search(r'FE[A-Z]{2}(\d{2})-', t_clean)
+            if m_c:
+                st["campana"] = f"20{m_c.group(1)}"
+
+        if run_item.get("estado") == "NO CONFORME":
+            st["alertas"] += 1
+        elif run_item.get("estado") == "CON OBSERVACIONES":
+            st["advertencias"] += 1
+
+    r_lgg_dh = 6
+    for idx_dh, (t_name, data_dh) in enumerate(sorted(lgg_by_dh.items()), start=1):
+        ws_lgg_taladros.cell(row=r_lgg_dh, column=2, value=idx_dh).alignment = alignment_center
+        ws_lgg_taladros.cell(row=r_lgg_dh, column=3, value=t_name).alignment = alignment_left
+        ws_lgg_taladros.cell(row=r_lgg_dh, column=4, value=data_dh["campana"]).alignment = alignment_center
+
+        c_d = ws_lgg_taladros.cell(row=r_lgg_dh, column=5, value=data_dh["desde_min"] if data_dh["desde_min"] != 999999.0 else 0)
         c_d.alignment = alignment_right
-        if run_item.get("de") is not None: c_d.number_format = '0.00'
+        c_d.number_format = '0.00'
 
-        c_a = ws_lgg_celdas.cell(row=r_lgg_c, column=7, value=run_item.get("a"))
-        c_a.alignment = alignment_right
-        if run_item.get("a") is not None: c_a.number_format = '0.00'
+        c_h = ws_lgg_taladros.cell(row=r_lgg_dh, column=6, value=data_dh["hasta_max"] if data_dh["hasta_max"] != -1.0 else 0)
+        c_h.alignment = alignment_right
+        c_h.number_format = '0.00'
 
-        c_len = ws_lgg_celdas.cell(row=r_lgg_c, column=8, value=run_item.get("longitud"))
+        c_len = ws_lgg_taladros.cell(row=r_lgg_dh, column=7, value=data_dh["len_sum"])
         c_len.alignment = alignment_right
-        if run_item.get("longitud") is not None: c_len.number_format = '0.00'
+        c_len.number_format = '0.00'
 
-        c_rec = ws_lgg_celdas.cell(row=r_lgg_c, column=9, value=run_item.get("rec_m"))
+        ws_lgg_taladros.cell(row=r_lgg_dh, column=8, value=data_dh["corridas"]).alignment = alignment_center
+
+        c_rec = ws_lgg_taladros.cell(row=r_lgg_dh, column=9, value=data_dh["rec_sum"])
         c_rec.alignment = alignment_right
-        if run_item.get("rec_m") is not None: c_rec.number_format = '0.00'
+        c_rec.number_format = '0.00'
 
-        c_rqd = ws_lgg_celdas.cell(row=r_lgg_c, column=10, value=run_item.get("rqd_m"))
+        c_rqd = ws_lgg_taladros.cell(row=r_lgg_dh, column=10, value=data_dh["rqd_sum"])
         c_rqd.alignment = alignment_right
-        if run_item.get("rqd_m") is not None: c_rqd.number_format = '0.00'
+        c_rqd.number_format = '0.00'
 
-        ws_lgg_celdas.cell(row=r_lgg_c, column=11, value=run_item.get("lito1")).alignment = alignment_center
-        ws_lgg_celdas.cell(row=r_lgg_c, column=12, value=run_item.get("lito2")).alignment = alignment_center
-        ws_lgg_celdas.cell(row=r_lgg_c, column=13, value=run_item.get("lito3")).alignment = alignment_center
-        ws_lgg_celdas.cell(row=r_lgg_c, column=14, value=run_item.get("resistencia")).alignment = alignment_center
+        rec_pct = (data_dh["rec_sum"] / data_dh["len_sum"]) if data_dh["len_sum"] > 0 else 0
+        c_rec_p = ws_lgg_taladros.cell(row=r_lgg_dh, column=11, value=rec_pct)
+        c_rec_p.alignment = alignment_right
+        c_rec_p.number_format = '0.0%'
 
-        c_st = ws_lgg_celdas.cell(row=r_lgg_c, column=15, value=run_item.get("estado", "CONFORME"))
+        rqd_pct = (data_dh["rqd_sum"] / data_dh["len_sum"]) if data_dh["len_sum"] > 0 else 0
+        c_rqd_p = ws_lgg_taladros.cell(row=r_lgg_dh, column=12, value=rqd_pct)
+        c_rqd_p.alignment = alignment_right
+        c_rqd_p.number_format = '0.0%'
+
+        total_anom = data_dh["alertas"] + data_dh["advertencias"]
+        ws_lgg_taladros.cell(row=r_lgg_dh, column=13, value=total_anom).alignment = alignment_center
+
+        if data_dh["alertas"] > 0:
+            est_qa = "NO CONFORME"
+            fill_st = fill_accent_red
+        elif data_dh["advertencias"] > 0:
+            est_qa = "CON OBSERVACIONES"
+            fill_st = fill_accent_orange
+        else:
+            est_qa = "CONFORME"
+            fill_st = fill_accent_green
+
+        c_st = ws_lgg_taladros.cell(row=r_lgg_dh, column=14, value=est_qa)
         c_st.alignment = alignment_center
         c_st.font = font_bold
-        if run_item.get("estado") == "CONFORME":
-            c_st.fill = fill_accent_green
+        c_st.fill = fill_st
+
+        # Cruce con Estructural
+        n_est = est_dh_counts.get(t_name, 0)
+        c_cruce = ws_lgg_taladros.cell(row=r_lgg_dh, column=15)
+        c_cruce.alignment = alignment_center
+        c_cruce.font = font_bold
+        if n_est > 0:
+            c_cruce.value = f"COINCIDE ({n_est} estructuras)"
+            c_cruce.fill = fill_accent_green
         else:
-            c_st.fill = fill_accent_red
+            c_cruce.value = "❌ FALTANTE EN ESTRUCTURAL"
+            c_cruce.fill = fill_accent_red
 
         for col_idx in range(2, 16):
-            cell = ws_lgg_celdas.cell(row=r_lgg_c, column=col_idx)
+            cell = ws_lgg_taladros.cell(row=r_lgg_dh, column=col_idx)
             cell.border = border_thin
             if cell.font != font_bold:
                 cell.font = font_regular
-            if r_lgg_c % 2 == 0 and col_idx != 15:
+            if r_lgg_dh % 2 == 0 and col_idx not in (14, 15):
                 cell.fill = fill_zebra
 
-        r_lgg_c += 1
+        r_lgg_dh += 1
 
-    if r_lgg_c > 6:
-        ws_lgg_celdas.auto_filter.ref = f"B5:O{r_lgg_c - 1}"
+    if r_lgg_dh > 6:
+        ws_lgg_taladros.auto_filter.ref = f"B5:O{r_lgg_dh - 1}"
 
-    for col in ws_lgg_celdas.iter_cols(min_col=2, max_col=15, min_row=5, max_row=min(r_lgg_c, 100)):
+    for col in ws_lgg_taladros.iter_cols(min_col=2, max_col=15, min_row=5, max_row=min(r_lgg_dh, 100)):
         max_len = max(len(str(cell.value or '')) for cell in col)
         col_letter = get_column_letter(col[0].column)
-        ws_lgg_celdas.column_dimensions[col_letter].width = max(11, min(max_len + 3, 25))
+        ws_lgg_taladros.column_dimensions[col_letter].width = max(12, min(max_len + 3, 30))
 
     # =========================================================================
-    # --- HOJA: 🗂️ CELDAS ÚNICAS ESTRUCTURAL (DISCONTINUIDADES EVALUADAS) ---
+    # --- HOJA: 🗂️ TALADROS ÚNICOS ESTRUCTURAL (CONSOLIDADO 1 FILA POR TALADRO) ---
     # =========================================================================
-    ws_est_celdas = wb.create_sheet(title="🗂️ Celdas Únicas Estructural")
-    ws_est_celdas.views.sheetView[0].showGridLines = True
+    ws_est_taladros = wb.create_sheet(title="🗂️ Taladros Únicos Estructural")
+    ws_est_taladros.views.sheetView[0].showGridLines = True
 
-    ws_est_celdas.cell(row=2, column=2, value="REGISTRO DE ESTRUCTURAS Y DISCONTINUIDADES ÚNICAS — LOGUEO ESTRUCTURAL").font = font_title
-    ws_est_celdas.cell(
+    ws_est_taladros.cell(row=2, column=2, value="CONSOLIDADO DE TALADROS ÚNICOS EVALUADOS — LOGUEO ESTRUCTURAL").font = font_title
+    ws_est_taladros.cell(
         row=3, column=2,
-        value="Consolidado exclusivo de discontinuidades estructurales con observaciones, alertas o discrepancias detectadas."
+        value="Resumen ejecutivo de sondajes orientados con estadísticas de discontinuidades, profundidades y cruce con Logueo General."
     ).font = font_subtitle
 
-    c_back_est = ws_est_celdas.cell(row=2, column=17)
+    c_back_est = ws_est_taladros.cell(row=2, column=12)
     c_back_est.value = '=HYPERLINK("#' + "'❌ Catálogo de Errores'" + '!B2", "⬅ Volver al Catálogo de Errores")'
     c_back_est.font = Font(name="Segoe UI", size=10, bold=True, color="1B365D", underline="single")
     c_back_est.alignment = alignment_right
 
-    headers_est_celdas = [
-        "N°", "Fila Excel", "Taladro", "Profundidad (m)", "Corrida Asociada", "Tipo Estructura",
-        "Alfa (°)", "Beta (°)", "Dip (°)", "Azimut (°)", "Abertura (mm)", "Espesor (mm)",
-        "Tipo Relleno", "Dureza Pared", "Litología", "Estado QA/QC"
+    headers_est_dh = [
+        "N°", "Taladro", "Campaña", "Profundidad Mín (m)", "Profundidad Máx (m)",
+        "Rango Evaluado (m)", "Total Discontinuidades", "Estructuras con Alerta",
+        "Estado QA/QC", "Cruce con LGG"
     ]
 
-    for c_idx, h_text in enumerate(headers_est_celdas, start=2):
-        cell = ws_est_celdas.cell(row=5, column=c_idx, value=h_text)
+    for c_idx, h_text in enumerate(headers_est_dh, start=2):
+        cell = ws_est_taladros.cell(row=5, column=c_idx, value=h_text)
         cell.font = font_header
         cell.fill = fill_primary
         cell.alignment = alignment_center
         cell.border = border_thin
 
-    unique_est_structs = [s for s in diag.get("unique_est_structures", []) if s.get("estado") != "CONFORME"]
-    r_est_c = 6
-    for idx_st, st_item in enumerate(unique_est_structs, start=1):
-        ws_est_celdas.cell(row=r_est_c, column=2, value=idx_st).alignment = alignment_center
-        ws_est_celdas.cell(row=r_est_c, column=3, value=st_item.get("fila_excel", idx_st + 1)).alignment = alignment_center
-        ws_est_celdas.cell(row=r_est_c, column=4, value=st_item.get("taladro")).alignment = alignment_left
+    est_by_dh = defaultdict(lambda: {
+        "estructuras": 0, "prof_min": 999999.0, "prof_max": -1.0, "campana": "S/C", "alertas": 0
+    })
 
-        c_p = ws_est_celdas.cell(row=r_est_c, column=5, value=st_item.get("profundidad"))
-        c_p.alignment = alignment_right
-        if st_item.get("profundidad") is not None: c_p.number_format = '0.00'
+    for st_item in diag.get("unique_est_structures", []):
+        t_clean = str(st_item.get("taladro", "")).strip().upper()
+        if not t_clean:
+            continue
+        st = est_by_dh[t_clean]
+        st["estructuras"] += 1
+        p = st_item.get("profundidad")
+        if p is not None:
+            st["prof_min"] = min(st["prof_min"], float(p))
+            st["prof_max"] = max(st["prof_max"], float(p))
+        if st["campana"] == "S/C":
+            m_c = re.search(r'FE[A-Z]{2}(\d{2})-', t_clean)
+            if m_c:
+                st["campana"] = f"20{m_c.group(1)}"
+        if st_item.get("estado") == "NO CONFORME":
+            st["alertas"] += 1
 
-        ws_est_celdas.cell(row=r_est_c, column=6, value=st_item.get("corrida")).alignment = alignment_center
-        ws_est_celdas.cell(row=r_est_c, column=7, value=st_item.get("tipo_est")).alignment = alignment_center
+    r_est_dh = 6
+    for idx_dh, (t_name, data_dh) in enumerate(sorted(est_by_dh.items()), start=1):
+        ws_est_taladros.cell(row=r_est_dh, column=2, value=idx_dh).alignment = alignment_center
+        ws_est_taladros.cell(row=r_est_dh, column=3, value=t_name).alignment = alignment_left
+        ws_est_taladros.cell(row=r_est_dh, column=4, value=data_dh["campana"]).alignment = alignment_center
 
-        c_alf = ws_est_celdas.cell(row=r_est_c, column=8, value=st_item.get("alfa"))
-        c_alf.alignment = alignment_right
-        if st_item.get("alfa") is not None: c_alf.number_format = '#,##0'
+        c_p_min = ws_est_taladros.cell(row=r_est_dh, column=5, value=data_dh["prof_min"] if data_dh["prof_min"] != 999999.0 else 0)
+        c_p_min.alignment = alignment_right
+        c_p_min.number_format = '0.00'
 
-        c_bet = ws_est_celdas.cell(row=r_est_c, column=9, value=st_item.get("beta"))
-        c_bet.alignment = alignment_right
-        if st_item.get("beta") is not None: c_bet.number_format = '#,##0'
+        c_p_max = ws_est_taladros.cell(row=r_est_dh, column=6, value=data_dh["prof_max"] if data_dh["prof_max"] != -1.0 else 0)
+        c_p_max.alignment = alignment_right
+        c_p_max.number_format = '0.00'
 
-        c_dip = ws_est_celdas.cell(row=r_est_c, column=10, value=st_item.get("dip"))
-        c_dip.alignment = alignment_right
-        if st_item.get("dip") is not None: c_dip.number_format = '#,##0'
+        rango = max(0, data_dh["prof_max"] - data_dh["prof_min"]) if data_dh["prof_max"] != -1.0 else 0
+        c_rango = ws_est_taladros.cell(row=r_est_dh, column=7, value=rango)
+        c_rango.alignment = alignment_right
+        c_rango.number_format = '0.00'
 
-        c_az = ws_est_celdas.cell(row=r_est_c, column=11, value=st_item.get("azimuth"))
-        c_az.alignment = alignment_right
-        if st_item.get("azimuth") is not None: c_az.number_format = '#,##0'
+        ws_est_taladros.cell(row=r_est_dh, column=8, value=data_dh["estructuras"]).alignment = alignment_center
+        ws_est_taladros.cell(row=r_est_dh, column=9, value=data_dh["alertas"]).alignment = alignment_center
 
-        c_ab = ws_est_celdas.cell(row=r_est_c, column=12, value=st_item.get("abertura"))
-        c_ab.alignment = alignment_right
-        if st_item.get("abertura") is not None: c_ab.number_format = '0.00'
+        if data_dh["alertas"] > 0:
+            est_qa = "NO CONFORME"
+            fill_st = fill_accent_red
+        else:
+            est_qa = "CONFORME"
+            fill_st = fill_accent_green
 
-        c_esp = ws_est_celdas.cell(row=r_est_c, column=13, value=st_item.get("espesor"))
-        c_esp.alignment = alignment_right
-        if st_item.get("espesor") is not None: c_esp.number_format = '0.00'
-
-        ws_est_celdas.cell(row=r_est_c, column=14, value=st_item.get("relleno")).alignment = alignment_center
-        ws_est_celdas.cell(row=r_est_c, column=15, value=st_item.get("dureza_pared")).alignment = alignment_center
-        
-        lito_str = "/".join(filter(None, [st_item.get("lito1"), st_item.get("lito2"), st_item.get("lito3")]))
-        ws_est_celdas.cell(row=r_est_c, column=16, value=lito_str or "—").alignment = alignment_center
-
-        c_st = ws_est_celdas.cell(row=r_est_c, column=17, value=st_item.get("estado", "CONFORME"))
+        c_st = ws_est_taladros.cell(row=r_est_dh, column=10, value=est_qa)
         c_st.alignment = alignment_center
         c_st.font = font_bold
-        if st_item.get("estado") == "CONFORME":
-            c_st.fill = fill_accent_green
-        else:
-            c_st.fill = fill_accent_red
+        c_st.fill = fill_st
 
-        for col_idx in range(2, 18):
-            cell = ws_est_celdas.cell(row=r_est_c, column=col_idx)
+        # Cruce con LGG
+        n_lgg = lgg_by_dh[t_name]["corridas"] if t_name in lgg_by_dh else 0
+        c_cruce = ws_est_taladros.cell(row=r_est_dh, column=11)
+        c_cruce.alignment = alignment_center
+        c_cruce.font = font_bold
+        if n_lgg > 0:
+            c_cruce.value = f"COINCIDE ({n_lgg} corridas)"
+            c_cruce.fill = fill_accent_green
+        else:
+            c_cruce.value = "❌ FALTANTE EN LGG"
+            c_cruce.fill = fill_accent_red
+
+        for col_idx in range(2, 12):
+            cell = ws_est_taladros.cell(row=r_est_dh, column=col_idx)
             cell.border = border_thin
             if cell.font != font_bold:
                 cell.font = font_regular
-            if r_est_c % 2 == 0 and col_idx != 17:
+            if r_est_dh % 2 == 0 and col_idx not in (10, 11):
                 cell.fill = fill_zebra
 
-        r_est_c += 1
+        r_est_dh += 1
 
-    if r_est_c > 6:
-        ws_est_celdas.auto_filter.ref = f"B5:Q{r_est_c - 1}"
+    if r_est_dh > 6:
+        ws_est_taladros.auto_filter.ref = f"B5:K{r_est_dh - 1}"
 
-    for col in ws_est_celdas.iter_cols(min_col=2, max_col=17, min_row=5, max_row=min(r_est_c, 100)):
+    for col in ws_est_taladros.iter_cols(min_col=2, max_col=11, min_row=5, max_row=min(r_est_dh, 100)):
         max_len = max(len(str(cell.value or '')) for cell in col)
         col_letter = get_column_letter(col[0].column)
-        ws_est_celdas.column_dimensions[col_letter].width = max(11, min(max_len + 3, 25))
+        ws_est_taladros.column_dimensions[col_letter].width = max(12, min(max_len + 3, 30))
 
     # --- HOJA: DETALLE COMPLETO DE INCIDENCIAS ---
     ws_detail = wb.create_sheet(title="📋 Detalle de Incidencias")
