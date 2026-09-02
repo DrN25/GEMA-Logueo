@@ -20,7 +20,7 @@ import SaveConfirmModal from './components/common/SaveConfirmModal';
 import PltView from './features/plt/PltView';
 import RqdDashboard from './features/dashboard/RqdDashboard';
 import ReportsPdf from './features/reports/ReportsPdf';
-import BulkAuditor from './features/auditor/BulkAuditor';
+import AuditoriaHub from './features/auditor/AuditoriaHub';
 
 import { validateLogueoQAQC, type QaQcAlert } from './utils/qaQcRules';
 import { validateLogueoMandatory, toVacioAlerts } from './utils/mandatoryRules';
@@ -2112,7 +2112,7 @@ export default function App() {
 
           {currentView === 'revision' && (
             <div className="flex-1 overflow-y-auto">
-              <BulkAuditor apiBase={API_BASE} />
+              <AuditoriaHub apiBase={API_BASE} />
             </div>
           )}
 
