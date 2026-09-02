@@ -13,7 +13,7 @@ import pandas as pd
 from fastapi import APIRouter, HTTPException, UploadFile, File, Query, BackgroundTasks
 from fastapi.responses import StreamingResponse, FileResponse, JSONResponse
 
-from app.core.validator_plt_regulares import PltRegularesValidator
+from app.core.validator_plt_regulares import PltRegularesValidator, extract_lgg_dataframe
 from app.services.plt_excel_exporter_regulares import export_plt_regulares_to_excel
 
 router = APIRouter(prefix="/api", tags=["Auditoría PLT Regulares"])
@@ -129,23 +129,41 @@ def _build_compact_metrics(diag: dict, campania_filter: Optional[str] = None) ->
 @router.post("/auditoria/plt/upload")
 @router.post("/audit/plt/upload-and-audit")
 async def upload_plt_audit_file(
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    lgg_file: Optional[UploadFile] = File(None)
 ):
     """
-    Recibe un archivo Excel de Ensayos PLT, ejecuta la validación integral y pre-genera el reporte Excel.
+    Recibe un archivo Excel de Ensayos PLT y opcionalmente la base de Logueo General (LGG),
+    ejecuta la validación integral (autónoma o cruzada) y pre-genera el reporte Excel.
     """
     if not file.filename.lower().endswith(('.xlsx', '.xlsm', '.xls')):
         raise HTTPException(status_code=400, detail="Formato no soportado. Debe ser un archivo Excel (.xlsx, .xlsm, .xls).")
 
+    if lgg_file and not lgg_file.filename.lower().endswith(('.xlsx', '.xlsm', '.xls')):
+        raise HTTPException(status_code=400, detail="Formato de archivo LGG no soportado. Debe ser un archivo Excel (.xlsx, .xlsm, .xls).")
+
     audit_id = f"plt_reg_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     temp_path = os.path.join(plt_history_dir, f"temp_{audit_id}_{file.filename}")
     saved_excel_path = os.path.join(plt_history_dir, f"{audit_id}_{file.filename}")
+
+    temp_lgg_path = None
+    if lgg_file:
+        temp_lgg_path = os.path.join(plt_history_dir, f"temp_lgg_{audit_id}_{lgg_file.filename}")
 
     try:
         content = await file.read()
         with open(temp_path, "wb") as f:
             f.write(content)
         shutil.copyfile(temp_path, saved_excel_path)
+
+        df_lgg = None
+        if lgg_file and temp_lgg_path:
+            content_lgg = await lgg_file.read()
+            with open(temp_lgg_path, "wb") as f:
+                f.write(content_lgg)
+            df_lgg = extract_lgg_dataframe(temp_lgg_path)
+            if df_lgg is not None:
+                print(f"[QAQC PLT] Archivo LGG cargado y procesado: {len(df_lgg)} corridas extraídas.")
 
         # Cargar DataFrame con Calamine o Pandas
         try:
@@ -162,15 +180,18 @@ async def upload_plt_audit_file(
 
         # Validar
         validator = PltRegularesValidator()
-        diag = validator.audit_dataframe(df)
+        diag = validator.audit_dataframe(df, df_lgg=df_lgg)
 
         diag["nombre_archivo"] = file.filename
+        diag["lgg_archivo"] = lgg_file.filename if lgg_file else None
         diag["fecha_auditoria"] = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         diag["audit_id"] = audit_id
 
         # Métricas compactas
         metricas = _build_compact_metrics(diag)
         metricas["nombre_archivo"] = file.filename
+        metricas["lgg_archivo"] = diag["lgg_archivo"]
+        metricas["has_lgg_crosscheck"] = diag.get("has_lgg_crosscheck", False)
         metricas["fecha_auditoria"] = diag["fecha_auditoria"]
         metricas["audit_id"] = audit_id
 
@@ -195,222 +216,25 @@ async def upload_plt_audit_file(
         return JSONResponse(
             content={
                 "status": "success",
-                "message": "Auditoría PLT ejecutada correctamente",
+                "message": "Auditoría PLT ejecutada correctamente" + (" (con cruce LGG)" if df_lgg is not None else " (modo autónomo)"),
                 "audit_id": audit_id,
                 "filename": file.filename,
-                "metricas": metricas,
+                "lgg_filename": lgg_file.filename if lgg_file else None,
+                "has_lgg_crosscheck": diag.get("has_lgg_crosscheck", False),
+                "summary": metricas
             }
         )
     except Exception as e:
-        print(f"[QAQC PLT] [ERROR] {e}")
-        raise HTTPException(status_code=500, detail=f"Error durante la auditoría PLT: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error durante el procesamiento del archivo PLT: {str(e)}")
     finally:
         if os.path.exists(temp_path):
-            try:
-                os.remove(temp_path)
-            except Exception:
-                pass
+            try: os.remove(temp_path)
+            except Exception: pass
+        if temp_lgg_path and os.path.exists(temp_lgg_path):
+            try: os.remove(temp_lgg_path)
+            except Exception: pass
 
 
-@router.get("/auditoria/plt/status")
-@router.get("/audit/plt/status")
-def get_plt_audit_status(audit_id: Optional[str] = Query(None)):
-    """Estado de la auditoría y verificación de reporte Excel."""
-    if audit_id:
-        compact_file = os.path.join(plt_history_dir, f"{audit_id}_compact.json")
-        reporte_file = os.path.join(plt_history_dir, f"{audit_id}_reporte.xlsx")
-    else:
-        compact_file = LATEST_PLT_COMPACT
-        reporte_file = LATEST_PLT_EXCEL
 
-    if os.path.exists(compact_file):
-        try:
-            with open(compact_file, "r", encoding="utf-8") as f:
-                meta = json.load(f)
-        except Exception:
-            meta = {}
-        return {
-            "status": "listo",
-            "reporte_listo": os.path.exists(reporte_file),
-            "nombre_archivo": meta.get("nombre_archivo"),
-            "fecha_auditoria": meta.get("fecha_auditoria"),
-            "audit_id": meta.get("audit_id", audit_id),
-        }
-
-    if os.path.exists(LATEST_PLT_DIAG):
-        return {"status": "procesando", "reporte_listo": False}
-
-    raise HTTPException(status_code=404, detail="No se encontró ninguna auditoría PLT activa.")
-
-
-@router.get("/auditoria/plt/resumen-ligero")
-@router.get("/audit/plt/resumen-ligero")
-def get_plt_resumen_ligero(
-    audit_id: Optional[str] = Query(None),
-    campania: Optional[str] = Query(None),
-):
-    """Retorna los KPIs ejecutivos y estadísticas con soporte de filtrado."""
-    if audit_id:
-        diag_path = os.path.join(plt_history_dir, f"{audit_id}_diag.json")
-    else:
-        diag_path = LATEST_PLT_DIAG
-
-    if not os.path.exists(diag_path):
-        raise HTTPException(status_code=404, detail="No hay ninguna auditoría PLT cargada en memoria.")
-
-    with open(diag_path, "r", encoding="utf-8") as f:
-        diag = json.load(f)
-
-    metricas = _build_compact_metrics(diag, campania_filter=campania)
-    metricas["nombre_archivo"] = diag.get("nombre_archivo", "Planilla PLT")
-    metricas["fecha_auditoria"] = diag.get("fecha_auditoria", "")
-    metricas["audit_id"] = diag.get("audit_id", audit_id)
-    return JSONResponse(content=metricas)
-
-
-@router.get("/auditoria/plt/incidencias-paginadas")
-@router.get("/audit/plt/incidencias-paginadas")
-def get_plt_incidencias_paginadas(
-    page: int = Query(1, ge=1),
-    limit: int = Query(50, ge=1, le=500),
-    tipo_incidencia: Optional[str] = Query(None),
-    rule_code: Optional[str] = Query(None),
-    campania: Optional[str] = Query(None),
-    taladro: Optional[str] = Query(None),
-    search: Optional[str] = Query(None),
-    audit_id: Optional[str] = Query(None),
-):
-    """Retorna la lista paginada y filtrada de inconsistencias encontradas."""
-    if audit_id:
-        diag_path = os.path.join(plt_history_dir, f"{audit_id}_diag.json")
-    else:
-        diag_path = LATEST_PLT_DIAG
-
-    if not os.path.exists(diag_path):
-        raise HTTPException(status_code=404, detail="No hay ninguna auditoría PLT cargada en memoria.")
-
-    with open(diag_path, "r", encoding="utf-8") as f:
-        diag = json.load(f)
-
-    items = diag.get("anomalies", [])
-
-    # Filtrar por campañas
-    if campania:
-        camps = [c.strip().upper() for c in campania.split(",") if c.strip()]
-        if camps and "TODAS" not in camps:
-            items = [i for i in items if str(i.get("campana", "")).strip().upper() in camps]
-
-    # Filtrar por taladro
-    if taladro:
-        t_clean = taladro.strip().upper()
-        if t_clean and t_clean != "TODOS":
-            items = [i for i in items if str(i.get("taladro", "")).strip().upper() == t_clean]
-
-    # Filtrar por severidad
-    if tipo_incidencia and tipo_incidencia.upper() != "TODOS":
-        items = [i for i in items if i.get("severity") == tipo_incidencia.upper()]
-
-    # Filtrar por código de regla
-    if rule_code:
-        items = [i for i in items if i.get("category_code") == rule_code]
-
-    # Filtrar por búsqueda de texto
-    if search:
-        q = search.strip().upper()
-        items = [
-            i for i in items
-            if q in str(i.get("taladro", "")).upper()
-            or q in str(i.get("muestra", "")).upper()
-            or q in str(i.get("columna", "")).upper()
-            or q in str(i.get("message", "")).upper()
-            or q in str(i.get("category_code", "")).upper()
-            or q in str(i.get("category_name", "")).upper()
-        ]
-
-    total_items = len(items)
-    total_pages = max(1, (total_items + limit - 1) // limit)
-    start_idx = (page - 1) * limit
-    end_idx = start_idx + limit
-    page_items = items[start_idx:end_idx]
-
-    return JSONResponse(
-        content={
-            "page": page,
-            "limit": limit,
-            "total_items": total_items,
-            "total_pages": total_pages,
-            "items": page_items,
-        }
-    )
-
-
-@router.get("/auditoria/plt/reporte-excel")
-@router.get("/audit/plt/download-report/{audit_id}")
-def download_plt_excel_report(
-    audit_id: Optional[str] = None
-):
-    """Descarga el reporte Excel (.xlsx) generado."""
-    if audit_id and audit_id != "latest":
-        hist_excel = os.path.join(plt_history_dir, f"{audit_id}_reporte.xlsx")
-        if os.path.exists(hist_excel):
-            return FileResponse(
-                path=hist_excel,
-                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                filename=f"Reporte_Auditoria_PLT_Regulares_{audit_id}.xlsx"
-            )
-
-    if os.path.exists(LATEST_PLT_EXCEL):
-        return FileResponse(
-            path=LATEST_PLT_EXCEL,
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            filename="Reporte_Auditoria_PLT_Regulares.xlsx"
-        )
-
-    raise HTTPException(status_code=404, detail="No se encontró el reporte Excel generado.")
-
-
-@router.get("/auditoria/plt/historial")
-@router.get("/audit/plt/history")
-def get_plt_audit_history():
-    """Retorna la lista de auditorías PLT previas."""
-    history = []
-    if not os.path.exists(plt_history_dir):
-        return JSONResponse(content={"history": []})
-
-    for f in os.listdir(plt_history_dir):
-        if f.endswith("_compact.json"):
-            aid = f.replace("_compact.json", "")
-            try:
-                with open(os.path.join(plt_history_dir, f), "r", encoding="utf-8") as jf:
-                    meta = json.load(jf)
-                reporte_file = os.path.join(plt_history_dir, f"{aid}_reporte.xlsx")
-                history.append({
-                    "audit_id": aid,
-                    "nombre_archivo": meta.get("nombre_archivo", "Planilla PLT"),
-                    "fecha_auditoria": meta.get("fecha_auditoria", ""),
-                    "total_registros": meta.get("total_registros_evaluados", 0),
-                    "integridad_global_pct": meta.get("integridad_global_pct", 0.0),
-                    "total_alertas": meta.get("total_alertas", 0),
-                    "total_advertencias": meta.get("total_advertencias", 0),
-                    "total_vacios": meta.get("total_vacios", 0),
-                    "has_report": os.path.exists(reporte_file),
-                })
-            except Exception:
-                continue
-
-    history = sorted(history, key=lambda x: x["audit_id"], reverse=True)
-    return JSONResponse(content={"history": history})
-
-
-@router.delete("/auditoria/plt/historial")
-@router.delete("/audit/plt/history")
-def clear_plt_audit_history():
-    """Limpia todos los registros del historial PLT."""
-    try:
-        for f in os.listdir(plt_history_dir):
-            p = os.path.join(plt_history_dir, f)
-            if os.path.isfile(p):
-                os.remove(p)
-        return {"status": "success", "message": "Historial de auditorías PLT limpiado correctamente."}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))

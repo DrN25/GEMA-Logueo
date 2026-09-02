@@ -137,11 +137,14 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
         }
     };
 
-    const handleUpload = async (file: File) => {
+    const handleUpload = async (file: File, lggFile?: File | null) => {
         setStatus('uploading');
-        setMessage(`Subiendo y auditando ${file.name}...`);
+        setMessage(`Subiendo y auditando ${file.name}${lggFile ? ` (con cruce ${lggFile.name})` : ''}...`);
         const formData = new FormData();
         formData.append('file', file);
+        if (lggFile) {
+            formData.append('lgg_file', lggFile);
+        }
 
         try {
             const res = await fetch(`${apiBase}/api/auditoria/plt/upload`, {
@@ -156,9 +159,9 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
 
             const data = await res.json();
             setSelectedAuditId(data.audit_id);
-            setKpis(data.metricas);
+            setKpis(data.metricas || data.summary);
             setStatus('loaded');
-            setMessage('Auditoría completada exitosamente.');
+            setMessage(data.message || 'Auditoría completada exitosamente.');
             await fetchHistory();
             await fetchPaginatedIncidencias(1);
         } catch (e: any) {
@@ -225,11 +228,23 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
                         <FileSpreadsheet size={24} />
                     </div>
                     <div>
-                        <h1 className="text-base sm:text-lg font-black tracking-wider text-slate-100 uppercase">
-                            Auditoría QA/QC — Ensayos PLT Regulares (DDH)
-                        </h1>
+                        <div className="flex flex-wrap items-center gap-2.5">
+                            <h1 className="text-base sm:text-lg font-black tracking-wider text-slate-100 uppercase">
+                                Auditoría QA/QC — Ensayos PLT Regulares (DDH)
+                            </h1>
+                            {kpis?.has_lgg_crosscheck ? (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-cyan-500/15 text-cyan-400 border border-cyan-500/30">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                                    Cruce LGG Activo
+                                </span>
+                            ) : kpis ? (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-500/15 text-slate-400 border border-slate-500/25">
+                                    Modo Autónomo (Sin LGG)
+                                </span>
+                            ) : null}
+                        </div>
                         <p className="text-xs text-slate-400">
-                            Validación de consistencia geomecánica, diámetros nominales y fórmulas nucleares (34 columnas)
+                            Validación de duplicados, consistencia de Factor K vs Litología y cruce con corridas LGG
                         </p>
                     </div>
                 </div>
