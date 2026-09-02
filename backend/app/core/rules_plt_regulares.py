@@ -41,6 +41,9 @@ CATEGORIES_REGISTRY_PLT_REGULARES: Dict[str, RuleCategoryPLT] = {
     "CAT_PLT_CAMPANA_INVALIDA": RuleCategoryPLT(
         "CAT_PLT_CAMPANA_INVALIDA", "Año de campaña no válido (debe ser un año entre 2000 y 2035).", "ALERTA"
     ),
+    "CAT_PLT_FECHA_DISCORDANTE_CAMPANA": RuleCategoryPLT(
+        "CAT_PLT_FECHA_DISCORDANTE_CAMPANA", "Año de la fecha de ensayo no coincide con el año de campaña.", "ALERTA"
+    ),
     "CAT_PLT_FECHA_INVALIDA": RuleCategoryPLT(
         "CAT_PLT_FECHA_INVALIDA", "Fecha de ensayo con formato no válido o no parseable.", "ALERTA"
     ),

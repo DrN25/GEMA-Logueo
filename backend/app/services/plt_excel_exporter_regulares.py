@@ -427,6 +427,192 @@ def export_plt_regulares_to_excel(diag: Dict[str, Any], output_path: str):
     ws_cat.auto_filter.ref = f"B5:{last_col_letter}{r_cat - 1}"
 
     # =========================================================================
+    # --- HOJA: 🗂️ CELDAS ÚNICAS PLT (MUESTRAS Y ENSAYOS REGULARES) ---
+    # =========================================================================
+    ws_samples = wb.create_sheet(title="🗂️ Celdas Únicas PLT")
+    ws_samples.views.sheetView[0].showGridLines = True
+
+    ws_samples.cell(row=2, column=2, value="REGISTRO DE CELDAS Y MUESTRAS ÚNICAS EVALUADAS — PLT REGULARES").font = font_title
+    ws_samples.cell(
+        row=3, column=2,
+        value="Consolidado exclusivo de muestras y tramos con observaciones, alertas o discrepancias QA/QC detectadas."
+    ).font = font_subtitle
+
+    c_back_samples = ws_samples.cell(row=2, column=16)
+    c_back_samples.value = '=HYPERLINK("#' + "'📋 Catálogo de Errores'" + '!B2", "⬅ Volver al Catálogo de Errores")'
+    c_back_samples.font = s["font_back_link"]
+    c_back_samples.alignment = alignment_right
+
+    headers_samples = [
+        "Fila Excel", "Taladro", "Muestra", "Campaña", "Desde (m)", "Hasta (m)", "Longitud (m)",
+        "Lito 1", "Lito 2", "Lito 3", "Tipo Litológico", "Factor K",
+        "Carga P (kN)", "D (mm)", "Is(50) (MPa)", "UCS (MPa)", "ISRM (PLT)", "Estado QA/QC", "N° Incidencias"
+    ]
+
+    for c_idx, h_text in enumerate(headers_samples, start=2):
+        cell = ws_samples.cell(row=5, column=c_idx, value=h_text)
+        cell.font = font_header
+        cell.fill = fill_primary
+        cell.alignment = alignment_center
+        cell.border = border_thin
+
+    unique_samples = [s for s in diag.get("unique_samples_plt", []) if s.get("estado") != "CONFORME" or s.get("incidencias_cant", 0) > 0]
+    r_samp = 6
+
+    for s_item in unique_samples:
+        ws_samples.cell(row=r_samp, column=2, value=s_item.get("row_index")).alignment = alignment_center
+        ws_samples.cell(row=r_samp, column=3, value=s_item.get("taladro")).alignment = alignment_left
+        ws_samples.cell(row=r_samp, column=4, value=s_item.get("muestra")).alignment = alignment_center
+        ws_samples.cell(row=r_samp, column=5, value=s_item.get("campana")).alignment = alignment_center
+        
+        c_from = ws_samples.cell(row=r_samp, column=6, value=s_item.get("from_m"))
+        c_from.alignment = alignment_right
+        if s_item.get("from_m") is not None: c_from.number_format = '0.00'
+
+        c_to = ws_samples.cell(row=r_samp, column=7, value=s_item.get("to_m"))
+        c_to.alignment = alignment_right
+        if s_item.get("to_m") is not None: c_to.number_format = '0.00'
+
+        c_len = ws_samples.cell(row=r_samp, column=8, value=s_item.get("longitud_m"))
+        c_len.alignment = alignment_right
+        if s_item.get("longitud_m") is not None: c_len.number_format = '0.00'
+
+        ws_samples.cell(row=r_samp, column=9, value=s_item.get("lito1")).alignment = alignment_center
+        ws_samples.cell(row=r_samp, column=10, value=s_item.get("lito2")).alignment = alignment_center
+        ws_samples.cell(row=r_samp, column=11, value=s_item.get("lito3")).alignment = alignment_center
+        ws_samples.cell(row=r_samp, column=12, value=s_item.get("tipo_litologico")).alignment = alignment_left
+        ws_samples.cell(row=r_samp, column=13, value=s_item.get("factor_k")).alignment = alignment_center
+
+        c_p = ws_samples.cell(row=r_samp, column=14, value=s_item.get("p_kn"))
+        c_p.alignment = alignment_right
+        if s_item.get("p_kn") is not None: c_p.number_format = '#,##0.00'
+
+        c_d = ws_samples.cell(row=r_samp, column=15, value=s_item.get("d_mm"))
+        c_d.alignment = alignment_right
+        if s_item.get("d_mm") is not None: c_d.number_format = '#,##0.00'
+
+        c_is = ws_samples.cell(row=r_samp, column=16, value=s_item.get("is50_mpa"))
+        c_is.alignment = alignment_right
+        if s_item.get("is50_mpa") is not None: c_is.number_format = '0.00'
+
+        c_ucs = ws_samples.cell(row=r_samp, column=17, value=s_item.get("ucs_mpa"))
+        c_ucs.alignment = alignment_right
+        if s_item.get("ucs_mpa") is not None: c_ucs.number_format = '0.00'
+
+        ws_samples.cell(row=r_samp, column=18, value=s_item.get("isrm")).alignment = alignment_center
+        
+        c_st = ws_samples.cell(row=r_samp, column=19, value=s_item.get("estado"))
+        c_st.alignment = alignment_center
+        c_st.font = font_bold
+        if s_item.get("estado") == "CONFORME":
+            c_st.fill = fill_accent_green
+        elif s_item.get("estado") == "NO CONFORME":
+            c_st.fill = fill_accent_red
+        else:
+            c_st.fill = fill_accent_yellow
+
+        c_cnt = ws_samples.cell(row=r_samp, column=20, value=s_item.get("incidencias_cant", 0))
+        c_cnt.alignment = alignment_right
+        c_cnt.number_format = '#,##0'
+
+        for col_idx in range(2, 21):
+            cell = ws_samples.cell(row=r_samp, column=col_idx)
+            cell.border = border_thin
+            if cell.font != font_bold:
+                cell.font = font_regular
+            if r_samp % 2 == 0 and col_idx != 19:
+                cell.fill = fill_zebra
+
+        r_samp += 1
+
+    if r_samp > 6:
+        ws_samples.auto_filter.ref = f"B5:T{r_samp - 1}"
+
+    # Autoajuste de columnas en Celdas Únicas PLT
+    for col in ws_samples.iter_cols(min_col=2, max_col=20, min_row=5, max_row=min(r_samp, 100)):
+        max_len = max(len(str(cell.value or '')) for cell in col)
+        col_letter = get_column_letter(col[0].column)
+        ws_samples.column_dimensions[col_letter].width = max(11, min(max_len + 3, 26))
+
+    # =========================================================================
+    # --- HOJA OPCIONAL: 🗂️ CELDAS ÚNICAS LGG (SI SE CARGÓ EL LOGUEO) ---
+    # =========================================================================
+    unique_lgg = [l for l in diag.get("unique_runs_lgg", []) if l.get("estado") != "CONFORME" or l.get("muestras_plt_cant", 0) > 0]
+    if unique_lgg:
+        ws_lgg_sheet = wb.create_sheet(title="🗂️ Celdas Únicas LGG")
+        ws_lgg_sheet.views.sheetView[0].showGridLines = True
+
+        ws_lgg_sheet.cell(row=2, column=2, value="REGISTRO DE CORRIDAS ÚNICAS EVALUADAS — LOGUEO GENERAL (LGG)").font = font_title
+        ws_lgg_sheet.cell(
+            row=3, column=2,
+            value="Listado de corridas geomecánicas oficiales de sondajes DDH cruzadas contra la planilla de ensayos PLT."
+        ).font = font_subtitle
+
+        c_back_lgg = ws_lgg_sheet.cell(row=2, column=11)
+        c_back_lgg.value = '=HYPERLINK("#' + "'📋 Catálogo de Errores'" + '!B2", "⬅ Volver al Catálogo de Errores")'
+        c_back_lgg.font = s["font_back_link"]
+        c_back_lgg.alignment = alignment_right
+
+        headers_lgg = [
+            "N°", "Taladro", "Desde (m)", "Hasta (m)", "Longitud (m)",
+            "Lito 1", "Lito 2", "Lito 3", "Resistencia ISRM", "Muestras PLT Asociadas"
+        ]
+
+        for c_idx, h_text in enumerate(headers_lgg, start=2):
+            cell = ws_lgg_sheet.cell(row=5, column=c_idx, value=h_text)
+            cell.font = font_header
+            cell.fill = fill_primary
+            cell.alignment = alignment_center
+            cell.border = border_thin
+
+        r_lgg = 6
+        for idx_lgg, l_item in enumerate(unique_lgg, start=1):
+            ws_lgg_sheet.cell(row=r_lgg, column=2, value=idx_lgg).alignment = alignment_center
+            ws_lgg_sheet.cell(row=r_lgg, column=3, value=l_item.get("taladro")).alignment = alignment_left
+            
+            c_fd = ws_lgg_sheet.cell(row=r_lgg, column=4, value=l_item.get("desde_m"))
+            c_fd.alignment = alignment_right
+            if l_item.get("desde_m") is not None: c_fd.number_format = '0.00'
+
+            c_th = ws_lgg_sheet.cell(row=r_lgg, column=5, value=l_item.get("hasta_m"))
+            c_th.alignment = alignment_right
+            if l_item.get("hasta_m") is not None: c_th.number_format = '0.00'
+
+            c_ln = ws_lgg_sheet.cell(row=r_lgg, column=6, value=l_item.get("longitud_m"))
+            c_ln.alignment = alignment_right
+            if l_item.get("longitud_m") is not None: c_ln.number_format = '0.00'
+
+            ws_lgg_sheet.cell(row=r_lgg, column=7, value=l_item.get("lito1")).alignment = alignment_center
+            ws_lgg_sheet.cell(row=r_lgg, column=8, value=l_item.get("lito2")).alignment = alignment_center
+            ws_lgg_sheet.cell(row=r_lgg, column=9, value=l_item.get("lito3")).alignment = alignment_center
+            ws_lgg_sheet.cell(row=r_lgg, column=10, value=l_item.get("isrm")).alignment = alignment_center
+
+            c_mcount = ws_lgg_sheet.cell(row=r_lgg, column=11, value=l_item.get("muestras_plt_cant", 0))
+            c_mcount.alignment = alignment_right
+            c_mcount.number_format = '#,##0'
+            if l_item.get("muestras_plt_cant", 0) > 0:
+                c_mcount.font = font_bold
+
+            for col_idx in range(2, 12):
+                cell = ws_lgg_sheet.cell(row=r_lgg, column=col_idx)
+                cell.border = border_thin
+                if cell.font != font_bold:
+                    cell.font = font_regular
+                if r_lgg % 2 == 0:
+                    cell.fill = fill_zebra
+
+            r_lgg += 1
+
+        if r_lgg > 6:
+            ws_lgg_sheet.auto_filter.ref = f"B5:K{r_lgg - 1}"
+
+        for col in ws_lgg_sheet.iter_cols(min_col=2, max_col=11, min_row=5, max_row=min(r_lgg, 100)):
+            max_len = max(len(str(cell.value or '')) for cell in col)
+            col_letter = get_column_letter(col[0].column)
+            ws_lgg_sheet.column_dimensions[col_letter].width = max(11, min(max_len + 3, 24))
+
+
+    # =========================================================================
     # --- HOJA 3: 📑 DETALLE PLANO COMPLETO DE INCIDENCIAS ---
     # =========================================================================
     ws_detail = wb.create_sheet(title="📑 Detalle de Incidencias")
@@ -440,7 +626,7 @@ def export_plt_regulares_to_excel(diag: Dict[str, Any], output_path: str):
 
     headers_detail = [
         "ID", "Fila Excel", "Gravedad", "Taladro", "Muestra", "Campaña",
-        "From (m)", "To (m)", "Columna de Falla", "Código Regla", "Mensaje de Inconsistencia Geomecánica"
+        "From (m)", "To (m)", "Columna de Falla", "Valor Actual", "Código Regla", "Mensaje de Inconsistencia Geomecánica"
     ]
 
     grid_heading_row = 5
@@ -473,10 +659,11 @@ def export_plt_regulares_to_excel(diag: Dict[str, Any], output_path: str):
         ws_detail.cell(row=r_d, column=8, value=inc.get("from_m") if inc.get("from_m") is not None else "").alignment = alignment_right
         ws_detail.cell(row=r_d, column=9, value=inc.get("to_m") if inc.get("to_m") is not None else "").alignment = alignment_right
         ws_detail.cell(row=r_d, column=10, value=str(inc.get("columna", "—"))).alignment = alignment_left
-        ws_detail.cell(row=r_d, column=11, value=str(inc.get("category_code", "—"))).alignment = alignment_center
-        ws_detail.cell(row=r_d, column=12, value=str(inc.get("message", "—"))).alignment = alignment_left
+        ws_detail.cell(row=r_d, column=11, value=str(inc.get("valor_actual", "—"))).alignment = alignment_center
+        ws_detail.cell(row=r_d, column=12, value=str(inc.get("category_code", "—"))).alignment = alignment_center
+        ws_detail.cell(row=r_d, column=13, value=str(inc.get("message", "—"))).alignment = alignment_left
 
-        for col_idx in range(2, 13):
+        for col_idx in range(2, 14):
             cell_d = ws_detail.cell(row=r_d, column=col_idx)
             cell_d.border = border_thin
             if r_d % 2 == 0 and col_idx != 4:
@@ -544,7 +731,7 @@ def export_plt_regulares_to_excel(diag: Dict[str, Any], output_path: str):
         r_indiv = r_err_c + 2
         ws_err.cell(row=r_indiv, column=2, value="REGISTROS INDIVIDUALES AFECTADOS (LISTADO COMPLETO)").font = font_section
 
-        headers_indiv = ["N°", "Fila Excel", "Taladro", "Muestra", "Campaña", "From (m)", "To (m)", "Columna", "Diagnóstico Detallado"]
+        headers_indiv = ["N°", "Fila Excel", "Taladro", "Muestra", "Campaña", "From (m)", "To (m)", "Columna de Falla", "Valor Actual", "Diagnóstico Detallado"]
         for idx, col in enumerate(headers_indiv, start=2):
             cell = ws_err.cell(row=r_indiv + 1, column=idx, value=col)
             cell.font = font_header
@@ -562,16 +749,17 @@ def export_plt_regulares_to_excel(diag: Dict[str, Any], output_path: str):
             ws_err.cell(row=r_indiv_cur, column=7, value=rec.get("from_m") if rec.get("from_m") is not None else "").alignment = alignment_right
             ws_err.cell(row=r_indiv_cur, column=8, value=rec.get("to_m") if rec.get("to_m") is not None else "").alignment = alignment_right
             ws_err.cell(row=r_indiv_cur, column=9, value=str(rec.get("columna", "—"))).alignment = alignment_left
-            ws_err.cell(row=r_indiv_cur, column=10, value=str(rec.get("message", "—"))).alignment = alignment_left
+            ws_err.cell(row=r_indiv_cur, column=10, value=str(rec.get("valor_actual", "—"))).alignment = alignment_center
+            ws_err.cell(row=r_indiv_cur, column=11, value=str(rec.get("message", "—"))).alignment = alignment_left
 
-            for col_idx in range(2, 11):
+            for col_idx in range(2, 12):
                 cell_i = ws_err.cell(row=r_indiv_cur, column=col_idx)
                 cell_i.border = border_thin
                 if r_indiv_cur % 2 == 0:
                     cell_i.fill = fill_zebra
             r_indiv_cur += 1
 
-        ws_err.auto_filter.ref = f"B{r_indiv + 1}:J{r_indiv_cur - 1}"
+        ws_err.auto_filter.ref = f"B{r_indiv + 1}:K{r_indiv_cur - 1}"
 
     # Auto-ajuste de ancho de columnas para todas las pestañas
     for ws in wb.worksheets:

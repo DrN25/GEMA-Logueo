@@ -34,6 +34,56 @@ os.makedirs(temp_dir, exist_ok=True)
 def simplify_message(msg):
     msg_clean = str(msg or "").strip()
     msg_up = msg_clean.upper()
+
+    # --- REGLAS RMR Y CRUCE RMR-LGG ---
+    if "ESPACIAMIENTO" in msg_up and ("NO COINCIDE CON LA FÓRMULA" in msg_up or "NO COINCIDE CON LA FORMULA" in msg_up or "LONG.CORRIDA" in msg_up):
+        return "Espaciamiento de fracturas en RMR no coincide con la fórmula calculada."
+    if "COMBINACIÓN LITOLÓGICA EN RMR" in msg_up or "COMBINACION LITOLOGICA EN RMR" in msg_up or ("COMBINACIÓN LITOL" in msg_up and "RMR" in msg_up and "LGG" in msg_up):
+        return "Combinación litológica en RMR no coincide con LGG."
+    if "TOTAL DE FRACTURAS EN RMR" in msg_up and "NO COINCIDE CON" in msg_up:
+        return "Total de Fracturas en RMR no coincide con la suma calculada (FRF + FracNat)."
+    if "FRACTURAS NATURALES EN RMR" in msg_up and ("NO COINCIDE" in msg_up or "FRAC NAT" in msg_up):
+        return "Fracturas Naturales en RMR no coincide con LGG."
+    if "FRF EN RMR" in msg_up and "NO COINCIDE CON" in msg_up:
+        return "FRF en RMR no coincide con LGG."
+    if "RQD (M) EN RMR" in msg_up and "NO COINCIDE" in msg_up:
+        return "Metraje RQD (m) en RMR no coincide con LGG."
+    if ("REC (M) EN RMR" in msg_up or "RECUPERACIÓN EN RMR" in msg_up or "RECUPERACION EN RMR" in msg_up) and "NO COINCIDE" in msg_up:
+        return "Recuperación (m) en RMR no coincide con LGG."
+    if "LONGITUD DE TRAMO FRACTURADO" in msg_up and ("RMR" in msg_up or "LRF" in msg_up) and "NO COINCIDE" in msg_up:
+        return "Longitud de Tramo Fracturado (LRF) en RMR no coincide con LGG."
+    if "ABERTURA EN RMR" in msg_up and "NO COINCIDE" in msg_up:
+        return "Abertura de junta en RMR no coincide con LGG."
+    if "ESPESOR DE RELLENO EN RMR" in msg_up and "NO COINCIDE" in msg_up:
+        return "Espesor de relleno en RMR no coincide con LGG."
+    if "RUGOSIDAD EN RMR" in msg_up and "NO COINCIDE" in msg_up:
+        return "Rugosidad en RMR no coincide con LGG."
+    if "INTEMPERISMO EN RMR" in msg_up and "NO COINCIDE" in msg_up:
+        return "Intemperismo en RMR no coincide con LGG."
+    if "TIPO DE ESTRUCTURA EN RMR" in msg_up and "NO COINCIDE" in msg_up:
+        return "Tipo de Estructura en RMR no coincide con LGG."
+    if ("TIPO DE RELLENO EN RMR" in msg_up or "RELLENO EN RMR" in msg_up) and "NO COINCIDE" in msg_up:
+        return "Tipo de Relleno en RMR no coincide con LGG."
+    if "RESISTENCIA EN RMR" in msg_up and "NO COINCIDE" in msg_up:
+        return "Resistencia ISRM en RMR no coincide con LGG."
+    if "JRC10 EN RMR" in msg_up and "NO COINCIDE" in msg_up:
+        return "JRC10 en RMR no coincide con LGG."
+    if "CORRIDA EN VALIDACIÓN RMR" in msg_up or "CORRIDA EN VALIDACION RMR" in msg_up or ("CORRIDA EN" in msg_up and "RMR" in msg_up and "NO COINCIDE CON NINGUNA" in msg_up):
+        return "Corrida en Validación RMR no coincide con ninguna corrida registrada en LGG."
+    if "INTERVALO DESDE/HASTA" in msg_up and "RMR" in msg_up and "NO COINCIDE" in msg_up:
+        return "Intervalo Desde/Hasta en RMR no coincide con el intervalo de LGG."
+    if "LA LONGITUD DE CORRIDA" in msg_up and "NO COINCIDE CON (HASTA - DESDE" in msg_up:
+        return "Longitud de corrida en RMR no coincide con (Hasta - Desde)."
+    if "RQD (%) EN RMR" in msg_up and ("NO COINCIDE CON LA FÓRMULA" in msg_up or "NO COINCIDE CON LA FORMULA" in msg_up):
+        return "RQD (%) en RMR no coincide con la fórmula calculada."
+    if "REC (%) EN RMR" in msg_up and ("NO COINCIDE CON LA FÓRMULA" in msg_up or "NO COINCIDE CON LA FORMULA" in msg_up):
+        return "Recuperación (%) en RMR no coincide con la fórmula calculada."
+    if "FF/1M EN RMR" in msg_up and "NO COINCIDE CON" in msg_up:
+        return "FF/1m en RMR no coincide con la fórmula calculada."
+    if "CLASIFICACIÓN DE RELLENO" in msg_up or "CLASIFICACION DE RELLENO" in msg_up:
+        return "Clasificación de Relleno en RMR no coincide con el código esperado."
+    if "PRESENCIA DE AGUA EN RMR" in msg_up:
+        return "Presencia de Agua en RMR difiere de las observaciones de LGG."
     
     # 0. Regla DEP_VACIA (Campo erróneo debido a dependencias vacías o mal calculadas)
     if "DEPENDENCIAS VACIAS" in msg_up or "DEPENDENCIAS VACÍAS" in msg_up or "CAMPO ERRONEO DEBIDO" in msg_up or "CAMPO ERRÓNEO DEBIDO" in msg_up:
@@ -56,6 +106,8 @@ def simplify_message(msg):
         return "Corrida en Validación RMR no coincide con ninguna corrida registrada en LGG."
     if "PRESENCIA DE AGUA EN RMR" in msg_up or "PRESENCIA DE AGUA" in msg_up:
         return "Presencia de Agua en RMR difiere de las observaciones de LGG."
+    if "INCOMPATIBILIDAD DE LITOLOGÍA ENTRE LA CORRIDA Y LA JUNTA" in msg_up or "INCOMPATIBILIDAD DE LITOLOGIA ENTRE LA CORRIDA Y LA JUNTA" in msg_up or ("INCOMPATIBILIDAD" in msg_up and "LITOLOG" in msg_up and "JUNTA" in msg_up):
+        return "Incompatibilidad de litología entre la corrida y la junta."
     if "LITOLOGÍA" in msg_up or "LITOLOGIA" in msg_up:
         return "Litología en RMR difiere de Litho 1 en LGG."
     if "ESPESOR DE RELLENO EN RMR" in msg_up:
@@ -174,9 +226,11 @@ def simplify_message(msg):
     if "TIPO DE RELLENO" in msg_up and ("ABERTURA DE JUNTA ES 0" in msg_up or "ABERTURA ES 0" in msg_up or "ABERTURA DE JUNTA ES 0" in msg_up):
         return "El tipo de relleno está definido pero la abertura de junta es 0mm."
     if "DUREZA DE PARED" in msg_up and ("SUPERA" in msg_up or "INCOMPATIBILIDAD GEOLÓGICA" in msg_up or "INCOMPATIBILIDAD GEOLOGICA" in msg_up):
-        return "Dureza de pared de junta en Estructural supera la resistencia maxima estimada de la corrida en LGG."
+        return "Incompatibilidad geológica (Dureza de pared de junta supera la resistencia maxima estimada de la corrida en LGG)."
+    if "INCOMPATIBILIDAD DE LITOLOGÍA ENTRE LA CORRIDA Y LA JUNTA" in msg_up or "INCOMPATIBILIDAD DE LITOLOGIA ENTRE LA CORRIDA Y LA JUNTA" in msg_up or ("INCOMPATIBILIDAD" in msg_up and "LITOLOG" in msg_up and "JUNTA" in msg_up):
+        return "Incompatibilidad de litología entre la corrida y la junta."
     if "HUÉRFANA" in msg_up or "HUERFANA" in msg_up:
-        return "Profundidad huérfana de estructura en Logueo Estructural no corresponde a ningún tramo de corrida en LGG."
+        return "Profundidad huérfana de junta no corresponde a ningún tramo de corrida en LGG."
     if "NO EXISTE DE FORMA EXACTA" in msg_up or "PAR DE CORRIDA" in msg_up or "COINCIDE EXACTAMENTE" in msg_up or "CORRIDA ASOCIADA" in msg_up:
         return "La corrida asociada (de/a) no existe de forma exacta en las corridas de LGG para el taladro."
     if "FUERA DEL TRAMO" in msg_up or "TRAMO DE CORRIDA ESPECIFICADO" in msg_up:
@@ -596,7 +650,195 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
         c_link.border = border_thin
         r_cat += 1
 
-    # --- HOJA 3: DETALLE COMPLETO DE INCIDENCIAS ---
+    # =========================================================================
+    # --- HOJA: 🗂️ CELDAS ÚNICAS LGG (CORRIDAS EVALUADAS) ---
+    # =========================================================================
+    ws_lgg_celdas = wb.create_sheet(title="🗂️ Celdas Únicas LGG")
+    ws_lgg_celdas.views.sheetView[0].showGridLines = True
+
+    ws_lgg_celdas.cell(row=2, column=2, value="REGISTRO DE CORRIDAS Y CELDAS ÚNICAS EVALUADAS — LOGUEO GENERAL (LGG)").font = font_title
+    ws_lgg_celdas.cell(
+        row=3, column=2,
+        value="Consolidado exclusivo de corridas de logueo general con observaciones, alertas o discrepancias detectadas."
+    ).font = font_subtitle
+
+    c_back_lgg = ws_lgg_celdas.cell(row=2, column=15)
+    c_back_lgg.value = '=HYPERLINK("#' + "'❌ Catálogo de Errores'" + '!B2", "⬅ Volver al Catálogo de Errores")'
+    c_back_lgg.font = Font(name="Segoe UI", size=10, bold=True, color="1B365D", underline="single")
+    c_back_lgg.alignment = alignment_right
+
+    headers_lgg_celdas = [
+        "N°", "Fila Excel", "Taladro", "Corrida [De - A]", "Desde (m)", "Hasta (m)", "Longitud (m)",
+        "Recuperación (m)", "RQD (m)", "Litología 1", "Litología 2", "Litología 3", "Resistencia ISRM", "Estado QA/QC"
+    ]
+
+    for c_idx, h_text in enumerate(headers_lgg_celdas, start=2):
+        cell = ws_lgg_celdas.cell(row=5, column=c_idx, value=h_text)
+        cell.font = font_header
+        cell.fill = fill_primary
+        cell.alignment = alignment_center
+        cell.border = border_thin
+
+    unique_lgg_runs = [r for r in diag.get("unique_lgg_runs", []) if r.get("estado") != "CONFORME"]
+    r_lgg_c = 6
+    for idx_run, run_item in enumerate(unique_lgg_runs, start=1):
+        ws_lgg_celdas.cell(row=r_lgg_c, column=2, value=idx_run).alignment = alignment_center
+        ws_lgg_celdas.cell(row=r_lgg_c, column=3, value=run_item.get("fila_excel", idx_run + 1)).alignment = alignment_center
+        ws_lgg_celdas.cell(row=r_lgg_c, column=4, value=run_item.get("taladro")).alignment = alignment_left
+        ws_lgg_celdas.cell(row=r_lgg_c, column=5, value=run_item.get("corrida")).alignment = alignment_center
+
+        c_d = ws_lgg_celdas.cell(row=r_lgg_c, column=6, value=run_item.get("de"))
+        c_d.alignment = alignment_right
+        if run_item.get("de") is not None: c_d.number_format = '0.00'
+
+        c_a = ws_lgg_celdas.cell(row=r_lgg_c, column=7, value=run_item.get("a"))
+        c_a.alignment = alignment_right
+        if run_item.get("a") is not None: c_a.number_format = '0.00'
+
+        c_len = ws_lgg_celdas.cell(row=r_lgg_c, column=8, value=run_item.get("longitud"))
+        c_len.alignment = alignment_right
+        if run_item.get("longitud") is not None: c_len.number_format = '0.00'
+
+        c_rec = ws_lgg_celdas.cell(row=r_lgg_c, column=9, value=run_item.get("rec_m"))
+        c_rec.alignment = alignment_right
+        if run_item.get("rec_m") is not None: c_rec.number_format = '0.00'
+
+        c_rqd = ws_lgg_celdas.cell(row=r_lgg_c, column=10, value=run_item.get("rqd_m"))
+        c_rqd.alignment = alignment_right
+        if run_item.get("rqd_m") is not None: c_rqd.number_format = '0.00'
+
+        ws_lgg_celdas.cell(row=r_lgg_c, column=11, value=run_item.get("lito1")).alignment = alignment_center
+        ws_lgg_celdas.cell(row=r_lgg_c, column=12, value=run_item.get("lito2")).alignment = alignment_center
+        ws_lgg_celdas.cell(row=r_lgg_c, column=13, value=run_item.get("lito3")).alignment = alignment_center
+        ws_lgg_celdas.cell(row=r_lgg_c, column=14, value=run_item.get("resistencia")).alignment = alignment_center
+
+        c_st = ws_lgg_celdas.cell(row=r_lgg_c, column=15, value=run_item.get("estado", "CONFORME"))
+        c_st.alignment = alignment_center
+        c_st.font = font_bold
+        if run_item.get("estado") == "CONFORME":
+            c_st.fill = fill_accent_green
+        else:
+            c_st.fill = fill_accent_red
+
+        for col_idx in range(2, 16):
+            cell = ws_lgg_celdas.cell(row=r_lgg_c, column=col_idx)
+            cell.border = border_thin
+            if cell.font != font_bold:
+                cell.font = font_regular
+            if r_lgg_c % 2 == 0 and col_idx != 15:
+                cell.fill = fill_zebra
+
+        r_lgg_c += 1
+
+    if r_lgg_c > 6:
+        ws_lgg_celdas.auto_filter.ref = f"B5:O{r_lgg_c - 1}"
+
+    for col in ws_lgg_celdas.iter_cols(min_col=2, max_col=15, min_row=5, max_row=min(r_lgg_c, 100)):
+        max_len = max(len(str(cell.value or '')) for cell in col)
+        col_letter = get_column_letter(col[0].column)
+        ws_lgg_celdas.column_dimensions[col_letter].width = max(11, min(max_len + 3, 25))
+
+    # =========================================================================
+    # --- HOJA: 🗂️ CELDAS ÚNICAS ESTRUCTURAL (DISCONTINUIDADES EVALUADAS) ---
+    # =========================================================================
+    ws_est_celdas = wb.create_sheet(title="🗂️ Celdas Únicas Estructural")
+    ws_est_celdas.views.sheetView[0].showGridLines = True
+
+    ws_est_celdas.cell(row=2, column=2, value="REGISTRO DE ESTRUCTURAS Y DISCONTINUIDADES ÚNICAS — LOGUEO ESTRUCTURAL").font = font_title
+    ws_est_celdas.cell(
+        row=3, column=2,
+        value="Consolidado exclusivo de discontinuidades estructurales con observaciones, alertas o discrepancias detectadas."
+    ).font = font_subtitle
+
+    c_back_est = ws_est_celdas.cell(row=2, column=17)
+    c_back_est.value = '=HYPERLINK("#' + "'❌ Catálogo de Errores'" + '!B2", "⬅ Volver al Catálogo de Errores")'
+    c_back_est.font = Font(name="Segoe UI", size=10, bold=True, color="1B365D", underline="single")
+    c_back_est.alignment = alignment_right
+
+    headers_est_celdas = [
+        "N°", "Fila Excel", "Taladro", "Profundidad (m)", "Corrida Asociada", "Tipo Estructura",
+        "Alfa (°)", "Beta (°)", "Dip (°)", "Azimut (°)", "Abertura (mm)", "Espesor (mm)",
+        "Tipo Relleno", "Dureza Pared", "Litología", "Estado QA/QC"
+    ]
+
+    for c_idx, h_text in enumerate(headers_est_celdas, start=2):
+        cell = ws_est_celdas.cell(row=5, column=c_idx, value=h_text)
+        cell.font = font_header
+        cell.fill = fill_primary
+        cell.alignment = alignment_center
+        cell.border = border_thin
+
+    unique_est_structs = [s for s in diag.get("unique_est_structures", []) if s.get("estado") != "CONFORME"]
+    r_est_c = 6
+    for idx_st, st_item in enumerate(unique_est_structs, start=1):
+        ws_est_celdas.cell(row=r_est_c, column=2, value=idx_st).alignment = alignment_center
+        ws_est_celdas.cell(row=r_est_c, column=3, value=st_item.get("fila_excel", idx_st + 1)).alignment = alignment_center
+        ws_est_celdas.cell(row=r_est_c, column=4, value=st_item.get("taladro")).alignment = alignment_left
+
+        c_p = ws_est_celdas.cell(row=r_est_c, column=5, value=st_item.get("profundidad"))
+        c_p.alignment = alignment_right
+        if st_item.get("profundidad") is not None: c_p.number_format = '0.00'
+
+        ws_est_celdas.cell(row=r_est_c, column=6, value=st_item.get("corrida")).alignment = alignment_center
+        ws_est_celdas.cell(row=r_est_c, column=7, value=st_item.get("tipo_est")).alignment = alignment_center
+
+        c_alf = ws_est_celdas.cell(row=r_est_c, column=8, value=st_item.get("alfa"))
+        c_alf.alignment = alignment_right
+        if st_item.get("alfa") is not None: c_alf.number_format = '#,##0'
+
+        c_bet = ws_est_celdas.cell(row=r_est_c, column=9, value=st_item.get("beta"))
+        c_bet.alignment = alignment_right
+        if st_item.get("beta") is not None: c_bet.number_format = '#,##0'
+
+        c_dip = ws_est_celdas.cell(row=r_est_c, column=10, value=st_item.get("dip"))
+        c_dip.alignment = alignment_right
+        if st_item.get("dip") is not None: c_dip.number_format = '#,##0'
+
+        c_az = ws_est_celdas.cell(row=r_est_c, column=11, value=st_item.get("azimuth"))
+        c_az.alignment = alignment_right
+        if st_item.get("azimuth") is not None: c_az.number_format = '#,##0'
+
+        c_ab = ws_est_celdas.cell(row=r_est_c, column=12, value=st_item.get("abertura"))
+        c_ab.alignment = alignment_right
+        if st_item.get("abertura") is not None: c_ab.number_format = '0.00'
+
+        c_esp = ws_est_celdas.cell(row=r_est_c, column=13, value=st_item.get("espesor"))
+        c_esp.alignment = alignment_right
+        if st_item.get("espesor") is not None: c_esp.number_format = '0.00'
+
+        ws_est_celdas.cell(row=r_est_c, column=14, value=st_item.get("relleno")).alignment = alignment_center
+        ws_est_celdas.cell(row=r_est_c, column=15, value=st_item.get("dureza_pared")).alignment = alignment_center
+        
+        lito_str = "/".join(filter(None, [st_item.get("lito1"), st_item.get("lito2"), st_item.get("lito3")]))
+        ws_est_celdas.cell(row=r_est_c, column=16, value=lito_str or "—").alignment = alignment_center
+
+        c_st = ws_est_celdas.cell(row=r_est_c, column=17, value=st_item.get("estado", "CONFORME"))
+        c_st.alignment = alignment_center
+        c_st.font = font_bold
+        if st_item.get("estado") == "CONFORME":
+            c_st.fill = fill_accent_green
+        else:
+            c_st.fill = fill_accent_red
+
+        for col_idx in range(2, 18):
+            cell = ws_est_celdas.cell(row=r_est_c, column=col_idx)
+            cell.border = border_thin
+            if cell.font != font_bold:
+                cell.font = font_regular
+            if r_est_c % 2 == 0 and col_idx != 17:
+                cell.fill = fill_zebra
+
+        r_est_c += 1
+
+    if r_est_c > 6:
+        ws_est_celdas.auto_filter.ref = f"B5:Q{r_est_c - 1}"
+
+    for col in ws_est_celdas.iter_cols(min_col=2, max_col=17, min_row=5, max_row=min(r_est_c, 100)):
+        max_len = max(len(str(cell.value or '')) for cell in col)
+        col_letter = get_column_letter(col[0].column)
+        ws_est_celdas.column_dimensions[col_letter].width = max(11, min(max_len + 3, 25))
+
+    # --- HOJA: DETALLE COMPLETO DE INCIDENCIAS ---
     ws_detail = wb.create_sheet(title="📋 Detalle de Incidencias")
     ws_detail.views.sheetView[0].showGridLines = True
     
@@ -794,7 +1036,7 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
     try:
         faltantes_extra = diag.get("faltantes_no_obligatorios") or []
         resultado_vacios = compute_analysis(diag, filtered, faltantes_extra)
-        crear_hoja_analisis_vacios(wb, resultado_vacios, index=3)
+        crear_hoja_analisis_vacios(wb, resultado_vacios, index=4)
     except Exception as e:
         print(f"[-] Error al generar la hoja de análisis de datos faltantes: {e}", flush=True)
 

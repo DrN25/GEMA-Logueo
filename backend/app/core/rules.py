@@ -280,7 +280,7 @@ MASTER_ERROR_RULES = [
     },
     {
         "code": "R204",
-        "msg": "El ángulo Alfa es inválido. Debe estar entre 0° y 90°",
+        "msg": "El ángulo Alfa es inválido. Debe estar entre 0° y 90°.",
         "severity": "ALERTA",
         "group": "Estructural"
     },
@@ -292,7 +292,7 @@ MASTER_ERROR_RULES = [
     },
     {
         "code": "R206",
-        "msg": "El ángulo Beta es inválido. Debe estar entre 0° y 360°",
+        "msg": "El ángulo Beta es inválido. Debe estar entre 0° y 360°.",
         "severity": "ALERTA",
         "group": "Estructural"
     },
@@ -340,7 +340,7 @@ MASTER_ERROR_RULES = [
     },
     {
         "code": "R214",
-        "msg": "Incompatibilidad geológica (Dureza de pared de junta supera la resistencia intacta de la corrida).",
+        "msg": "Incompatibilidad geológica (Dureza de pared de junta supera la resistencia maxima estimada de la corrida en LGG).",
         "severity": "ADVERTENCIA",
         "group": "Estructural"
     },
@@ -361,6 +361,157 @@ MASTER_ERROR_RULES = [
         "msg": "La profundidad en logueo estructural excede el límite final registrado en LGG.",
         "severity": "ALERTA",
         "group": "Estructural"
+    },
+    # --- MÓDULO RMR Y CRUCE RMR CON LGG ---
+    {
+        "code": "R401",
+        "msg": "Corrida en Validación RMR no coincide con ninguna corrida registrada en LGG.",
+        "severity": "ALERTA",
+        "group": "RMR"
+    },
+    {
+        "code": "R402",
+        "msg": "Intervalo Desde/Hasta en RMR no coincide con el intervalo de LGG.",
+        "severity": "ALERTA",
+        "group": "RMR"
+    },
+    {
+        "code": "R403",
+        "msg": "Longitud de corrida en RMR no coincide con (Hasta - Desde).",
+        "severity": "ALERTA",
+        "group": "RMR"
+    },
+    {
+        "code": "R404",
+        "msg": "Recuperación (m) en RMR no coincide con LGG.",
+        "severity": "ALERTA",
+        "group": "RMR"
+    },
+    {
+        "code": "R405",
+        "msg": "Metraje RQD (m) en RMR no coincide con LGG.",
+        "severity": "ALERTA",
+        "group": "RMR"
+    },
+    {
+        "code": "R406",
+        "msg": "Combinación litológica en RMR no coincide con LGG.",
+        "severity": "ALERTA",
+        "group": "RMR"
+    },
+    {
+        "code": "R407",
+        "msg": "Resistencia ISRM en RMR no coincide con LGG.",
+        "severity": "ALERTA",
+        "group": "RMR"
+    },
+    {
+        "code": "R408",
+        "msg": "Fracturas Naturales en RMR no coincide con LGG.",
+        "severity": "ALERTA",
+        "group": "RMR"
+    },
+    {
+        "code": "R409",
+        "msg": "FRF en RMR no coincide con LGG.",
+        "severity": "ALERTA",
+        "group": "RMR"
+    },
+    {
+        "code": "R410",
+        "msg": "Total de Fracturas en RMR no coincide con la suma calculada (FRF + FracNat).",
+        "severity": "ALERTA",
+        "group": "RMR"
+    },
+    {
+        "code": "R411",
+        "msg": "Espaciamiento de fracturas en RMR no coincide con la fórmula calculada.",
+        "severity": "ALERTA",
+        "group": "RMR"
+    },
+    {
+        "code": "R412",
+        "msg": "Longitud de Tramo Fracturado (LRF) en RMR no coincide con LGG.",
+        "severity": "ALERTA",
+        "group": "RMR"
+    },
+    {
+        "code": "R413",
+        "msg": "Abertura de junta en RMR no coincide con LGG.",
+        "severity": "ALERTA",
+        "group": "RMR"
+    },
+    {
+        "code": "R414",
+        "msg": "Rugosidad en RMR no coincide con LGG.",
+        "severity": "ALERTA",
+        "group": "RMR"
+    },
+    {
+        "code": "R415",
+        "msg": "JRC10 en RMR no coincide con LGG.",
+        "severity": "ALERTA",
+        "group": "RMR"
+    },
+    {
+        "code": "R416",
+        "msg": "Intemperismo en RMR no coincide con LGG.",
+        "severity": "ALERTA",
+        "group": "RMR"
+    },
+    {
+        "code": "R417",
+        "msg": "Tipo de Relleno en RMR no coincide con LGG.",
+        "severity": "ALERTA",
+        "group": "RMR"
+    },
+    {
+        "code": "R418",
+        "msg": "Espesor de relleno en RMR no coincide con LGG.",
+        "severity": "ALERTA",
+        "group": "RMR"
+    },
+    {
+        "code": "R419",
+        "msg": "Tipo de Estructura en RMR no coincide con LGG.",
+        "severity": "ALERTA",
+        "group": "RMR"
+    },
+    {
+        "code": "R420",
+        "msg": "Presencia de Agua en RMR difiere de las observaciones de LGG.",
+        "severity": "ALERTA",
+        "group": "RMR"
+    },
+    {
+        "code": "R421",
+        "msg": "Clasificación de Relleno en RMR no coincide con el código esperado.",
+        "severity": "ALERTA",
+        "group": "RMR"
+    },
+    {
+        "code": "R422",
+        "msg": "RQD (%) en RMR no coincide con la fórmula calculada.",
+        "severity": "ALERTA",
+        "group": "RMR"
+    },
+    {
+        "code": "R423",
+        "msg": "Recuperación (%) en RMR no coincide con la fórmula calculada.",
+        "severity": "ALERTA",
+        "group": "RMR"
+    },
+    {
+        "code": "R424",
+        "msg": "FF/1m en RMR no coincide con la fórmula calculada.",
+        "severity": "ALERTA",
+        "group": "RMR"
+    },
+    {
+        "code": "R425",
+        "msg": "La Longitud de Corrida en RMR debe ser mayor a 0.",
+        "severity": "ALERTA",
+        "group": "RMR"
     }
 ]
 

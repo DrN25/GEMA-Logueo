@@ -755,7 +755,9 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
     lgg_runs = []
     
     total_lgg_filas = 0
+    unique_lgg_runs = []
     total_est_filas = 0
+    est_structures = []
     
     total_vacios = 0
     total_advertencias = 0
@@ -1393,7 +1395,9 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
         "distribucion_geotecnico": filas_por_geotecnico,
         "incidencias": incidencias,
         "resumen_por_celda_padre": resumen_celdas,
-        "faltantes_no_obligatorios": collector.dump()
+        "faltantes_no_obligatorios": collector.dump(),
+        "unique_lgg_runs": unique_lgg_runs,
+        "unique_est_structures": unique_est_structures
     }
 
     tmp_path = output_json_path + ".tmp"
@@ -1417,6 +1421,8 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
 
     incidencias = []
     lgg_runs = []
+    unique_lgg_runs = []
+    unique_est_structures = []
     total_lgg_filas = 0
     total_est_filas = 0
     
@@ -1725,6 +1731,22 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
             })
             if not row_has_errors: total_ok += 1
 
+            unique_lgg_runs.append({
+                "fila_excel": r,
+                "taladro": taladro,
+                "de": de,
+                "a": a,
+                "corrida": f"{de:.2f} - {a:.2f}" if (de is not None and a is not None) else f"C{corrida_num}",
+                "longitud": round(a - de, 2) if (de is not None and a is not None) else 0.0,
+                "rec_m": rec_m,
+                "rqd_m": rqd_m,
+                "lito1": safe_str(row_dict.get("lito1")),
+                "lito2": safe_str(row_dict.get("lito2")),
+                "lito3": safe_str(row_dict.get("lito3")),
+                "resistencia": resistencia,
+                "estado": "CONFORME" if not row_has_errors else "NO CONFORME"
+            })
+
     # --- 2. PROCESAR ESTRUCTURAL ---
     conf_est = config.get("est")
     if conf_est:
@@ -1927,6 +1949,20 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
                     reg_err_est("relleno1", relleno1, "ADVERTENCIA", f"El tipo de relleno está definido pero la abertura de junta es 0mm. Datos evaluados -> Tipo Relleno: '{relleno1}', Abertura de Junta: {abertura}mm, Espesor: {espesor}mm.")
 
             if matching_run:
+                # Regla R215: Incompatibilidad de litología entre corrida y junta
+                est_l1 = safe_str(row_dict.get("lito1"))
+                est_l2 = safe_str(row_dict.get("lito2"))
+                est_l3 = safe_str(row_dict.get("lito3"))
+                lgg_l1 = safe_str(matching_run.get("lito1"))
+                lgg_l2 = safe_str(matching_run.get("lito2"))
+                lgg_l3 = safe_str(matching_run.get("lito3"))
+
+                if est_l1 and est_l1.upper() not in ("-1", "NAN", "", "NONE") and lgg_l1 and lgg_l1.upper() not in ("-1", "NAN", "", "NONE"):
+                    if est_l1.strip().upper() != lgg_l1.strip().upper() or (est_l2 and lgg_l2 and est_l2.strip().upper() not in ("-1", "NAN", "") and est_l2.strip().upper() != lgg_l2.strip().upper()):
+                        lito_est_str = f"{est_l1}/{est_l2}/{est_l3}".strip("/")
+                        lito_lgg_str = f"{lgg_l1}/{lgg_l2}/{lgg_l3}".strip("/")
+                        reg_err_est("lito1", lito_est_str, "ADVERTENCIA", f"Incompatibilidad de litología entre la corrida y la junta. Datos evaluados -> Estructural: '{lito_est_str}', LGG: '{lito_lgg_str}'.")
+
                 if raw_dureza is not None and not dureza_can:
                     reg_err_est("dureza_pared", raw_dureza, "ALERTA", f"Código de Resistencia ISRM no válido. Permitidos: {', '.join(VALID_STRENGTHS)}")
                 
@@ -1944,6 +1980,26 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
                             )
 
             if not row_has_errors: total_ok += 1
+
+            unique_est_structures.append({
+                "fila_excel": r,
+                "taladro": taladro,
+                "profundidad": depth,
+                "corrida": f"{est_de:.2f} - {est_a:.2f}" if (est_de is not None and est_a is not None) else "N/A",
+                "tipo_est": tipo_est,
+                "alfa": alfa,
+                "beta": beta,
+                "dip": dip,
+                "azimuth": azimuth,
+                "abertura": abertura,
+                "espesor": espesor,
+                "relleno": relleno1,
+                "dureza_pared": dureza_pared,
+                "lito1": safe_str(row_dict.get("lito1")),
+                "lito2": safe_str(row_dict.get("lito2")),
+                "lito3": safe_str(row_dict.get("lito3")),
+                "estado": "CONFORME" if not row_has_errors else "NO CONFORME"
+            })
 
     # --- 2.5. PROCESAR HOJA RMR (SI EXISTE) ---
     conf_rmr = config.get("rmr")
@@ -2063,7 +2119,9 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
         "distribucion_geotecnico": filas_por_geotecnico,
         "incidencias": incidencias,
         "resumen_por_celda_padre": resumen_celdas,
-        "faltantes_no_obligatorios": collector.dump()
+        "faltantes_no_obligatorios": collector.dump(),
+        "unique_lgg_runs": unique_lgg_runs,
+        "unique_est_structures": unique_est_structures
     }
 
     tmp_path = output_json_path + ".tmp"

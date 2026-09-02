@@ -7,7 +7,7 @@ Incorpora:
   3. Cruce geomecánico opcional con Logueo General (LGG) para corridas, profundidades, litología y dureza ISRM.
 """
 
-from collections import defaultdict
+from collections import defaultdict, Counter
 from datetime import datetime, date
 import io
 import math
@@ -269,6 +269,9 @@ class PltRegularesValidator:
 
         total_rows = len(df)
         anomalies: List[Dict[str, Any]] = []
+        unique_samples_plt: List[Dict[str, Any]] = []
+        row_anomalies_count = [0] * total_rows
+
         drillhole_stats = defaultdict(lambda: {"total": 0, "alertas": 0, "advertencias": 0, "vacios": 0})
         campaign_stats = defaultdict(lambda: {"total": 0, "alertas": 0, "advertencias": 0, "vacios": 0})
         category_counter = Counter_custom()
@@ -281,10 +284,13 @@ class PltRegularesValidator:
         # Helper para registrar anomalías
         def add_anomaly(excel_row: int, campana: str, taladro: str, muestra: str,
                         from_val: Any, to_val: Any, col_name: str, cat_code: str,
-                        message: str, sev_override: Optional[str] = None):
+                        message: str, sev_override: Optional[str] = None,
+                        valor_actual: Any = None):
             cat = CATEGORIES_REGISTRY_PLT_REGULARES.get(cat_code)
             sev = sev_override or (cat.severity if cat else "ALERTA")
             cat_name = cat.name if cat else cat_code
+
+            v_act = str(valor_actual) if (valor_actual is not None and str(valor_actual).strip() != "") else "—"
 
             anomalies.append({
                 "row_index": excel_row,
@@ -294,6 +300,7 @@ class PltRegularesValidator:
                 "from_m": to_float(from_val),
                 "to_m": to_float(to_val),
                 "columna": col_name,
+                "valor_actual": v_act,
                 "category_code": cat_code,
                 "category_name": cat_name,
                 "severity": sev,
@@ -302,6 +309,9 @@ class PltRegularesValidator:
             category_counter[cat_code] += 1
             column_error_counter[col_name] += 1
             severity_counter[sev] = severity_counter.get(sev, 0) + 1
+
+            if 0 <= excel_row - 2 < len(row_anomalies_count):
+                row_anomalies_count[excel_row - 2] += 1
 
             if sev == "ALERTA":
                 drillhole_stats[taladro]["alertas"] += 1
@@ -346,7 +356,7 @@ class PltRegularesValidator:
                     add_anomaly(row_num, c_key, t_key, m_clean, f_val, t_val,
                                 "Nro Muestra", "CAT_PLT_MUESTRA_DUPLICADA",
                                 f"Muestra '{m_clean}' repetida en el taladro '{t_key}' (ya fue registrada en la fila {prev_row}).",
-                                sev_override="ALERTA")
+                                sev_override="ALERTA", valor_actual=m_clean)
                 else:
                     seen_samples[sample_key] = row_num
 
@@ -358,7 +368,7 @@ class PltRegularesValidator:
                     add_anomaly(row_num, c_key, t_key, m_clean, f_val, t_val,
                                 "From", "CAT_PLT_TRAMO_DUPLICADO",
                                 f"El tramo [{f_val:.2f} - {t_val:.2f} m] se encuentra repetido en el taladro '{t_key}' (ya registrado en fila {prev_row}).",
-                                sev_override="ALERTA")
+                                sev_override="ALERTA", valor_actual=m_clean)
                 else:
                     seen_intervals[int_key] = row_num
 
@@ -386,7 +396,7 @@ class PltRegularesValidator:
                     add_anomaly(curr["row_num"], curr["campana"], curr["taladro"], curr["muestra"],
                                 curr["from"], curr["to"], "From", "CAT_PLT_TRAMOS_CRUZADOS",
                                 f"El tramo [{curr['from']:.2f} - {curr['to']:.2f} m] se cruza con la muestra anterior {prev['muestra']} [{prev['from']:.2f} - {prev['to']:.2f} m] de la fila {prev['row_num']}.",
-                                sev_override="ALERTA")
+                                sev_override="ALERTA", valor_actual=m_clean)
 
         # 4. Carga de ensayo repetida continuamente (posible copia de datos)
         for (dh, f_str, p_k, d_k), p_list in p_measurements_by_group.items():
@@ -395,7 +405,7 @@ class PltRegularesValidator:
                     add_anomaly(it["row_num"], it["campana"], it["taladro"], it["muestra"],
                                 it["from"], it["to"], "P instr (kN)", "CAT_PLT_CARGA_REPETIDA",
                                 f"Carga P={it['p']:.2f} kN repetida de forma idéntica en {len(p_list)} muestras seguidas el día {f_str} (revisar posible copia de datos).",
-                                sev_override="ADVERTENCIA")
+                                sev_override="ADVERTENCIA", valor_actual=f"P={it['p']:.2f} kN")
 
         # Indexar LGG por taladro si está activo el modo cruzado
         lgg_by_dh = {}
@@ -464,9 +474,10 @@ class PltRegularesValidator:
             campaign_stats[campana_key]["total"] += 1
 
             # Helper local vinculado a la fila
-            def reg_err(col: str, cat: str, msg: str, sev: Optional[str] = None):
+            def reg_err(col: str, cat: str, msg: str, sev: Optional[str] = None, val: Any = None):
+                val_act = val if val is not None else row.get(col)
                 add_anomaly(excel_row_num, campana_key, taladro_key, muestra_str,
-                            from_raw, to_raw, col, cat, msg, sev_override=sev)
+                            from_raw, to_raw, col, cat, msg, sev_override=sev, valor_actual=val_act)
 
             # --- 1. Identificación y Fecha ---
             if not taladro_str:
@@ -493,7 +504,7 @@ class PltRegularesValidator:
                 if fecha_dt > today:
                     reg_err("Fecha", "CAT_PLT_FECHA_FUTURA", f"Fecha de ensayo '{fecha_dt}' es posterior a la fecha actual ({today}).")
                 if campana_int and fecha_dt.year != campana_int:
-                    reg_err("Fecha", "CAT_PLT_CAMPANA_INVALIDA", f"Año de la fecha ({fecha_dt.year}) no coincide con la Campaña ({campana_int}).")
+                    reg_err("Fecha", "CAT_PLT_FECHA_DISCORDANTE_CAMPANA", f"Año de la fecha ({fecha_dt.year}) no coincide con la Campaña ({campana_int}).", val=clean_str(fecha_raw))
 
             # --- 2. Corridas y Tramos ---
             c_desde_f = to_float(c_desde_raw)
@@ -788,12 +799,76 @@ class PltRegularesValidator:
                                         f"Dureza del ensayo ({plt_isrm}) difiere de la dureza estimada en campo en LGG ({lgg_isrm}).",
                                         sev="ADVERTENCIA")
 
+            # Guardar celda / muestra única evaluada
+            n_anom = row_anomalies_count[idx] if idx < len(row_anomalies_count) else 0
+            is_invalid = row_severity_flags[idx] if idx < len(row_severity_flags) else False
+            if is_invalid:
+                estado_qa = "NO CONFORME"
+            elif n_anom > 0:
+                estado_qa = "CON OBSERVACIONES"
+            else:
+                estado_qa = "CONFORME" 
+
+            unique_samples_plt.append({
+                "row_index": excel_row_num,
+                "taladro": taladro_str,
+                "muestra": muestra_str,
+                "campana": campana_key,
+                "from_m": from_f,
+                "to_m": to_f,
+                "longitud_m": round(to_f - from_f, 2) if (to_f is not None and from_f is not None) else None,
+                "lito1": clean_str(lito1_raw),
+                "lito2": clean_str(lito2_raw),
+                "lito3": clean_str(lito3_raw),
+                "tipo_litologico": clean_str(tipo_lito_raw),
+                "factor_k": clean_str(factor_k_raw),
+                "p_kn": p_f,
+                "d_mm": d_f,
+                "is50_mpa": is50_f if is50_f is not None else calc_is50,
+                "ucs_mpa": ucs_f if ucs_f is not None else calc_ucs,
+                "isrm": clean_str(isrm_raw),
+                "estado": estado_qa,
+                "incidencias_cant": n_anom
+            })
+
         # =====================================================================
         # FASE 3: MÉTRICAS CONSOLIDADAS
         # =====================================================================
         invalid_count = sum(row_severity_flags)
         valid_count = total_rows - invalid_count
         quality_idx = (valid_count / total_rows * 100.0) if total_rows > 0 else 100.0
+
+        # Resumir corridas únicas de LGG si vino el archivo
+        unique_runs_lgg = []
+        if has_lgg and df_lgg is not None and not df_lgg.empty:
+            # Mapear conteo de muestras por corrida
+            plt_counts = Counter()
+            for s in unique_samples_plt:
+                t = s["taladro"]
+                fm = s["from_m"]
+                tm = s["to_m"]
+                if t and fm is not None and tm is not None:
+                    plt_counts[(t, fm, tm)] += 1
+
+            for _, l_row in df_lgg.iterrows():
+                t_lgg = str(l_row.get("taladro", "")).strip().upper()
+                d_lgg = to_float(l_row.get("desde_m"))
+                h_lgg = to_float(l_row.get("hasta_m"))
+                m_count = 0
+                if d_lgg is not None and h_lgg is not None:
+                    m_count = sum(1 for s in unique_samples_plt if s["taladro"] == t_lgg and s["from_m"] is not None and d_lgg <= s["from_m"] <= h_lgg)
+
+                unique_runs_lgg.append({
+                    "taladro": t_lgg,
+                    "desde_m": d_lgg,
+                    "hasta_m": h_lgg,
+                    "longitud_m": round(h_lgg - d_lgg, 2) if (h_lgg is not None and d_lgg is not None) else None,
+                    "lito1": str(l_row.get("lito1", "")).strip().upper(),
+                    "lito2": str(l_row.get("lito2", "")).strip().upper(),
+                    "lito3": str(l_row.get("lito3", "")).strip().upper(),
+                    "isrm": str(l_row.get("isrm", "")).strip().upper(),
+                    "muestras_plt_cant": m_count
+                })
 
         return {
             "total_rows": total_rows,
@@ -806,5 +881,7 @@ class PltRegularesValidator:
             "drillhole_stats": dict(drillhole_stats),
             "campaign_stats": dict(campaign_stats),
             "anomalies": anomalies,
-            "has_lgg_crosscheck": has_lgg
+            "has_lgg_crosscheck": has_lgg,
+            "unique_samples_plt": unique_samples_plt,
+            "unique_runs_lgg": unique_runs_lgg
         }
