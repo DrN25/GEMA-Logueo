@@ -10,7 +10,7 @@ import shutil
 from datetime import datetime
 from typing import Optional, List
 import pandas as pd
-from fastapi import APIRouter, HTTPException, UploadFile, File, Query, BackgroundTasks
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Query, BackgroundTasks
 from fastapi.responses import StreamingResponse, FileResponse, JSONResponse
 
 from app.core.validator_plt_regulares import PltRegularesValidator, extract_lgg_dataframe
@@ -127,6 +127,7 @@ def _build_compact_metrics(diag: dict, campania_filter: Optional[str] = None) ->
         "worst_drillholes": worst_drillholes,
         "has_lgg_crosscheck": diag.get("has_lgg_crosscheck", False),
         "lgg_archivo": diag.get("lgg_archivo"),
+        "proyecto": diag.get("proyecto", "auto"),
     }
 
 
@@ -134,11 +135,13 @@ def _build_compact_metrics(diag: dict, campania_filter: Optional[str] = None) ->
 @router.post("/audit/plt/upload-and-audit")
 async def upload_plt_audit_file(
     file: UploadFile = File(...),
-    lgg_file: Optional[UploadFile] = File(None)
+    lgg_file: Optional[UploadFile] = File(None),
+    proyecto: Optional[str] = Form(None)
 ):
     """
     Recibe un archivo Excel de Ensayos PLT y opcionalmente la base de Logueo General (LGG),
     ejecuta la validación integral (autónoma o cruzada) y pre-genera el reporte Excel.
+    Soporta selección de proyecto ('ferrobamba', 'chalco' o autodetección).
     """
     if not file.filename.lower().endswith(('.xlsx', '.xlsm', '.xls')):
         raise HTTPException(status_code=400, detail="Formato no soportado. Debe ser un archivo Excel (.xlsx, .xlsm, .xls).")
@@ -184,10 +187,11 @@ async def upload_plt_audit_file(
 
         # Validar
         validator = PltRegularesValidator()
-        diag = validator.audit_dataframe(df, df_lgg=df_lgg)
+        diag = validator.audit_dataframe(df, df_lgg=df_lgg, project=proyecto)
 
         diag["nombre_archivo"] = file.filename
         diag["lgg_archivo"] = lgg_file.filename if lgg_file else None
+        diag["proyecto"] = proyecto or "auto"
         diag["fecha_auditoria"] = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         diag["audit_id"] = audit_id
 

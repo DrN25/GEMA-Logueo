@@ -174,7 +174,8 @@ CATEGORIES_REGISTRY_PLT_REGULARES: Dict[str, RuleCategoryPLT] = {
 # ===========================================================================
 # 2. CATÁLOGO LITOLÓGICO Y FACTOR K CANÓNICO (SSOT)
 # ===========================================================================
-LITHOLOGY_FULL_CATALOG = [
+# Catálogo Canónico Ferrobamba (Fuente: SSOT Geomecánica Ferrobamba)
+FERROBAMBA_LITHOLOGY_CATALOG = [
     # INTRUSIVOS
     {"grupo": "INTRUSIVOS", "lito1": "MZB",  "lito2": "MZB", "lito3": "MZB_EQ", "k": 8.29},
     {"grupo": "INTRUSIVOS", "lito1": "MZB",  "lito2": "MZB", "lito3": "MZB_P",  "k": 8.53},
@@ -249,21 +250,250 @@ LITHOLOGY_FULL_CATALOG = [
     {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MBL", "lito3": "Varios", "k": 13.34},
 ]
 
+# Alias histórico para retrocompatibilidad total
+LITHOLOGY_FULL_CATALOG = FERROBAMBA_LITHOLOGY_CATALOG
+
+# Catálogo Canónico Chalcobamba (Fuente: _LEYENDA_LITOLOGIA_CHALCO(1).xlsx - Hoja1, LITH1 y LITH3, LITH2)
+CHALCO_LITHOLOGY_CATALOG = [
+    # ==================== SEDIMENTARIOS ====================
+    {"grupo": "SEDIMENTARIOS", "lito1": "LMT", "lito2": "LMT", "lito3": "LMT_M",  "k": 14.74},
+    {"grupo": "SEDIMENTARIOS", "lito1": "LMT", "lito2": "LMT", "lito3": "LMT_MG", "k": 14.25},
+    {"grupo": "SEDIMENTARIOS", "lito1": "LMT", "lito2": "LMT", "lito3": "LMT_Mg", "k": 14.25},
+    {"grupo": "SEDIMENTARIOS", "lito1": "LMT", "lito2": "LMT", "lito3": "LMT_S",  "k": 14.84},
+    {"grupo": "SEDIMENTARIOS", "lito1": "LMT", "lito2": "LMT", "lito3": "LMT_C",  "k": 16.83},
+    {"grupo": "SEDIMENTARIOS", "lito1": "LMT", "lito2": "LMT", "lito3": "LMT_U",  "k": 14.84},
+    {"grupo": "SEDIMENTARIOS", "lito1": "LMT", "lito2": "LMT", "lito3": "Varios", "k": 14.84},
+    {"grupo": "SEDIMENTARIOS", "lito1": "LMT", "lito2": "LMT", "lito3": "-",      "k": 14.84},
+    {"grupo": "SEDIMENTARIOS", "lito1": "SHL", "lito2": "HFL", "lito3": "SHL_MA", "k": 14.84},
+    {"grupo": "SEDIMENTARIOS", "lito1": "SHL", "lito2": "SHL", "lito3": "-",      "k": 14.84},
+    {"grupo": "SEDIMENTARIOS", "lito1": "OVD", "lito2": "OVD", "lito3": "-",      "k": 14.84},
+    {"grupo": "SEDIMENTARIOS", "lito1": "QT",  "lito2": "QT",  "lito3": "-",      "k": 14.84},
+    {"grupo": "SEDIMENTARIOS", "lito1": "NR",  "lito2": "NR",  "lito3": "-",      "k": 14.84},
+
+    # ==================== INTRUSIVOS (CHALCOBAMBA) ====================
+    # DI: Diorita de hornblenda (DIO_1: 7.60, DIO_2: 7.60, DIO_P: 7.60)
+    {"grupo": "INTRUSIVOS", "lito1": "DI", "lito2": "DI", "lito3": "DIO_1", "k": 7.60},
+    {"grupo": "INTRUSIVOS", "lito1": "DI", "lito2": "DI", "lito3": "DIO_2", "k": 7.60},
+    {"grupo": "INTRUSIVOS", "lito1": "DI", "lito2": "DI", "lito3": "DIO_P", "k": 7.60},
+    {"grupo": "INTRUSIVOS", "lito1": "DI", "lito2": "DI", "lito3": "NR",    "k": 7.60},
+    {"grupo": "INTRUSIVOS", "lito1": "DI", "lito2": "DI", "lito3": "-",     "k": 7.60},
+    {"grupo": "INTRUSIVOS", "lito1": "DI", "lito2": "DI", "lito3": "Varios","k": 7.60},
+    # MZM: Monzonita Máfica (MZM_1: 8.61, MZM_2: 9.31)
+    {"grupo": "INTRUSIVOS", "lito1": "MZM", "lito2": "MZM", "lito3": "MZM_1", "k": 8.61},
+    {"grupo": "INTRUSIVOS", "lito1": "MZM", "lito2": "MZM", "lito3": "MZM_2", "k": 9.31},
+    {"grupo": "INTRUSIVOS", "lito1": "MZM", "lito2": "MZM", "lito3": "NR",    "k": 8.61},
+    {"grupo": "INTRUSIVOS", "lito1": "MZM", "lito2": "MZM", "lito3": "-",     "k": 8.61},
+    {"grupo": "INTRUSIVOS", "lito1": "MZM", "lito2": "MZM", "lito3": "Varios","k": 8.61},
+    # MZH: Monzonita hornbléndica (MZH: 11.62, MZH_K: 9.31, MZH_J: 9.31)
+    {"grupo": "INTRUSIVOS", "lito1": "MZH", "lito2": "MZH", "lito3": "MZH",   "k": 11.62},
+    {"grupo": "INTRUSIVOS", "lito1": "MZH", "lito2": "MZH", "lito3": "MZH_K", "k": 9.31},
+    {"grupo": "INTRUSIVOS", "lito1": "MZH", "lito2": "MZH", "lito3": "MZH_J", "k": 9.31},
+    {"grupo": "INTRUSIVOS", "lito1": "MZH", "lito2": "MZH", "lito3": "NR",    "k": 11.62},
+    {"grupo": "INTRUSIVOS", "lito1": "MZH", "lito2": "MZH", "lito3": "-",     "k": 11.62},
+    {"grupo": "INTRUSIVOS", "lito1": "MZH", "lito2": "MZH", "lito3": "Varios","k": 11.62},
+    # MZB: Monzonita de biotita (MZB_1: 9.20, MZB_2: 7.60)
+    {"grupo": "INTRUSIVOS", "lito1": "MZB", "lito2": "MZB", "lito3": "MZB_1", "k": 9.20},
+    {"grupo": "INTRUSIVOS", "lito1": "MZB", "lito2": "MZB", "lito3": "MZB_2", "k": 7.60},
+    {"grupo": "INTRUSIVOS", "lito1": "MZB", "lito2": "MZB", "lito3": "NR",    "k": 9.20},
+    {"grupo": "INTRUSIVOS", "lito1": "MZB", "lito2": "MZB", "lito3": "-",     "k": 9.20},
+    {"grupo": "INTRUSIVOS", "lito1": "MZB", "lito2": "MZB", "lito3": "Varios","k": 9.20},
+    # MZQ: Monzonita cuarzosa (k = 12.29)
+    {"grupo": "INTRUSIVOS", "lito1": "MZQ", "lito2": "MZQ", "lito3": "MZQ_1A", "k": 12.29},
+    {"grupo": "INTRUSIVOS", "lito1": "MZQ", "lito2": "MZQ", "lito3": "MZQ_1B", "k": 12.29},
+    {"grupo": "INTRUSIVOS", "lito1": "MZQ", "lito2": "MZQ", "lito3": "MZQ_2",  "k": 12.29},
+    {"grupo": "INTRUSIVOS", "lito1": "MZQ", "lito2": "MZQ", "lito3": "MZQ_3A", "k": 12.29},
+    {"grupo": "INTRUSIVOS", "lito1": "MZQ", "lito2": "MZQ", "lito3": "MZQ_3B", "k": 12.29},
+    {"grupo": "INTRUSIVOS", "lito1": "MZQ", "lito2": "MZQ", "lito3": "NR",     "k": 12.29},
+    {"grupo": "INTRUSIVOS", "lito1": "MZQ", "lito2": "MZQ", "lito3": "-",      "k": 12.29},
+    {"grupo": "INTRUSIVOS", "lito1": "MZQ", "lito2": "MZQ", "lito3": "Varios", "k": 12.29},
+    {"grupo": "INTRUSIVOS", "lito1": "MZD", "lito2": "MZD", "lito3": "MZD",    "k": 9.87},
+
+    # ==================== BRECHAS ====================
+    {"grupo": "BRECHAS", "lito1": "BX",           "lito2": "BX",  "lito3": "BX",     "k": 13.72},
+    {"grupo": "BRECHAS", "lito1": "BX",           "lito2": "TBX", "lito3": "TBX",    "k": 13.72},
+    {"grupo": "BRECHAS", "lito1": "TBX",          "lito2": "TBX", "lito3": "TBX",    "k": 13.72},
+    {"grupo": "BRECHAS", "lito1": "TBX",          "lito2": "TBX", "lito3": "-",      "k": 13.72},
+    {"grupo": "BRECHAS", "lito1": "HBX",          "lito2": "HBX", "lito3": "HBX_MM", "k": 11.41},
+    {"grupo": "BRECHAS", "lito1": "HBX",          "lito2": "HBX", "lito3": "HBX_MG", "k": 11.41},
+    {"grupo": "BRECHAS", "lito1": "HBX",          "lito2": "HBX", "lito3": "HBX_MP", "k": 11.41},
+    {"grupo": "BRECHAS", "lito1": "HBX",          "lito2": "HBX", "lito3": "HBX_MI", "k": 11.41},
+    {"grupo": "BRECHAS", "lito1": "HBX",          "lito2": "HBX", "lito3": "HBX_MS", "k": 11.41},
+    {"grupo": "BRECHAS", "lito1": "HBX",          "lito2": "HBX", "lito3": "HBX_P",  "k": 11.41},
+    {"grupo": "BRECHAS", "lito1": "HBX / LMT",    "lito2": "HBX", "lito3": "HBX_CM", "k": 11.41},
+    {"grupo": "BRECHAS", "lito1": "HBX",          "lito2": "HBX", "lito3": "HBX_CM", "k": 11.41},
+    {"grupo": "BRECHAS", "lito1": "HBX / LMT",    "lito2": "HBX", "lito3": "HBX_CG", "k": 11.41},
+    {"grupo": "BRECHAS", "lito1": "HBX",          "lito2": "HBX", "lito3": "HBX_CG", "k": 11.41},
+    {"grupo": "BRECHAS", "lito1": "HBX / LMT",    "lito2": "HBX", "lito3": "HBX_CP", "k": 11.41},
+    {"grupo": "BRECHAS", "lito1": "HBX",          "lito2": "HBX", "lito3": "HBX_CP", "k": 11.41},
+    {"grupo": "BRECHAS", "lito1": "HBX / varios", "lito2": "HBX", "lito3": "HBX_CI", "k": 11.41},
+    {"grupo": "BRECHAS", "lito1": "HBX",          "lito2": "HBX", "lito3": "HBX_CI", "k": 11.41},
+    {"grupo": "BRECHAS", "lito1": "HBX / SHL",    "lito2": "HBX", "lito3": "HBX_CS", "k": 11.41},
+    {"grupo": "BRECHAS", "lito1": "HBX",          "lito2": "HBX", "lito3": "HBX_CS", "k": 11.41},
+    {"grupo": "BRECHAS", "lito1": "HBX",          "lito2": "HBX", "lito3": "HBX_U",  "k": 11.41},
+    {"grupo": "BRECHAS", "lito1": "HBX",          "lito2": "HBX", "lito3": "HBX",    "k": 11.41},
+    {"grupo": "BRECHAS", "lito1": "HBX",          "lito2": "HBX", "lito3": "-",      "k": 11.41},
+    {"grupo": "BRECHAS", "lito1": "MBX / varios", "lito2": "MBX", "lito3": "MBX",    "k": 11.41},
+    {"grupo": "BRECHAS", "lito1": "MBX",          "lito2": "MBX", "lito3": "MBX",    "k": 11.41},
+    {"grupo": "BRECHAS", "lito1": "MBX",          "lito2": "MBX", "lito3": "-",      "k": 11.41},
+
+    # ==================== ENDOSKARN ====================
+    {"grupo": "ENDOSKARN", "lito1": "INTRUSIVO", "lito2": "EGT", "lito3": "varios", "k": 9.87},
+    {"grupo": "ENDOSKARN", "lito1": "INTRUSIVO", "lito2": "EGT", "lito3": "-",      "k": 9.87},
+    {"grupo": "ENDOSKARN", "lito1": "INTRUSIVO", "lito2": "EPG", "lito3": "varios", "k": 9.87},
+    {"grupo": "ENDOSKARN", "lito1": "INTRUSIVO", "lito2": "EPG", "lito3": "-",      "k": 9.87},
+    {"grupo": "ENDOSKARN", "lito1": "DI",        "lito2": "EGT", "lito3": "-",      "k": 9.87},
+    {"grupo": "ENDOSKARN", "lito1": "DI",        "lito2": "EPG", "lito3": "-",      "k": 9.87},
+    {"grupo": "ENDOSKARN", "lito1": "MZM",       "lito2": "EGT", "lito3": "-",      "k": 9.87},
+    {"grupo": "ENDOSKARN", "lito1": "MZM",       "lito2": "EPG", "lito3": "-",      "k": 9.87},
+    {"grupo": "ENDOSKARN", "lito1": "MZH",       "lito2": "EGT", "lito3": "-",      "k": 9.87},
+    {"grupo": "ENDOSKARN", "lito1": "MZH",       "lito2": "EPG", "lito3": "-",      "k": 9.87},
+    {"grupo": "ENDOSKARN", "lito1": "MZB",       "lito2": "EGT", "lito3": "-",      "k": 9.87},
+    {"grupo": "ENDOSKARN", "lito1": "MZB",       "lito2": "EPG", "lito3": "-",      "k": 9.87},
+    {"grupo": "ENDOSKARN", "lito1": "MZQ",       "lito2": "EGT", "lito3": "-",      "k": 9.87},
+    {"grupo": "ENDOSKARN", "lito1": "MZQ",       "lito2": "EPG", "lito3": "-",      "k": 9.87},
+
+    # ==================== METAMORFICAS / EXOSKARNS ====================
+    # GSK - Skarn de granates (k = 11.15 oficial Chalcobamba / corregido por Geología)
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "GSK", "lito3": "LMT_M",  "k": 11.15},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "GSK", "lito3": "LMT_S",  "k": 11.15},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "GSK", "lito3": "LMT_U",  "k": 11.15},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "GSK", "lito3": "LMT_MG", "k": 11.15},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "GSK", "lito3": "LMT_Mg", "k": 11.15},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "GSK", "lito3": "Varios", "k": 11.15},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "GSK", "lito3": "-",      "k": 11.15},
+    # PSK - Skarn de piroxenos (k = 12.63)
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "PSK", "lito3": "LMT_MG", "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "PSK", "lito3": "LMT_Mg", "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "PSK", "lito3": "LMT_S",  "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "PSK", "lito3": "LMT_U",  "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "PSK", "lito3": "Varios", "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "PSK", "lito3": "-",      "k": 12.63},
+    # MSK - Skarn de Magnetita (k = 12.63)
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MSK", "lito3": "LMT_MG", "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MSK", "lito3": "LMT_Mg", "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MSK", "lito3": "LMT_M",  "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MSK", "lito3": "LMT_U",  "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MSK", "lito3": "Varios", "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MSK", "lito3": "-",      "k": 12.63},
+    # ESK - Skarn de Epidota (k = 12.63)
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "ESK", "lito3": "LMT_M",  "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "ESK", "lito3": "LMT_MG", "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "ESK", "lito3": "LMT_Mg", "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "ESK", "lito3": "LMT_U",  "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "ESK", "lito3": "Varios", "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "ESK", "lito3": "-",      "k": 12.63},
+    # MBC - Mármol con Calcosilicatos (k = 11.78)
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MBC", "lito3": "LMT_MG", "k": 11.78},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MBC", "lito3": "LMT_Mg", "k": 11.78},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MBC", "lito3": "LMT_S",  "k": 11.78},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MBC", "lito3": "LMT_M",  "k": 11.78},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MBC", "lito3": "Varios", "k": 11.78},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MBC", "lito3": "-",      "k": 11.78},
+    # MBL - Mármol (k = 13.34)
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MBL", "lito3": "LMT_MG", "k": 13.34},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MBL", "lito3": "LMT_Mg", "k": 13.34},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MBL", "lito3": "LMT_S",  "k": 13.34},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MBL", "lito3": "LMT_M",  "k": 13.34},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MBL", "lito3": "Varios", "k": 13.34},
+    {"grupo": "METAMORFICAS", "lito1": "LMT", "lito2": "MBL", "lito3": "-",      "k": 13.34},
+    # Hornfels (k = 12.63)
+    {"grupo": "METAMORFICAS", "lito1": "SHL", "lito2": "HFL", "lito3": "SHL_MA", "k": 12.63},
+    {"grupo": "METAMORFICAS", "lito1": "SHL", "lito2": "HFL", "lito3": "-",      "k": 12.63},
+    # Cuarcita (k = 12.63)
+    {"grupo": "METAMORFICAS", "lito1": "SND", "lito2": "QZT", "lito3": "-",      "k": 12.63},
+]
+
 INTRUSIVE_LITOS_SET = {
     "MZB", "MZQ", "MZM", "GRD", "TON", "DIO", "POR", "AND", "DAC", "MZD",
     "INTRUSIVO", "INTRUSIVOS", "INTRUSIVA", "INTRUSIVAS", "INTRUS"
 }
 
-def resolve_expected_k_and_type(l1: str, l2: str, l3: str) -> Tuple[Optional[str], Optional[float]]:
+CHALCO_INTRUSIVE_LITOS_SET = {
+    "DI", "DIO", "DIORITA", "MZM", "MZH", "MZB", "MZQ",
+    "MZD", "AN", "GD", "TON", "POR", "DAC", "QFP",
+    "INTRUSIVO", "INTRUSIVOS", "INTRUSIVA", "INTRUSIVAS"
+}
+
+def resolve_expected_k_and_type(l1: str, l2: str, l3: str, project: str = "ferrobamba") -> Tuple[Optional[str], Optional[float]]:
     """
     Resuelve el grupo geológico y el Factor K esperado para la combinación litológica (L1, L2, L3)
-    según el catálogo oficial SSOT de GEMA.
+    según el catálogo oficial SSOT de GEMA para el proyecto geológico ('ferrobamba' o 'chalco').
     """
+    proj = "chalco" if project and "chalco" in str(project).strip().lower() else "ferrobamba"
     l1_norm = str(l1 or "").strip().upper()
     l2_norm = str(l2 or "").strip().upper()
     l3_norm = str(l3 or "").strip().upper()
 
-    # 1. Búsqueda exacta en catálogo
+    if proj == "chalco":
+        CHALCO_ALIASES = {
+            "DIO": "DI", "DIORITA": "DI", "SK": "SKARN",
+            "LMT_MG": "LMT_MG", "LMT_Mg": "LMT_MG",
+            "MZQ1A_CUERPO(TQMP)": "MZQ_1A", "MZQ1A_CUERPO": "MZQ_1A",
+        }
+        l1_norm = CHALCO_ALIASES.get(l1_norm, l1_norm)
+        l2_norm = CHALCO_ALIASES.get(l2_norm, l2_norm)
+        l3_norm = CHALCO_ALIASES.get(l3_norm, l3_norm).replace("/", "_")
+
+        # 1. Búsqueda exacta en catálogo Chalcobamba
+        for item in CHALCO_LITHOLOGY_CATALOG:
+            cat_l1 = item["lito1"].upper()
+            cat_l2 = item["lito2"].upper()
+            cat_l3 = item["lito3"].upper()
+
+            if cat_l1 in ("INTRUSIVO", "INTRUSIVOS"):
+                m1 = (l1_norm in CHALCO_INTRUSIVE_LITOS_SET) or (l1_norm == cat_l1)
+            elif "/" in cat_l1:
+                m1 = (l1_norm == cat_l1) or (l1_norm in [p.strip() for p in cat_l1.split("/")])
+            elif cat_l1:
+                m1 = (l1_norm == cat_l1)
+            else:
+                m1 = True
+
+            m2 = (l2_norm == cat_l2) if cat_l2 else True
+
+            if cat_l3 in ("VARIOS", "CUALQUIERA"):
+                m3 = bool(l3_norm and l3_norm not in ("-", "N/A", "NONE", "NR"))
+            elif "/" in cat_l3:
+                m3 = (l3_norm == cat_l3) or (l3_norm in [p.strip() for p in cat_l3.split("/")])
+            elif cat_l3 in ("-", "NR", ""):
+                m3 = (l3_norm in ("-", "NR", "", "NONE", "N/A"))
+            elif cat_l3:
+                m3 = (l3_norm == cat_l3)
+            else:
+                m3 = True
+
+            if m1 and m2 and m3:
+                return item["grupo"], item["k"]
+
+        # 2. Reglas jerárquicas geológicas de contingencia (Chalcobamba)
+        if l2_norm in ("EPG", "EGT") or l1_norm in ("EPG", "EGT"): return "ENDOSKARN", 9.87
+        if l2_norm == "MBL": return "METAMORFICAS", 13.34
+        if l2_norm == "MBC": return "METAMORFICAS", 11.78
+        if l2_norm == "GSK": return "METAMORFICAS", 11.15
+        if l2_norm in ("ESK", "MSK", "PSK", "HFL", "QZT", "SKN", "SKARN"): return "METAMORFICAS", 12.63
+        if l2_norm in ("TBX", "BX") or l1_norm in ("TBX", "BX"): return "BRECHAS", 13.72
+        if l2_norm in ("HBX", "MBX") or l1_norm in ("HBX", "MBX"): return "BRECHAS", 11.41
+        if l2_norm in ("DI", "DIO") or l1_norm in ("DI", "DIO"): return "INTRUSIVOS", 7.60
+        if l2_norm == "MZH" or l1_norm == "MZH":
+            if l3_norm in ("MZH_K", "MZH_J"): return "INTRUSIVOS", 9.31
+            return "INTRUSIVOS", 11.62
+        if l2_norm == "MZB" or l1_norm == "MZB":
+            if l3_norm == "MZB_2": return "INTRUSIVOS", 7.60
+            return "INTRUSIVOS", 9.20
+        if l2_norm == "MZM" or l1_norm == "MZM":
+            if l3_norm == "MZM_1": return "INTRUSIVOS", 8.61
+            return "INTRUSIVOS", 9.31
+        if l2_norm == "MZQ" or l1_norm == "MZQ": return "INTRUSIVOS", 12.29
+        if l2_norm == "MZD" or l1_norm == "MZD": return "INTRUSIVOS", 9.87
+        if l2_norm == "LMT" or l1_norm == "LMT":
+            if l3_norm == "LMT_C": return "SEDIMENTARIOS", 16.83
+            if l3_norm == "LMT_M": return "SEDIMENTARIOS", 14.74
+            if l3_norm in ("LMT_MG", "LMT_Mg"): return "SEDIMENTARIOS", 14.25
+            return "SEDIMENTARIOS", 14.84
+        if l2_norm in ("SHL", "OVD", "QT", "NR") or l1_norm in ("SHL", "OVD", "QT"): return "SEDIMENTARIOS", 14.84
+        return None, None
+
+    # Proyecto Ferrobamba (comportamiento canónico preexistente)
     for item in LITHOLOGY_FULL_CATALOG:
         cat_l1 = item["lito1"].upper()
         cat_l2 = item["lito2"].upper()

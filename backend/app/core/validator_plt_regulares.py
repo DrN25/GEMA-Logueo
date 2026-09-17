@@ -100,6 +100,16 @@ def to_int(val: Any) -> Optional[int]:
     return int(round(f))
 
 
+def detect_project_for_drillhole(taladro: str, default_project: Optional[str] = None) -> str:
+    """Detecta si un taladro pertenece al depósito Chalcobamba o Ferrobamba."""
+    if default_project and str(default_project).strip().lower() not in ("auto", "detect", "none", ""):
+        return "chalco" if "chalco" in str(default_project).lower() else "ferrobamba"
+    t = str(taladro or "").strip().upper()
+    if "-CB" in t or "_CB" in t or t.startswith("CB") or "CHALCO" in t:
+        return "chalco"
+    return "ferrobamba"
+
+
 def parse_date(val: Any) -> Optional[date]:
     """Parsea fechas desde seriales de Excel, objetos datetime o strings."""
     if val is None or pd.isna(val):
@@ -258,10 +268,11 @@ class PltRegularesValidator:
         self.tol_f = tolerance_f
         self.tol_ucs = tolerance_ucs
 
-    def audit_dataframe(self, df: pd.DataFrame, df_lgg: Optional[pd.DataFrame] = None) -> Dict[str, Any]:
+    def audit_dataframe(self, df: pd.DataFrame, df_lgg: Optional[pd.DataFrame] = None, project: Optional[str] = None) -> Dict[str, Any]:
         """
         Audita un DataFrame completo de ensayos PLT regulares y genera el diagnóstico estructurado.
         Si se suministra `df_lgg`, ejecuta adicionalmente las validaciones cruzadas con Logueo General.
+        Soporta auto-detección o asignación de proyecto ('ferrobamba' o 'chalco').
         """
         # Normalizar nombres de columnas
         col_map = {}
@@ -454,6 +465,7 @@ class PltRegularesValidator:
             campana_int = to_int(campana_raw)
             campana_key = str(campana_int) if campana_int else (clean_str(campana_raw) or "S/C")
             taladro_key = taladro_str or "S/T"
+            row_project = detect_project_for_drillhole(taladro_key, project)
 
             drillhole_stats[taladro_key]["total"] += 1
             campaign_stats[campana_key]["total"] += 1
@@ -621,7 +633,7 @@ class PltRegularesValidator:
                             sev="ALERTA")
 
             # Resolución canónica de Factor K y Grupo Geológico
-            exp_grupo, exp_k = resolve_expected_k_and_type(lito1_str, lito2_str, lito3_str)
+            exp_grupo, exp_k = resolve_expected_k_and_type(lito1_str, lito2_str, lito3_str, project=row_project)
 
             if exp_grupo and tipo_lito_str:
                 norm_tipo_lito = normalize_geologic_group(tipo_lito_str)
@@ -817,6 +829,7 @@ class PltRegularesValidator:
                 "from_m": from_f,
                 "to_m": to_f,
                 "longitud_m": round(to_f - from_f, 2) if (to_f is not None and from_f is not None) else None,
+                "proyecto": row_project,
                 "lito1": clean_str(lito1_raw),
                 "lito2": clean_str(lito2_raw),
                 "lito3": clean_str(lito3_raw),
