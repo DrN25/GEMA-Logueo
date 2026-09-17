@@ -5,6 +5,7 @@ y reglas específicas de validación (incluyendo duplicados, Factor K y cruce co
 """
 
 from typing import Dict, List, Set, Optional, Tuple
+import unicodedata
 
 
 class RuleCategoryPLT:
@@ -42,7 +43,7 @@ CATEGORIES_REGISTRY_PLT_REGULARES: Dict[str, RuleCategoryPLT] = {
         "CAT_PLT_CAMPANA_INVALIDA", "Año de campaña no válido (debe ser un año entre 2000 y 2035).", "ALERTA"
     ),
     "CAT_PLT_FECHA_DISCORDANTE_CAMPANA": RuleCategoryPLT(
-        "CAT_PLT_FECHA_DISCORDANTE_CAMPANA", "Año de la fecha de ensayo no coincide con el año de campaña.", "ALERTA"
+        "CAT_PLT_FECHA_DISCORDANTE_CAMPANA", "Año de la fecha de ensayo no coincide con el año de campaña.", "ADVERTENCIA"
     ),
     "CAT_PLT_FECHA_INVALIDA": RuleCategoryPLT(
         "CAT_PLT_FECHA_INVALIDA", "Fecha de ensayo con formato no válido o no parseable.", "ALERTA"
@@ -292,6 +293,9 @@ def resolve_expected_k_and_type(l1: str, l2: str, l3: str) -> Tuple[Optional[str
     if l2_norm == "TBX" or l1_norm == "TBX": return "BRECHAS", 13.72
     if l2_norm in ("BX", "HBX", "MBX") or l1_norm in ("BX", "HBX"): return "BRECHAS", 11.41
 
+    # Endoskarn (prioridad sobre prefijos intrusivos de L1 cuando L2 es alteración de contacto)
+    if l2_norm in ("EPG", "EGT"): return "ENDOSKARN", 9.87
+
     # Intrusivos
     if l2_norm == "MZQ" or l1_norm == "MZQ": return "INTRUSIVOS", 12.29
     if l2_norm == "MZH" or l1_norm == "MZH": return "INTRUSIVOS", 11.62
@@ -300,7 +304,6 @@ def resolve_expected_k_and_type(l1: str, l2: str, l3: str) -> Tuple[Optional[str
     if l2_norm in ("MBF", "MBF1"): return "INTRUSIVOS", 9.20
     if l2_norm == "MBF2": return "INTRUSIVOS", 10.73
     if l2_norm == "MZD" or l1_norm == "MZD": return "INTRUSIVOS", 7.60
-    if l2_norm in ("EPG", "EGT"): return "ENDOSKARN", 9.87
     if l2_norm == "MZM":
         if l3_norm in ("MZM_F", "MBF1"): return "INTRUSIVOS", 9.31
         return "INTRUSIVOS", 8.61
@@ -349,6 +352,63 @@ VALID_GEOLOGIC_GROUPS = {
     "BRECHAS", "BRECHA", "BRECHA TECTONICA",
     "ENDOSKARN", "EXOSKARN", "SKARN", "ENDO"
 }
+
+CANONICAL_GEOLOGIC_GROUP_MAP = {
+    "INTRUSIVO": "INTRUSIVOS",
+    "INTRUSIVOS": "INTRUSIVOS",
+    "INTRUSIVA": "INTRUSIVOS",
+    "INTRUSIVAS": "INTRUSIVOS",
+    "ROCA INTRUSIVA": "INTRUSIVOS",
+    "SEDIMENTARIO": "SEDIMENTARIOS",
+    "SEDIMENTARIOS": "SEDIMENTARIOS",
+    "SEDIMENTARIA": "SEDIMENTARIOS",
+    "SEDIMENTARIAS": "SEDIMENTARIOS",
+    "ROCA SEDIMENTARIA": "SEDIMENTARIOS",
+    "METAMORFICO": "METAMORFICAS",
+    "METAMORFICOS": "METAMORFICAS",
+    "METAMORFICA": "METAMORFICAS",
+    "METAMORFICAS": "METAMORFICAS",
+    "ROCA METAMORFICA": "METAMORFICAS",
+    "BRECHA": "BRECHAS",
+    "BRECHAS": "BRECHAS",
+    "BRECHA TECTONICA": "BRECHAS",
+    "ENDOSKARN": "ENDOSKARN",
+    "EXOSKARN": "ENDOSKARN",
+    "EXOSKARNS": "ENDOSKARN",
+    "SKARN": "ENDOSKARN",
+    "SKARNS": "ENDOSKARN",
+    "ENDO": "ENDOSKARN",
+}
+
+def normalize_geologic_group(group_str: str) -> str:
+    """Normaliza un tipo o grupo litológico a su categoría geológica canónica oficial."""
+    if not group_str:
+        return ""
+    clean = "".join(c for c in unicodedata.normalize("NFD", str(group_str).strip().upper()) if unicodedata.category(c) != "Mn")
+    if clean in CANONICAL_GEOLOGIC_GROUP_MAP:
+        return CANONICAL_GEOLOGIC_GROUP_MAP[clean]
+    for k, v in CANONICAL_GEOLOGIC_GROUP_MAP.items():
+        if k in clean:
+            return v
+    return clean
+
+def are_geologic_groups_compatible(group_a: str, group_b: str) -> bool:
+    """
+    Verifica si dos grupos geológicos son compatibles o equivalentes,
+    admitiendo flexibilidades geológicas (ej. Skarn/Endoskarn clasificado como Metamórfico o Intrusivo).
+    """
+    norm_a = normalize_geologic_group(group_a)
+    norm_b = normalize_geologic_group(group_b)
+    if not norm_a or not norm_b:
+        return True
+    if norm_a == norm_b:
+        return True
+    # Compatibilidad geológica para Skarns (metasomatismo entre intrusivo y roca caja / metamorfismo de contacto)
+    if norm_a == "ENDOSKARN" and norm_b in ("METAMORFICAS", "INTRUSIVOS"):
+        return True
+    if norm_b == "ENDOSKARN" and norm_a in ("METAMORFICAS", "INTRUSIVOS"):
+        return True
+    return False
 
 ISRM_SCALE = [
     (0.25, "Suelo"),

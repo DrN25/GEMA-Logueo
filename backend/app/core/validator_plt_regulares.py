@@ -24,6 +24,9 @@ from app.core.rules_plt_regulares import (
     VALID_FRACTURE_TYPES,
     VALID_ROTURA_DIRECTIONS,
     VALID_GEOLOGIC_GROUPS,
+    CANONICAL_GEOLOGIC_GROUP_MAP,
+    normalize_geologic_group,
+    are_geologic_groups_compatible,
     ISRM_SCALE,
     OFFICIAL_34_COLUMNS,
     MANDATORY_PLT_COLUMNS,
@@ -503,8 +506,16 @@ class PltRegularesValidator:
             else:
                 if fecha_dt > today:
                     reg_err("Fecha", "CAT_PLT_FECHA_FUTURA", f"Fecha de ensayo '{fecha_dt}' es posterior a la fecha actual ({today}).")
-                if campana_int and fecha_dt.year != campana_int:
-                    reg_err("Fecha", "CAT_PLT_FECHA_DISCORDANTE_CAMPANA", f"Año de la fecha ({fecha_dt.year}) no coincide con la Campaña ({campana_int}).", val=clean_str(fecha_raw))
+                if campana_int:
+                    # Tolerancia de 1 mes hacia el año siguiente (ej. perforado a fin de año y ensayado en enero)
+                    within_tolerance = (
+                        fecha_dt.year == campana_int or
+                        (fecha_dt.year == campana_int + 1 and fecha_dt.month == 1)
+                    )
+                    if not within_tolerance:
+                        reg_err("Fecha", "CAT_PLT_FECHA_DISCORDANTE_CAMPANA",
+                                f"Año de la fecha ({fecha_dt.year}-{fecha_dt.month:02d}) no coincide con la Campaña ({campana_int}) superando la tolerancia de 1 mes.",
+                                val=clean_str(fecha_raw), sev="ADVERTENCIA")
 
             # --- 2. Corridas y Tramos ---
             c_desde_f = to_float(c_desde_raw)
@@ -620,16 +631,23 @@ class PltRegularesValidator:
             tipo_lito_str = strip_accents(clean_str(tipo_lito_raw).upper())
             if not tipo_lito_str:
                 reg_err("Tipo litológico", "CAT_CAMPO_OBLIGATORIO_VACIO", "Tipo litológico es obligatorio y se encuentra vacío.")
+            else:
+                norm_tipo_lito = normalize_geologic_group(tipo_lito_str)
+                if norm_tipo_lito not in CANONICAL_GEOLOGIC_GROUP_MAP.values():
+                    reg_err("Tipo litológico", "CAT_PLT_TIPO_LITOLOGICO_INVALIDO",
+                            f"Tipo litológico '{tipo_lito_raw}' no pertenece a los grupos geológicos admitidos.",
+                            sev="ALERTA")
 
             # Resolución canónica de Factor K y Grupo Geológico
             exp_grupo, exp_k = resolve_expected_k_and_type(lito1_str, lito2_str, lito3_str)
 
             if exp_grupo and tipo_lito_str:
-                exp_grupo_clean = strip_accents(exp_grupo).upper()
-                if not (exp_grupo_clean in tipo_lito_str or tipo_lito_str in exp_grupo_clean):
-                    reg_err("Tipo litológico", "CAT_PLT_TIPO_LITOLOGICO_INCONGRUENTE",
-                            f"Tipo litológico '{tipo_lito_raw}' no coincide con el grupo oficial '{exp_grupo}' para esta roca.",
-                            sev="ADVERTENCIA")
+                norm_tipo_lito = normalize_geologic_group(tipo_lito_str)
+                if norm_tipo_lito in CANONICAL_GEOLOGIC_GROUP_MAP.values():
+                    if not are_geologic_groups_compatible(norm_tipo_lito, exp_grupo):
+                        reg_err("Tipo litológico", "CAT_PLT_TIPO_LITOLOGICO_INCONGRUENTE",
+                                f"Tipo litológico '{tipo_lito_raw}' no coincide con el grupo oficial '{exp_grupo}' para esta roca.",
+                                sev="ADVERTENCIA")
 
             # --- 6. Ensayo Físico ---
             p_f = to_float(p_raw)

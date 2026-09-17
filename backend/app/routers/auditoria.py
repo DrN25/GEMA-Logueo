@@ -83,6 +83,8 @@ def simplify_message(msg):
     if "CLASIFICACIÓN DE RELLENO" in msg_up or "CLASIFICACION DE RELLENO" in msg_up:
         return "Clasificación de Relleno en RMR no coincide con el código esperado."
     if "PRESENCIA DE AGUA EN RMR" in msg_up:
+        if "TABLA DE PROFUNDIDAD" in msg_up or "CÓDIGO ESPERADO" in msg_up or "CODIGO ESPERADO" in msg_up or "ESPERADO" in msg_up:
+            return "Presencia de Agua en RMR no coincide con la tabla de profundidad teórica."
         return "Presencia de Agua en RMR difiere de las observaciones de LGG."
     
     # 0. Regla DEP_VACIA (Campo erróneo debido a dependencias vacías o mal calculadas)
@@ -105,6 +107,8 @@ def simplify_message(msg):
     if "CORRIDA EN VALIDACIÓN RMR" in msg_up or "CORRIDA EN VALIDACION RMR" in msg_up or ("RMR" in msg_up and "CORRIDA" in msg_up and "NO COINCIDE" in msg_up):
         return "Corrida en Validación RMR no coincide con ninguna corrida registrada en LGG."
     if "PRESENCIA DE AGUA EN RMR" in msg_up or "PRESENCIA DE AGUA" in msg_up:
+        if "TABLA DE PROFUNDIDAD" in msg_up or "CÓDIGO ESPERADO" in msg_up or "CODIGO ESPERADO" in msg_up or "ESPERADO" in msg_up:
+            return "Presencia de Agua en RMR no coincide con la tabla de profundidad teórica."
         return "Presencia de Agua en RMR difiere de las observaciones de LGG."
     if "INCOMPATIBILIDAD DE LITOLOGÍA ENTRE LA CORRIDA Y LA JUNTA" in msg_up or "INCOMPATIBILIDAD DE LITOLOGIA ENTRE LA CORRIDA Y LA JUNTA" in msg_up or ("INCOMPATIBILIDAD" in msg_up and "LITOLOG" in msg_up and "JUNTA" in msg_up):
         return "Incompatibilidad de litología entre la corrida y la junta."
@@ -172,6 +176,8 @@ def simplify_message(msg):
         return "El valor de FRF no coincide con el calculado por la fórmula."
 
     # 6. Inconsistencias físicas de metraje (RQD, LRF y Recuperada)
+    if "SUMA DE FRAGMENTOS" in msg_up or "SUMA DE FRAGMENTOS FÍSICOS" in msg_up or "SUMA DE FRAGMENTOS FISICOS" in msg_up:
+        return "La suma de fragmentos físicos supera el avance perforado."
     if "RQD" in msg_up and "RECUPERADA" in msg_up:
         return "Metraje RQD es mayor que la longitud recuperada."
     if "LRF" in msg_up and "RECUPERADA" in msg_up:
