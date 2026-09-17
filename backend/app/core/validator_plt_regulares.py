@@ -336,7 +336,6 @@ class PltRegularesValidator:
 
         # Indexar intervalos por taladro para chequear solapamientos/cruces
         intervals_by_dh = defaultdict(list)
-        p_measurements_by_group = defaultdict(list)
 
         for idx in range(total_rows):
             r = df.iloc[idx]
@@ -380,14 +379,6 @@ class PltRegularesValidator:
                     "muestra": m_clean, "from": f_val, "to": t_val
                 })
 
-            # 3. Agrupación para medición repetitiva
-            if t_clean and fecha_str and p_val is not None and d_val is not None:
-                p_group_key = (t_clean, fecha_str, round(p_val, 2), round(d_val, 1))
-                p_measurements_by_group[p_group_key].append({
-                    "row_num": row_num, "campana": c_key, "taladro": t_key,
-                    "muestra": m_clean, "from": f_val, "to": t_val, "p": p_val, "d": d_val
-                })
-
         # 3. Tramos que se cruzan o montan dentro de cada taladro
         for dh, items in intervals_by_dh.items():
             items_sorted = sorted(items, key=lambda x: x["from"])
@@ -400,15 +391,6 @@ class PltRegularesValidator:
                                 curr["from"], curr["to"], "From", "CAT_PLT_TRAMOS_CRUZADOS",
                                 f"El tramo [{curr['from']:.2f} - {curr['to']:.2f} m] se cruza con la muestra anterior {prev['muestra']} [{prev['from']:.2f} - {prev['to']:.2f} m] de la fila {prev['row_num']}.",
                                 sev_override="ALERTA", valor_actual=m_clean)
-
-        # 4. Carga de ensayo repetida continuamente (posible copia de datos)
-        for (dh, f_str, p_k, d_k), p_list in p_measurements_by_group.items():
-            if len(p_list) >= 4 and (p_k == round(p_k)):  # Si se repite 4+ veces un entero redondo
-                for it in p_list:
-                    add_anomaly(it["row_num"], it["campana"], it["taladro"], it["muestra"],
-                                it["from"], it["to"], "P instr (kN)", "CAT_PLT_CARGA_REPETIDA",
-                                f"Carga P={it['p']:.2f} kN repetida de forma idéntica en {len(p_list)} muestras seguidas el día {f_str} (revisar posible copia de datos).",
-                                sev_override="ADVERTENCIA", valor_actual=f"P={it['p']:.2f} kN")
 
         # Indexar LGG por taladro si está activo el modo cruzado
         lgg_by_dh = {}
@@ -507,14 +489,14 @@ class PltRegularesValidator:
                 if fecha_dt > today:
                     reg_err("Fecha", "CAT_PLT_FECHA_FUTURA", f"Fecha de ensayo '{fecha_dt}' es posterior a la fecha actual ({today}).")
                 if campana_int:
-                    # Tolerancia de 1 mes hacia el año siguiente (ej. perforado a fin de año y ensayado en enero)
+                    # Tolerancia de 12 meses hacia el año siguiente (ej. perforado a fin de año y ensayado entre enero y marzo)
                     within_tolerance = (
                         fecha_dt.year == campana_int or
-                        (fecha_dt.year == campana_int + 1 and fecha_dt.month == 1)
+                        (fecha_dt.year == campana_int + 1 and fecha_dt.month <= 12)
                     )
                     if not within_tolerance:
                         reg_err("Fecha", "CAT_PLT_FECHA_DISCORDANTE_CAMPANA",
-                                f"Año de la fecha ({fecha_dt.year}-{fecha_dt.month:02d}) no coincide con la Campaña ({campana_int}) superando la tolerancia de 1 mes.",
+                                f"Año de la fecha ({fecha_dt.year}-{fecha_dt.month:02d}) no coincide con la Campaña ({campana_int}) superando la tolerancia de 12 meses.",
                                 val=clean_str(fecha_raw), sev="ADVERTENCIA")
 
             # --- 2. Corridas y Tramos ---
