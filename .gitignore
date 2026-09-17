@@ -3,6 +3,8 @@ docs/
 *.rar
 *.7z
 
+__pycache__
+
 # Archivos pesados y de usuario
 backend/uploads/
 Sistema/backend/uploads/
