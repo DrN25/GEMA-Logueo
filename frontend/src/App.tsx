@@ -698,7 +698,7 @@ export default function App() {
   // estaba en una vista de edicion y existe un taladro guardado.
   // En la vista 'dashboard', NUNCA se auto-selecciona ningun taladro de fondo.
   useEffect(() => {
-    if (currentView === 'dashboard') return;
+    if (currentView === 'dashboard' || currentView === 'revision') return;
     if (!activeTaladro && taladros.length > 0) {
       const savedTaladroName = localStorage.getItem('geolog_active_taladro_name');
       if (savedTaladroName) {
@@ -1920,10 +1920,10 @@ export default function App() {
         />
 
         {/* Screen Content Wrapper - Cambiado a overflow-hidden porque los scrolls se manejan internamente */}
-        <div className="flex-1 p-6 relative flex flex-col overflow-hidden">
+        <div className={`flex-1 ${currentView === 'revision' ? 'p-0' : 'p-6'} relative flex flex-col overflow-hidden`}>
 
-          {/* 1. Dashboard Principal (Solo se desmonta si no hay taladro activo) */}
-          {(!activeTaladro || currentView === 'dashboard') && (
+          {/* 1. Dashboard Principal (Solo se muestra en 'dashboard' o si no hay taladro activo y no es 'revision') */}
+          {((!activeTaladro && currentView !== 'revision') || currentView === 'dashboard') && (
             <div className="flex-1 flex flex-col min-h-0 overflow-y-auto">
               <MainDashboard
                 taladros={paginatedTaladros}
@@ -2111,7 +2111,7 @@ export default function App() {
           )}
 
           {currentView === 'revision' && (
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
               <AuditoriaHub apiBase={API_BASE} />
             </div>
           )}

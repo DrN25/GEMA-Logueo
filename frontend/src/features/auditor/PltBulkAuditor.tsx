@@ -10,12 +10,40 @@ import PltKpiMetrics from './components/PltKpiMetrics';
 import PltConsolidatedDeviations from './components/PltConsolidatedDeviations';
 import PltDistributionBreakdown from './components/PltDistributionBreakdown';
 import PltAnomaliesViewer from './components/PltAnomaliesViewer';
+import AuditYearSelector, { ALL_AUDIT_YEARS } from './components/AuditYearSelector';
 
 interface PltBulkAuditorProps {
     apiBase: string;
+    selectedYears?: string[];
+    onSelectedYearsChange?: (years: string[]) => void;
 }
 
-export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
+export default function PltBulkAuditor({
+    apiBase,
+    selectedYears: propSelectedYears,
+    onSelectedYearsChange
+}: PltBulkAuditorProps) {
+    const [internalYears, setInternalYears] = useState<string[]>(() => {
+        const saved = localStorage.getItem('gema_selected_audit_years');
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            } catch {}
+        }
+        return ALL_AUDIT_YEARS;
+    });
+
+    const activeYears = propSelectedYears !== undefined ? propSelectedYears : internalYears;
+    const setActiveYears = (years: string[]) => {
+        if (onSelectedYearsChange) {
+            onSelectedYearsChange(years);
+        } else {
+            setInternalYears(years);
+            localStorage.setItem('gema_selected_audit_years', JSON.stringify(years));
+        }
+    };
+
     const [status, setStatus] = useState<'idle' | 'uploading' | 'processing' | 'loaded' | 'error'>(() => {
         const saved = localStorage.getItem('gema_plt_bulk_auditor_status');
         return (saved as any) || 'idle';
@@ -71,12 +99,18 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
         }
     }, []);
 
-    // Actualizar datos al cambiar filtros
+    // Actualizar datos al cambiar filtros o campañas seleccionadas
     useEffect(() => {
         if (status === 'loaded' || selectedAuditId) {
             fetchPaginatedIncidencias(1);
         }
-    }, [filterTipo, filterCampania, filterTaladro, selectedRuleCode, filterSearch]);
+    }, [filterTipo, filterCampania, filterTaladro, selectedRuleCode, filterSearch, activeYears]);
+
+    useEffect(() => {
+        if (status === 'loaded' && selectedAuditId) {
+            fetchKpisAndIncidencias();
+        }
+    }, [activeYears]);
 
     const fetchHistory = async () => {
         try {
@@ -93,7 +127,10 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
     const fetchKpisAndIncidencias = async () => {
         setLoadingTable(true);
         try {
-            const campParam = filterCampania || "";
+            const isAll = activeYears.length === ALL_AUDIT_YEARS.length;
+            const campParam = isAll
+                ? (filterCampania || "")
+                : (activeYears.length > 0 ? activeYears.join(",") : "NONE");
             const kpiUrl = `${apiBase}/api/auditoria/plt/resumen-ligero?audit_id=${selectedAuditId}&campania=${campParam}`;
             const resKpi = await fetch(kpiUrl);
             if (resKpi.ok) {
@@ -117,7 +154,13 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
             params.append('limit', '50');
             if (selectedAuditId) params.append('audit_id', selectedAuditId);
             if (filterTipo) params.append('tipo_incidencia', filterTipo);
-            if (filterCampania) params.append('campania', filterCampania);
+
+            const isAll = activeYears.length === ALL_AUDIT_YEARS.length;
+            const campParam = isAll
+                ? (filterCampania || "")
+                : (activeYears.length > 0 ? activeYears.join(",") : "NONE");
+            if (campParam) params.append('campania', campParam);
+
             if (filterTaladro) params.append('taladro', filterTaladro);
             if (selectedRuleCode) params.append('rule_code', selectedRuleCode);
             if (filterSearch) params.append('search', filterSearch);
@@ -199,7 +242,11 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
     const handleDownloadExcel = async () => {
         setIsDownloading(true);
         try {
-            const url = `${apiBase}/api/auditoria/plt/reporte-excel${selectedAuditId ? `?audit_id=${selectedAuditId}` : ''}`;
+            const isAll = activeYears.length === ALL_AUDIT_YEARS.length;
+            const campParam = isAll
+                ? (filterCampania || "")
+                : (activeYears.length > 0 ? activeYears.join(",") : "");
+            const url = `${apiBase}/api/auditoria/plt/reporte-excel?audit_id=${selectedAuditId}${campParam ? `&campania=${campParam}` : ''}`;
             const res = await fetch(url);
             if (!res.ok) throw new Error('No se pudo descargar el reporte Excel.');
 
@@ -207,7 +254,8 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
             const downloadUrl = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = downloadUrl;
-            a.download = `Reporte_Auditoria_PLT_Regulares_${selectedAuditId || 'latest'}.xlsx`;
+            const tag = isAll ? (selectedAuditId || 'latest') : `${selectedAuditId || 'latest'}_${activeYears.join('-')}`;
+            a.download = `Reporte_Auditoria_PLT_Regulares_${tag}.xlsx`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -328,6 +376,13 @@ export default function PltBulkAuditor({ apiBase }: PltBulkAuditorProps) {
             {/* Panel Principal cuando hay datos cargados */}
             {kpis && (
                 <>
+                    {/* Selector de Años / Campañas a Auditar */}
+                    <AuditYearSelector
+                        selectedYears={activeYears}
+                        onYearsChange={setActiveYears}
+                        title="Campañas de Perforación Evaluadas:"
+                    />
+
                     {/* Tarjetas KPI */}
                     <PltKpiMetrics
                         kpis={kpis}

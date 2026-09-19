@@ -12,12 +12,19 @@ import KpiMetrics from './components/KpiMetrics';
 import ConsolidatedDeviations from './components/ConsolidatedDeviations';
 import DistributionBreakdown from './components/DistributionBreakdown';
 import AnomaliesViewer from './components/AnomaliesViewer';
+import AuditYearSelector, { ALL_AUDIT_YEARS } from './components/AuditYearSelector';
 
 interface BulkAuditorProps {
   apiBase: string;
+  selectedYears?: string[];
+  onSelectedYearsChange?: (years: string[]) => void;
 }
 
-export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
+export default function BulkAuditor({
+  apiBase,
+  selectedYears: propSelectedYears,
+  onSelectedYearsChange
+}: BulkAuditorProps) {
 
 
   // Lifted state initialized from localStorage for persistence
@@ -59,7 +66,26 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
   const [filterSearch, setFilterSearch] = useState<string>('');
 
   // Interactive filters
-  const [selectedYears, setSelectedYears] = useState<string[]>([]);
+  const [internalYears, setInternalYears] = useState<string[]>(() => {
+    const saved = localStorage.getItem('gema_selected_audit_years');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch {}
+    }
+    return ALL_AUDIT_YEARS;
+  });
+
+  const selectedYears = propSelectedYears !== undefined ? propSelectedYears : internalYears;
+  const setSelectedYears = (years: string[]) => {
+    if (onSelectedYearsChange) {
+      onSelectedYearsChange(years);
+    } else {
+      setInternalYears(years);
+      localStorage.setItem('gema_selected_audit_years', JSON.stringify(years));
+    }
+  };
   const [selectedObservation, setSelectedObservation] = useState<string | null>(null);
   const [isConsolidatedExpanded, setIsConsolidatedExpanded] = useState<boolean>(false);
 
@@ -148,7 +174,9 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
 
   const pollResumen = async (auditId: string) => {
     try {
-      const yearParam = selectedYears.length > 0 ? selectedYears.join(",") : "TODOS";
+      const yearParam = selectedYears.length === ALL_AUDIT_YEARS.length
+        ? "TODOS"
+        : (selectedYears.length > 0 ? selectedYears.join(",") : "NONE");
       const res = await fetch(`${apiBase}/api/logueo/resumen-ligero?audit_id=${auditId}&years=${yearParam}`);
       if (res.ok) {
         if (res.status === 202) {
@@ -227,7 +255,9 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
   const fetchKpisAndIncidencias = async () => {
     setLoadingTable(true);
     try {
-      const yearParam = selectedYears.length > 0 ? selectedYears.join(",") : "TODOS";
+      const yearParam = selectedYears.length === ALL_AUDIT_YEARS.length
+        ? "TODOS"
+        : (selectedYears.length > 0 ? selectedYears.join(",") : "NONE");
       const kpiUrl = `${apiBase}/api/logueo/resumen-ligero?audit_id=${selectedAuditId}&years=${yearParam}`;
 
       const resKpi = await fetch(kpiUrl);
@@ -252,10 +282,12 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
       if (filterTipo) queryParams.append('tipo', filterTipo);
       if (filterCelda) queryParams.append('celda', filterCelda);
 
-      if (selectedYears.length > 0) {
+      if (selectedYears.length === ALL_AUDIT_YEARS.length) {
+        if (filterCampania) queryParams.append('campania', filterCampania);
+      } else if (selectedYears.length > 0) {
         queryParams.append('campania', selectedYears.join(","));
-      } else if (filterCampania) {
-        queryParams.append('campania', filterCampania);
+      } else {
+        queryParams.append('campania', "NONE");
       }
 
       if (filterGeotecnico) queryParams.append('geotecnico', filterGeotecnico);
@@ -354,7 +386,7 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
     setFilterCampania('');
     setFilterGeotecnico('');
     setFilterSearch('');
-    setSelectedYears([]);
+    setSelectedYears(ALL_AUDIT_YEARS);
     setSelectedObservation(null);
   };
 
@@ -371,7 +403,9 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
 
   const handleExportMarkdown = () => {
     if (!selectedAuditId) return;
-    const yearParam = selectedYears.length > 0 ? selectedYears.join(",") : "TODOS";
+    const yearParam = selectedYears.length === ALL_AUDIT_YEARS.length
+      ? "TODOS"
+      : (selectedYears.length > 0 ? selectedYears.join(",") : "NONE");
     window.open(`${apiBase}/api/logueo/reporte-markdown?audit_id=${selectedAuditId}&years=${yearParam}`, '_blank');
   };
 
@@ -559,35 +593,11 @@ export default function BulkAuditor({ apiBase }: BulkAuditorProps) {
               </div>
 
               {/* SELECTOR CAMPANAS */}
-              {kpis.distribucion_campania && kpis.distribucion_campania.length > 0 && (
-                <div className="flex flex-wrap items-center gap-1.5 bg-slate-950 border border-navy-900 rounded-xl p-1">
-                  <span className="text-xs font-extrabold text-slate-500 uppercase tracking-widest px-2">Campañas:</span>
-                  <button
-                    onClick={() => setSelectedYears([])}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all ${selectedYears.length === 0 ? 'bg-cyan-500 text-slate-950 shadow-[0_0_10px_rgba(6,182,212,0.2)]' : 'bg-navy-900/60 text-slate-400 hover:text-slate-200'
-                      }`}
-                  >
-                    Todas
-                  </button>
-                  {uniqueYears.map(yr => {
-                    const isSelected = selectedYears.includes(yr);
-                    return (
-                      <button
-                        key={yr}
-                        onClick={() => {
-                          setSelectedYears(prev =>
-                            prev.includes(yr) ? prev.filter(y => y !== yr) : [...prev, yr]
-                          );
-                        }}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all ${isSelected ? 'bg-cyan-500 text-slate-950 shadow-[0_0_10px_rgba(6,182,212,0.2)]' : 'bg-navy-900/60 text-slate-400 hover:text-slate-200'
-                          }`}
-                      >
-                        {yr}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+              <AuditYearSelector
+                selectedYears={selectedYears}
+                onYearsChange={setSelectedYears}
+                title="Campañas DDH:"
+              />
             </div>
 
             {/* BOTONES ACCION CABECERA */}

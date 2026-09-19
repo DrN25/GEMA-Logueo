@@ -8,7 +8,8 @@ import io
 import json
 import shutil
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Any
+from collections import defaultdict, Counter
 import pandas as pd
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Query, BackgroundTasks
 from fastapi.responses import StreamingResponse, FileResponse, JSONResponse
@@ -45,18 +46,51 @@ def _pregenerate_plt_excel(diag: dict, excel_out_path: str, public_out_path: str
         print(f"[QAQC PLT] [ERROR PRE-GENERACIÓN] Error al generar Excel: {e}")
 
 
+def _matches_campaign(val: Any, target_camps: list) -> bool:
+    if val is None:
+        return False
+    s = str(val).strip().upper()
+    if s in target_camps:
+        return True
+    try:
+        f = float(s)
+        if str(int(round(f))).upper() in target_camps:
+            return True
+    except (ValueError, TypeError):
+        pass
+    return False
+
+
 def _build_compact_metrics(diag: dict, campania_filter: Optional[str] = None) -> dict:
-    """Construye las métricas compactas y KPIs para el dashboard."""
+    """Construye las métricas compactas y KPIs para el dashboard, con soporte multi-campaña."""
     anomalies = diag.get("anomalies") or diag.get("incidencias") or []
     
     # Aplicar filtro de campaña si se especifica
-    if campania_filter and campania_filter.strip().upper() not in ("", "TODAS", "NONE", "NULL"):
+    if campania_filter and campania_filter.strip().upper() not in ("", "TODAS", "NONE", "NULL", "TODOS", "ALL"):
         camps = [c.strip().upper() for c in campania_filter.split(",") if c.strip()]
-        filtered_anomalies = [a for a in anomalies if str(a.get("campana", "")).strip().upper() in camps]
+        filtered_anomalies = [a for a in anomalies if _matches_campaign(a.get("campana"), camps)]
     else:
+        camps = []
         filtered_anomalies = anomalies
 
-    total_rows = diag.get("total_rows", 0)
+    if camps:
+        total_rows = sum(
+            c_stats.get("total", 0)
+            for camp_name, c_stats in diag.get("campaign_stats", {}).items()
+            if _matches_campaign(camp_name, camps)
+        )
+        if total_rows == 0 and filtered_anomalies:
+            total_rows = len(filtered_anomalies)
+        camp_row_errs = set(a.get("row_index") for a in filtered_anomalies if a.get("row_index") is not None)
+        invalid_rows = len(camp_row_errs)
+        valid_rows = max(0, total_rows - invalid_rows)
+        quality_index = round(valid_rows / max(1, total_rows) * 100.0, 2)
+    else:
+        total_rows = diag.get("total_rows", 0)
+        valid_rows = diag.get("valid_rows", 0)
+        invalid_rows = diag.get("invalid_rows", 0)
+        quality_index = diag.get("quality_index", 100.0)
+
     severity_counts = {"ALERTA": 0, "ADVERTENCIA": 0, "VACIO": 0}
     category_counts = {}
     drillholes_affected = set()
@@ -86,6 +120,8 @@ def _build_compact_metrics(diag: dict, campania_filter: Optional[str] = None) ->
     # Distribución por campaña
     dist_camp = []
     for camp_name, c_stats in sorted(diag.get("campaign_stats", {}).items()):
+        if camps and not _matches_campaign(camp_name, camps):
+            continue
         dist_camp.append({
             "campania": camp_name,
             "registros": c_stats.get("total", 0),
@@ -97,19 +133,43 @@ def _build_compact_metrics(diag: dict, campania_filter: Optional[str] = None) ->
 
     # Top 5 taladros
     worst_drillholes = []
-    for dh_name, dh_data in sorted(diag.get("drillhole_stats", {}).items(), key=lambda x: (x[1].get("alertas", 0) + x[1].get("vacios", 0)), reverse=True)[:5]:
-        worst_drillholes.append({
-            "taladro": dh_name,
-            "total_muestras": dh_data.get("total", 0),
-            "alertas": dh_data.get("alertas", 0),
-            "advertencias": dh_data.get("advertencias", 0),
-            "vacios": dh_data.get("vacios", 0),
-            "salud_pct": round(max(0.0, (dh_data.get("total", 0) - (dh_data.get("alertas", 0) + dh_data.get("vacios", 0))) / max(1, dh_data.get("total", 1)) * 100.0), 2)
-        })
-
-    valid_rows = diag.get("valid_rows", 0)
-    invalid_rows = diag.get("invalid_rows", 0)
-    total_taladros = len(diag.get("drillhole_stats", {}))
+    if camps:
+        dh_stats = defaultdict(lambda: {"total": 0, "alertas": 0, "advertencias": 0, "vacios": 0})
+        for a in filtered_anomalies:
+            dh = a.get("taladro")
+            if not dh:
+                continue
+            sev = a.get("severity", "ALERTA")
+            if sev == "ALERTA":
+                dh_stats[dh]["alertas"] += 1
+            elif sev == "VACIO":
+                dh_stats[dh]["vacios"] += 1
+            elif sev == "ADVERTENCIA":
+                dh_stats[dh]["advertencias"] += 1
+        for dh, st in dh_stats.items():
+            st["total"] = diag.get("drillhole_stats", {}).get(dh, {}).get("total", st["alertas"] + st["vacios"] + st["advertencias"])
+        for dh_name, dh_data in sorted(dh_stats.items(), key=lambda x: (x[1].get("alertas", 0) + x[1].get("vacios", 0)), reverse=True)[:5]:
+            tot = max(1, dh_data.get("total", 1))
+            worst_drillholes.append({
+                "taladro": dh_name,
+                "total_muestras": dh_data.get("total", 0),
+                "alertas": dh_data.get("alertas", 0),
+                "advertencias": dh_data.get("advertencias", 0),
+                "vacios": dh_data.get("vacios", 0),
+                "salud_pct": round(max(0.0, (dh_data.get("total", 0) - (dh_data.get("alertas", 0) + dh_data.get("vacios", 0))) / tot * 100.0), 2)
+            })
+        total_taladros = len(dh_stats)
+    else:
+        for dh_name, dh_data in sorted(diag.get("drillhole_stats", {}).items(), key=lambda x: (x[1].get("alertas", 0) + x[1].get("vacios", 0)), reverse=True)[:5]:
+            worst_drillholes.append({
+                "taladro": dh_name,
+                "total_muestras": dh_data.get("total", 0),
+                "alertas": dh_data.get("alertas", 0),
+                "advertencias": dh_data.get("advertencias", 0),
+                "vacios": dh_data.get("vacios", 0),
+                "salud_pct": round(max(0.0, (dh_data.get("total", 0) - (dh_data.get("alertas", 0) + dh_data.get("vacios", 0))) / max(1, dh_data.get("total", 1)) * 100.0), 2)
+            })
+        total_taladros = len(diag.get("drillhole_stats", {}))
 
     return {
         "total_registros_evaluados": total_rows,
@@ -117,7 +177,7 @@ def _build_compact_metrics(diag: dict, campania_filter: Optional[str] = None) ->
         "registros_con_incidencias": invalid_rows,
         "total_taladros_evaluados": total_taladros,
         "taladros_afectados": len(drillholes_affected),
-        "integridad_global_pct": diag.get("quality_index", 100.0),
+        "integridad_global_pct": quality_index,
         "total_alertas": severity_counts.get("ALERTA", 0),
         "total_advertencias": severity_counts.get("ADVERTENCIA", 0),
         "total_vacios": severity_counts.get("VACIO", 0),
@@ -318,9 +378,9 @@ def get_plt_paginated_incidencias(
         items = [i for i in items if str(i.get("severity", "")).strip().upper() == tipo_incidencia.strip().upper()]
 
     # Filtrar por campaña
-    if campania and campania.strip().upper() not in ("", "TODAS", "ALL"):
+    if campania and campania.strip().upper() not in ("", "TODAS", "ALL", "TODOS"):
         camps = [c.strip().upper() for c in campania.split(",") if c.strip()]
-        items = [i for i in items if str(i.get("campana", "")).strip().upper() in camps]
+        items = [i for i in items if _matches_campaign(i.get("campana"), camps)]
 
     # Filtrar por taladro
     if taladro and taladro.strip():
@@ -366,9 +426,33 @@ def get_plt_paginated_incidencias(
 
 @router.get("/auditoria/plt/reporte-excel")
 def download_plt_excel_report(
-    audit_id: Optional[str] = Query(None)
+    audit_id: Optional[str] = Query(None),
+    campania: Optional[str] = Query(None)
 ):
-    """Sirve el archivo Excel pre-generado de auditoría PLT."""
+    """Sirve o genera el archivo Excel de auditoría PLT, con soporte para filtrar por campañas."""
+    camps = [c.strip().upper() for c in campania.split(",") if c.strip()] if (campania and campania.strip().upper() not in ("", "TODAS", "ALL", "TODOS")) else []
+    diag_path = os.path.join(plt_history_dir, f"{audit_id}_diag.json") if audit_id else LATEST_PLT_DIAG
+
+    if camps and os.path.exists(diag_path):
+        try:
+            with open(diag_path, "r", encoding="utf-8") as f:
+                diag = json.load(f)
+            filtered_diag = dict(diag)
+            filtered_diag["anomalies"] = [a for a in (diag.get("anomalies") or []) if _matches_campaign(a.get("campana"), camps)]
+            filtered_diag["incidencias"] = filtered_diag["anomalies"]
+            filtered_diag["unique_samples_plt"] = [s for s in (diag.get("unique_samples_plt") or []) if _matches_campaign(s.get("campana"), camps)]
+            
+            camps_tag = "_".join(camps[:3]) + (f"_y_{len(camps)-3}_mas" if len(camps) > 3 else "")
+            gen_path = os.path.join(plt_history_dir, f"{audit_id or 'latest'}_reporte_{camps_tag}.xlsx")
+            export_plt_regulares_to_excel(filtered_diag, gen_path)
+            return FileResponse(
+                gen_path,
+                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                filename=f"Reporte_Auditoria_PLT_{camps_tag}.xlsx"
+            )
+        except Exception as e:
+            print(f"[QAQC PLT] Error al generar reporte filtrado: {e}")
+
     target_file = None
     if audit_id:
         p1 = os.path.join(plt_history_dir, f"{audit_id}_reporte.xlsx")

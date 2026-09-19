@@ -11,7 +11,7 @@ from openpyxl.utils import get_column_letter
 import time
 from datetime import datetime
 from collections import Counter, defaultdict
-from typing import Optional
+from typing import Optional, Any, List
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks, Form
 from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
@@ -1484,6 +1484,21 @@ def listar_auditorias():
                 pass
     return sorted(audits, key=lambda x: x["fecha"], reverse=True)
 
+def _is_year_match(val: Any, target_years: list) -> bool:
+    if val is None:
+        return False
+    s = str(val).strip()
+    if s in target_years:
+        return True
+    try:
+        f = float(s)
+        if str(int(round(f))) in target_years:
+            return True
+    except (ValueError, TypeError):
+        pass
+    return False
+
+
 @router.get("/logueo/resumen-ligero")
 def obtener_resumen_ligero(audit_id: str = None, years: str = None):
     if audit_id:
@@ -1522,12 +1537,14 @@ def obtener_resumen_ligero(audit_id: str = None, years: str = None):
         
     incidencias = diag.get("incidencias", [])
     
-    if years and years != "TODOS" and years != "":
+    if years and years not in ("TODOS", "TODAS", "ALL", ""):
         years_list = [y.strip() for y in years.split(",") if y.strip()]
-        incidencias = [i for i in incidencias if str(i.get("campania")) in years_list]
+        incidencias = [i for i in incidencias if _is_year_match(i.get("campania"), years_list)]
         resumen_celdas_raw = diag.get("resumen_por_celda_padre", {})
-        resumen_celdas = {k: v for k, v in resumen_celdas_raw.items() if str(v.get("campania")) in years_list}
+        resumen_celdas = {k: v for k, v in resumen_celdas_raw.items() if _is_year_match(v.get("campania"), years_list)}
         total_filas = sum(safe_int(diag.get("distribucion_filas_campana", {}).get(y, 0)) for y in years_list)
+        if total_filas == 0 and incidencias:
+            total_filas = len(set(f"{i.get('modulo', '')}_{i.get('fila_excel', '')}" for i in incidencias))
     else:
         resumen_celdas = diag.get("resumen_por_celda_padre", {})
         total_filas = diag.get("total_filas_procesadas", 0)
@@ -1698,9 +1715,9 @@ def obtener_incidencias_paginadas(
         incidencias = [i for i in incidencias if i.get("celda_padre") == celda]
     if columna:
         incidencias = [i for i in incidencias if i.get("columna") == columna]
-    if campania:
+    if campania and campania not in ("TODOS", "TODAS", "ALL", ""):
         c_list = [c.strip() for c in campania.split(",") if c.strip()]
-        incidencias = [i for i in incidencias if str(i.get("campania")) in c_list]
+        incidencias = [i for i in incidencias if _is_year_match(i.get("campania"), c_list)]
     if geotecnico:
         incidencias = [i for i in incidencias if i.get("geotecnico") == geotecnico]
     if search:
