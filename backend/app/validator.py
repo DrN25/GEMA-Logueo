@@ -397,19 +397,15 @@ def validate_row_qaqc(data: Dict[str, Any]) -> List[Dict[str, str]]:
 from collections import defaultdict
 
 def find_rmr_sheet_name(sheetnames: list) -> Optional[str]:
-    # 1. Prioridad: hojas de validación RMR
+    # 1. Prioridad: hojas con 'validacion' en el nombre (ej. 'Validación_Logueo', 'Validación_RMR')
     for s in sheetnames:
         norm = normalize_text(s)
-        if norm in ['validacionrmr', 'validacion_rmr', 'bdrmr', 'bd_rmr', 'logueormr', 'logueo_rmr']:
+        if 'validacion' in norm:
             return s
+    # 2. Secundaria: coincidencia con 'rmr', 'bdrmr', 'logueormr' (sin coincidir tablas como rmr76 o rmr89)
     for s in sheetnames:
         norm = normalize_text(s)
-        if 'validacion' in norm and 'rmr' in norm:
-            return s
-    # 2. Secundaria: coincidencia exacta con 'rmr' (sin coincidir tablas de referencia como rmr76 o rmr89)
-    for s in sheetnames:
-        norm = normalize_text(s)
-        if norm == 'rmr':
+        if norm in ['rmr', 'bdrmr', 'bd_rmr', 'logueormr', 'logueo_rmr']:
             return s
     return None
 
@@ -457,6 +453,33 @@ def validate_rmr_sheet_data(
     empty_streak = 0
     current_taladro = None
     total_rmr_filas = 0
+
+    dry_thresh = 75.0
+    nf_thresh = 80.0
+    wb_parent = getattr(ws_rmr, "parent", None)
+    if wb_parent:
+        for sname in wb_parent.sheetnames:
+            if "DATOS" in sname.upper() and "LG" in sname.upper():
+                try:
+                    ws_datos = wb_parent[sname]
+                    for r_chk in ws_datos.iter_rows(max_row=15, values_only=True):
+                        for c_i, val_c in enumerate(r_chk):
+                            t_u = str(val_c or "").strip().upper()
+                            if t_u in ("SECO", "SECO:"):
+                                for c_val in r_chk[c_i+1:c_i+5]:
+                                    try:
+                                        f_val = float(c_val)
+                                        if 0 < f_val < 500: dry_thresh = f_val; break
+                                    except (ValueError, TypeError): pass
+                            if t_u in ("HÚMEDO", "HUMEDO", "HÚMEDO:", "HUMEDO:"):
+                                for c_val in r_chk[c_i+1:c_i+5]:
+                                    try:
+                                        f_val = float(c_val)
+                                        if 0 < f_val < 500: nf_thresh = f_val; break
+                                    except (ValueError, TypeError): pass
+                except Exception:
+                    pass
+                break
 
     for r in range(h_idx + 1, ws_rmr.max_row + 1):
         if r % 500 == 0:
@@ -707,11 +730,15 @@ def validate_rmr_sheet_data(
             if espesor_rel is not None and abs(espesor_rel - lgg_esp) > 0.001:
                 reg_err_rmr("espesor_relleno", espesor_rel, "ALERTA", f"Espesor de relleno en RMR ({espesor_rel}mm) no coincide con LGG ({lgg_esp}mm).")
 
-            # REGLA PRESENCIA DE AGUA SEGÚN NORMA ISRM
+            # REGLA PRESENCIA DE AGUA SEGÚN CRITERIO TEÓRICO Y NORMA ISRM
             pres_agua_code = safe_str(row_dict.get("presencia_agua")).upper().strip()
             if pres_agua_code and pres_agua_code != "-1":
                 if pres_agua_code not in ("CDC", "DPH", "WTM", "DGE", "FGF"):
                     reg_err_rmr("presencia_agua", pres_agua_code, "ALERTA", f"Código de Presencia de Agua en RMR ('{pres_agua_code}') no es válido según norma ISRM.")
+                elif a is not None:
+                    expected_water_code = "CDC" if a < dry_thresh else ("DPH" if a <= nf_thresh else "WTM")
+                    if pres_agua_code != expected_water_code:
+                        reg_err_rmr("presencia_agua", pres_agua_code, "ALERTA", f"Presencia de Agua ({pres_agua_code}) no coincide con tabla teórica (esperado {expected_water_code} según profundidad {a}m).")
 
             # 4. REGLAS RATINGS RMR'76 (SUMA PURA DE SUB-RATINGS REGISTRADOS)
             rmr76_excel = sanitize_val(row_dict.get("rmr76"), float)
@@ -1036,7 +1063,9 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
 
             if rqd_m is not None and lrf_m is not None and small_frag_m is not None:
                 sum_frags = round(rqd_m + lrf_m + small_frag_m, 2)
-                if round(sum_frags, 4) > round(perf, 4):
+                if rec_m is not None and round(sum_frags, 2) > round(rec_m, 2) + 0.02:
+                    registrar_lgg_error("rqd_m", rqd_m, "ALERTA", f"La suma de fragmentos físicos supera la longitud recuperada. Datos evaluados -> Suma: {sum_frags}m (RQD: {rqd_m}m + LRF: {lrf_m}m + <10cm: {small_frag_m}m), Longitud Recuperada: {rec_m}m, Avance de corrida: {perf}m (De: {de}m, A: {a}m).")
+                elif round(sum_frags, 4) > round(perf, 4):
                     registrar_lgg_error("rqd_m", rqd_m, "ALERTA", f"La suma de fragmentos físicos supera el avance perforado. Datos evaluados -> Suma de fragmentos: {sum_frags}m (RQD: {rqd_m}m + LRF: {lrf_m}m + <10cm: {small_frag_m}m), Avance de corrida: {perf}m (De: {de}m, A: {a}m), Longitud Recuperada: {rec_m}m.")
 
         if b30 is not None and b60 is not None and b90 is not None and frac_nat is not None:
@@ -1363,14 +1392,20 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
                     registrar_est_error("azimuth", raw_azimuth, "ALERTA", f"El ángulo Azimut es inválido. Datos evaluados -> Azimut: {azimuth}°. Debe estar entre 0° y 360°.")
 
         matching_run = None
-        if depth is not None:
+        if est_de is not None and est_a is not None:
+            for run in lgg_runs:
+                if run["taladro"] == taladro and abs(run["de"] - est_de) < 0.01 and abs(run["a"] - est_a) < 0.01:
+                    matching_run = run
+                    break
+
+        if matching_run is None and depth is not None:
             for run in lgg_runs:
                 if run["taladro"] == taladro and run["de"] <= depth <= run["a"]:
                     matching_run = run
                     break
 
-            if matching_run is None:
-                registrar_est_error("profundidad", depth, "ALERTA", f"Profundidad huérfana de junta no corresponde a ningún tramo de corrida en LGG. Datos evaluados -> Profundidad de Junta: {depth}m, Taladro: '{taladro}'.")
+        if depth is not None and matching_run is None:
+            registrar_est_error("profundidad", depth, "ALERTA", f"Profundidad huérfana de junta no corresponde a ningún tramo de corrida en LGG. Datos evaluados -> Profundidad de Junta: {depth}m, Taladro: '{taladro}'.")
 
         raw_de = row_dict.get("de")
         if est_de is not None and est_a is not None:
@@ -1470,8 +1505,8 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
             if is_2026:
                 lgg_ori = matching_run.get("linea_orientacion")
                 if lgg_ori == "N":
-                    if (alfa is not None and alfa > 0) or (beta is not None and beta > 0):
-                        registrar_est_error("beta", beta, "ADVERTENCIA", f"Registro de estructura orientada (Alfa={alfa}°, Beta={beta}°) en corrida con línea de orientación 'N' (no orientada).")
+                    if beta is not None and beta >= 0:
+                        registrar_est_error("beta", beta, "ADVERTENCIA", f"Registro de estructura orientada (Beta={beta}°) en corrida con línea de orientación 'N' (no orientada).")
 
             raw_dureza = sanitize_val(row_dict.get("dureza_pared"), str)
             dureza_pared = get_canonical_value(raw_dureza, VALID_STRENGTHS) if raw_dureza is not None else None
@@ -1871,7 +1906,10 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
 
                 if rqd_m is not None and lrf_m is not None and small_frag_m is not None:
                     sum_frags = round(rqd_m + lrf_m + small_frag_m, 2)
-                    if round(sum_frags, 4) > round(perf, 4): reg_err("rqd_m", rqd_m, "ALERTA", f"La suma de fragmentos físicos supera el avance perforado. Datos evaluados -> Suma de fragmentos: {sum_frags}m (RQD: {rqd_m}m + LRF: {lrf_m}m + <10cm: {small_frag_m}m), Avance de corrida: {perf}m (De: {de}m, A: {a}m), Longitud Recuperada: {rec_m}m.")
+                    if rec_m is not None and round(sum_frags, 2) > round(rec_m, 2) + 0.02:
+                        reg_err("rqd_m", rqd_m, "ALERTA", f"La suma de fragmentos físicos supera la longitud recuperada. Datos evaluados -> Suma: {sum_frags}m (RQD: {rqd_m}m + LRF: {lrf_m}m + <10cm: {small_frag_m}m), Longitud Recuperada: {rec_m}m, Avance de corrida: {perf}m (De: {de}m, A: {a}m).")
+                    elif round(sum_frags, 4) > round(perf, 4):
+                        reg_err("rqd_m", rqd_m, "ALERTA", f"La suma de fragmentos físicos supera el avance perforado. Datos evaluados -> Suma de fragmentos: {sum_frags}m (RQD: {rqd_m}m + LRF: {lrf_m}m + <10cm: {small_frag_m}m), Avance de corrida: {perf}m (De: {de}m, A: {a}m), Longitud Recuperada: {rec_m}m.")
 
             if b30 is not None and b60 is not None and b90 is not None and frac_nat is not None:
                 sum_bins = b30 + b60 + b90
@@ -2154,15 +2192,15 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
                         reg_err_est("azimuth", raw_azimuth, "ALERTA", f"El ángulo Azimut es inválido. Datos evaluados -> Azimut: {azimuth}°. Debe estar entre 0° y 360°.")
 
             matching_run = None
-            if depth is not None:
+            if est_de is not None and est_a is not None:
                 for run in lgg_runs:
-                    if run["taladro"] == taladro and run["de"] <= depth <= run["a"]:
+                    if run["taladro"] == taladro and abs(run["de"] - est_de) < 0.01 and abs(run["a"] - est_a) < 0.01:
                         matching_run = run
                         break
 
-            if matching_run is None and est_de is not None and est_a is not None:
+            if matching_run is None and depth is not None:
                 for run in lgg_runs:
-                    if run["taladro"] == taladro and abs(run["de"] - est_de) < 0.001 and abs(run["a"] - est_a) < 0.001:
+                    if run["taladro"] == taladro and run["de"] <= depth <= run["a"]:
                         matching_run = run
                         break
 
@@ -2261,8 +2299,8 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
                 if is_2026:
                     lgg_ori = matching_run.get("linea_orientacion")
                     if lgg_ori == "N":
-                        if (alfa is not None and alfa > 0) or (beta is not None and beta > 0):
-                            reg_err_est("beta", beta, "ADVERTENCIA", f"Registro de estructura orientada (Alfa={alfa}°, Beta={beta}°) en corrida con línea de orientación 'N' (no orientada).")
+                        if beta is not None and beta >= 0:
+                            reg_err_est("beta", beta, "ADVERTENCIA", f"Registro de estructura orientada (Beta={beta}°) en corrida con línea de orientación 'N' (no orientada).")
 
                 if raw_dureza is not None and not dureza_can:
                     reg_err_est("dureza_pared", raw_dureza, "ALERTA", f"Código de Resistencia ISRM no válido. Permitidos: {', '.join(VALID_STRENGTHS)}")

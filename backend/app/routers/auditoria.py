@@ -180,6 +180,8 @@ def simplify_message(msg):
         return "El valor de FRF no coincide con el calculado por la fórmula."
 
     # 6. Inconsistencias físicas de metraje (RQD, LRF y Recuperada)
+    if "SUPERA LA LONGITUD RECUPERADA" in msg_up:
+        return "La suma de fragmentos físicos supera la longitud recuperada."
     if "SUMA DE FRAGMENTOS" in msg_up or "SUMA DE FRAGMENTOS FÍSICOS" in msg_up or "SUMA DE FRAGMENTOS FISICOS" in msg_up:
         return "La suma de fragmentos físicos supera el avance perforado."
     if "RQD" in msg_up and "RECUPERADA" in msg_up:
@@ -210,6 +212,8 @@ def simplify_message(msg):
         return "Código de Meteorización no válido."
     if "TIPO DE RELLENO NO VÁLIDO" in msg_up or "TIPO DE RELLENO NO VALIDO" in msg_up or "TIPO DE RELLENO" in msg_up and "INVALIDO" in msg_up:
         return "Código de Tipo de Relleno no válido."
+    if "PRESENCIA DE AGUA" in msg_up and ("TABLA TEÓRICA" in msg_up or "TABLA TEORICA" in msg_up):
+        return "Presencia de Agua en RMR no coincide con tabla teórica."
     if "PRESENCIA DE AGUA NO VÁLIDO" in msg_up or "PRESENCIA DE AGUA NO VALIDO" in msg_up or "PRESENCIA DE AGUA" in msg_up and "INVALIDO" in msg_up:
         return "Código de Presencia de Agua no válido."
     if "ESTRUCTURA 1 NO VÁLIDO" in msg_up or "ESTRUCTURA 1 NO VALIDO" in msg_up or "ESTRUCTURA 1" in msg_up and "INVALIDO" in msg_up:

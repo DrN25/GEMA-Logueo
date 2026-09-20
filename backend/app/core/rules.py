@@ -49,6 +49,12 @@ MASTER_ERROR_RULES = [
         "group": "LGG"
     },
     {
+        "code": "R106B",
+        "msg": "La suma de fragmentos físicos supera la longitud recuperada.",
+        "severity": "ALERTA",
+        "group": "LGG"
+    },
+    {
         "code": "R107",
         "msg": "La sumatoria de fracturas por buzamiento no coincide con el conteo general.",
         "severity": "ADVERTENCIA",
@@ -591,6 +597,12 @@ MASTER_ERROR_RULES = [
         "msg": "Registro de estructura orientada en corrida no orientada.",
         "severity": "ADVERTENCIA",
         "group": "Estructural"
+    },
+    {
+        "code": "R310",
+        "msg": "Presencia de Agua en RMR no coincide con tabla teórica.",
+        "severity": "ALERTA",
+        "group": "Validación RMR"
     }
 ]
 
