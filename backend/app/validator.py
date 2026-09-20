@@ -4,6 +4,7 @@ import math
 import unicodedata
 import re
 import openpyxl
+from collections import defaultdict
 from typing import List, Dict, Any, Optional
 from app.core.rules import WEATHERING_COMPATIBILITY, MASTER_ERROR_RULES
 from app.core.report_config import CAMPOS_EXTRA_A_CAPTURAR
@@ -38,6 +39,25 @@ VALID_FORMA = {str(x) for x in range(1, 7)}.union({"-1"})
 VALID_ORIENTACION = {"S", "N", "PU", "PT", "PT/PU", "BUENA", "REGULAR", "MALA", "NO APLICA", "NO REGISTRA", "S/O", "-1"}
 VALID_TURNOS = {"TD", "TN", "D", "N", "DIA", "NOCHE"}
 
+def get_sheet_safe(wb, sheet_hint=None, default_keywords=None):
+    """Obtiene una hoja de cálculo sin fallar por discrepancias de mayúsculas o nombres inexactos."""
+    if not wb or not wb.sheetnames:
+        return None
+    if sheet_hint and sheet_hint in wb.sheetnames:
+        return wb[sheet_hint]
+    if sheet_hint:
+        hint_norm = normalize_text(sheet_hint)
+        for s in wb.sheetnames:
+            if normalize_text(s) == hint_norm:
+                return wb[s]
+    if default_keywords:
+        for kw in default_keywords:
+            kw_norm = normalize_text(kw)
+            for s in wb.sheetnames:
+                if kw_norm in normalize_text(s):
+                    return wb[s]
+    return wb[wb.sheetnames[0]]
+
 LGG_PATTERNS = {
     "corrida": ["corrida", "id", "numcorrida"],
     "taladro": ["taladro", "sondaje", "drillhole", "holeid", "taladroid"],
@@ -45,7 +65,7 @@ LGG_PATTERNS = {
     "a": ["a", "hasta", "am", "hastam", "to", "depthto"],
     "perf": ["perf", "perforacion", "longitudperforada", "longperforada", "avance"],
     "rec_m": ["longitudrecuperadam", "recuperacionm", "recm", "recupm", "recuperacion", "recuperada", "longitudrecuperada", "longitudrecuperdadam", "longitudrecuperdada"],
-    "rqd_m": ["rqdm", "rqd", "rqdmfragmentos10cm", "frag10cmm", "sumfrags10cm", "rqdsumfrags10cmm", "fragmentos10cmm", "frags10cmm", "fragmayorigual10cmm", "sumfrag10cm", "fragsmayor10cmm", "fragmayor10cmm", "rqdsumfragsmayorigual10cmm", "sumfragsmayorigual10cmm"],
+    "rqd_m": ["rqdm", "rqd", "rqdmfragmentos10cm", "frag10cmm", "sumfrags10cm", "rqdsumfrags10cmm", "fragmentos10cmm", "frags10cmm", "fragmayorigual10cmm", "sumfrag10cm", "fragsmayor10cmm", "fragmayor10cmm", "rqdsumfragsmayorigual10cmm", "sumfragsmayorigual10cmm", "sumfragsmayor10cmm"],
     "lrf_m": ["longitudrocafracturadam", "lrfm", "lrf", "longitudrocafracturada", "rocafracturadam", "rocafracturada"],
     "small_frag_m": ["sumfrags10cmquenoentranalrqd", "smallfragm", "smallfrag", "sumfrags10cmquenoentranalrqdm", "frags10cmquenoentranalrqdm", "fragmenor10cmm", "fragmentosmenores10cm", "fragmenores10cm", "sumfragsmenor10cmquenoentranalrqdm"],
     "sum_frags_total": ["sumrqdlrfsumfragsmenor10cm", "sumrqdlrfsumfrags10cm", "sumrqdlrfsmallfrag", "sumrqdlrfsumfrags10cmm"],
@@ -156,11 +176,11 @@ SURVEY_PATTERNS = {
 }
 
 FALLBACK_LGG_MAP = {
-    "corrida": 1, "taladro": 2, "de": 3, "a": 4, "rec_m": 5, "rqd_m": 6, "lrf_m": 7, "small_frag_m": 8,
+    "corrida": 1, "taladro": 2, "de": 3, "a": 4, "rec_m": 5, "rqd_m": 6, "lrf_m": 7, "frf": 8,
     "frac_nat": 9, "lito1": 10, "lito2": 11, "lito3": 12, "resistencia": 13, "tipo_est1": 14, "tipo_est2": 15,
     "frac_buz30": 16, "frac_buz60": 17, "frac_buz90": 18, "abertura": 19, "rugosidad": 20, "jrc10": 21,
     "intemperismo": 22, "relleno1": 23, "relleno2": 24, "espesor": 25, "agua_obs": 26, "geologo": 27,
-    "comentarios": 28, "campana": 29, "frf": 30
+    "comentarios": 28, "campana": 29
 }
 
 FALLBACK_LGG_MAP_2026 = {
@@ -844,6 +864,7 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
 
     incidencias = []
     lgg_runs = []
+    lgg_runs_by_taladro = defaultdict(list)
     
     total_lgg_filas = 0
     unique_lgg_runs = []
@@ -1222,7 +1243,7 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
         elif espesor == 0 and abertura > 0 and relleno1 not in [None, "-1"]:
             registrar_lgg_error("espesor", espesor, "ADVERTENCIA", f"La abertura de junta es mayor a 0mm pero no se ha registrado espesor de relleno. Datos evaluados -> Abertura de Junta: {abertura}mm, Espesor: {espesor}mm (Tipo Relleno: '{relleno1}').")
 
-        lgg_runs.append({
+        run_entry = {
             "taladro": taladro, "de": de, "a": a, "corrida": corrida_num,
             "resistencia": resistencia,
             "lito1": safe_str(row_dict.get("lito1")),
@@ -1243,7 +1264,9 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
             "tipo_est1": tipo_est1 if 'tipo_est1' in locals() else row_dict.get("tipo_est1"),
             "linea_orientacion": str(row_dict.get("linea_orientacion")).strip().upper() if row_dict.get("linea_orientacion") else None,
             "proyecto": safe_str(row_dict.get("proyecto"))
-        })
+        }
+        lgg_runs.append(run_entry)
+        lgg_runs_by_taladro[taladro].append(run_entry)
 
         unique_lgg_runs.append({
             "fila_excel": r,
@@ -1391,16 +1414,17 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
                 if azimuth < 0.0 or azimuth > 360.0:
                     registrar_est_error("azimuth", raw_azimuth, "ALERTA", f"El ángulo Azimut es inválido. Datos evaluados -> Azimut: {azimuth}°. Debe estar entre 0° y 360°.")
 
+        taladro_runs = lgg_runs_by_taladro.get(taladro, [])
         matching_run = None
         if est_de is not None and est_a is not None:
-            for run in lgg_runs:
-                if run["taladro"] == taladro and abs(run["de"] - est_de) < 0.01 and abs(run["a"] - est_a) < 0.01:
+            for run in taladro_runs:
+                if abs(run["de"] - est_de) < 0.01 and abs(run["a"] - est_a) < 0.01:
                     matching_run = run
                     break
 
         if matching_run is None and depth is not None:
-            for run in lgg_runs:
-                if run["taladro"] == taladro and run["de"] <= depth <= run["a"]:
+            for run in taladro_runs:
+                if run["de"] <= depth <= run["a"]:
                     matching_run = run
                     break
 
@@ -1410,8 +1434,8 @@ def _validate_logueo_bulk_sheets_core(wb, lgg_sheet: str, est_sheet: str, output
         raw_de = row_dict.get("de")
         if est_de is not None and est_a is not None:
             has_exact_match = False
-            for run in lgg_runs:
-                if run["taladro"] == taladro and abs(run["de"] - est_de) < 0.001 and abs(run["a"] - est_a) < 0.001:
+            for run in taladro_runs:
+                if abs(run["de"] - est_de) < 0.001 and abs(run["a"] - est_a) < 0.001:
                     has_exact_match = True
                     break
             if not has_exact_match:
@@ -1619,6 +1643,7 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
 
     incidencias = []
     lgg_runs = []
+    lgg_runs_by_taladro = defaultdict(list)
     unique_lgg_runs = []
     unique_est_structures = []
     total_lgg_filas = 0
@@ -1664,8 +1689,8 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
                 is_2026 = True
 
     # --- 1. PROCESAR LGG ---
-    if conf_lgg:
-        ws_lgg = wb_main[conf_lgg["sheet"]]
+    ws_lgg = get_sheet_safe(wb_main, conf_lgg.get("sheet") if conf_lgg else None, ["lgg", "general"])
+    if ws_lgg:
         h_idx, l_map = find_header_row_and_mapping(ws_lgg, LGG_PATTERNS)
         lgg_claves_detectadas = set(l_map.keys())
         fallback_lgg = FALLBACK_LGG_MAP_2026 if is_2026 else FALLBACK_LGG_MAP
@@ -1785,7 +1810,7 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
                     "agua_obs", "campana", "geologo", "fecha", "turno", "proyecto"
                 ]
             else:
-                mandatory_lgg = ["corrida", "de", "a", "rec_m", "rqd_m", "lrf_m", "small_frag_m", "frac_nat", "lito1", "resistencia", "tipo_est1", "frac_buz30", "frac_buz60", "frac_buz90", "abertura", "rugosidad", "jrc10", "intemperismo", "relleno1", "espesor", "agua_obs", "campana", "geologo"]
+                mandatory_lgg = ["corrida", "de", "a", "rec_m", "rqd_m", "lrf_m", "frac_nat", "lito1", "resistencia", "tipo_est1", "frac_buz30", "frac_buz60", "frac_buz90", "abertura", "rugosidad", "jrc10", "intemperismo", "relleno1", "espesor", "agua_obs", "campana", "geologo"]
             for key in mandatory_lgg:
                 if key not in l_map: continue
                 val_raw = row_dict.get(key)
@@ -1994,7 +2019,7 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
 
             frf_val = sanitize_val(row_dict.get("frf"), int) if "frf" in l_map else None
 
-            lgg_runs.append({
+            lgg_run_entry = {
                 "taladro": taladro, "de": de, "a": a, "corrida": corrida_num,
                 "resistencia": resistencia,
                 "lito1": safe_str(row_dict.get("lito1")),
@@ -2015,7 +2040,9 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
                 "tipo_est1": tipo_est1 if 'tipo_est1' in locals() else row_dict.get("tipo_est1"),
                 "linea_orientacion": str(row_dict.get("linea_orientacion")).strip().upper() if row_dict.get("linea_orientacion") else None,
                 "proyecto": safe_str(row_dict.get("proyecto"))
-            })
+            }
+            lgg_runs.append(lgg_run_entry)
+            lgg_runs_by_taladro[taladro].append(lgg_run_entry)
             if not row_has_errors: total_ok += 1
 
             unique_lgg_runs.append({
@@ -2036,8 +2063,8 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
 
     # --- 2. PROCESAR ESTRUCTURAL ---
     conf_est = config.get("est")
-    if conf_est:
-        ws_est = wb_main[conf_est["sheet"]]
+    ws_est = get_sheet_safe(wb_main, conf_est.get("sheet") if conf_est else None, ["est"])
+    if ws_est:
         h_idx, e_map = find_header_row_and_mapping(ws_est, EST_PATTERNS)
         est_claves_detectadas = set(e_map.keys())
         fallback_est = FALLBACK_EST_MAP_2026 if is_2026 else FALLBACK_EST_MAP
@@ -2191,16 +2218,17 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
                     if azimuth < 0.0 or azimuth > 360.0:
                         reg_err_est("azimuth", raw_azimuth, "ALERTA", f"El ángulo Azimut es inválido. Datos evaluados -> Azimut: {azimuth}°. Debe estar entre 0° y 360°.")
 
+            taladro_runs = lgg_runs_by_taladro.get(taladro, [])
             matching_run = None
             if est_de is not None and est_a is not None:
-                for run in lgg_runs:
-                    if run["taladro"] == taladro and abs(run["de"] - est_de) < 0.01 and abs(run["a"] - est_a) < 0.01:
+                for run in taladro_runs:
+                    if abs(run["de"] - est_de) < 0.01 and abs(run["a"] - est_a) < 0.01:
                         matching_run = run
                         break
 
             if matching_run is None and depth is not None:
-                for run in lgg_runs:
-                    if run["taladro"] == taladro and run["de"] <= depth <= run["a"]:
+                for run in taladro_runs:
+                    if run["de"] <= depth <= run["a"]:
                         matching_run = run
                         break
 
@@ -2211,8 +2239,8 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
             raw_a = row_dict.get("a")
             if est_de is not None and est_a is not None:
                 has_exact_match = False
-                for run in lgg_runs:
-                    if run["taladro"] == taladro and abs(run["de"] - est_de) < 0.001 and abs(run["a"] - est_a) < 0.001:
+                for run in taladro_runs:
+                    if abs(run["de"] - est_de) < 0.001 and abs(run["a"] - est_a) < 0.001:
                         has_exact_match = True
                         break
                 if not has_exact_match:
@@ -2344,11 +2372,11 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
 
     # --- 2.5. PROCESAR HOJA RMR (SI EXISTE) ---
     conf_rmr = config.get("rmr")
-    rmr_sheet_name = conf_rmr["sheet"] if conf_rmr else find_rmr_sheet_name(wb_main.sheetnames)
+    rmr_hint = conf_rmr.get("sheet") if conf_rmr else None
+    ws_rmr = get_sheet_safe(wb_main, rmr_hint, ["rmr", "validacion"]) if (rmr_hint or find_rmr_sheet_name(wb_main.sheetnames)) else None
     total_rmr_filas = 0
     total_sin_informacion = 0
-    if rmr_sheet_name and rmr_sheet_name in wb_main.sheetnames:
-        ws_rmr = wb_main[rmr_sheet_name]
+    if ws_rmr:
         custom_rmr_map = conf_rmr.get("mappings") if conf_rmr else None
         r_counters = {"total_ok": 0, "total_vacios": 0, "total_sin_informacion": 0, "total_advertencias": 0, "total_alertas": 0}
         total_rmr_filas = validate_rmr_sheet_data(ws_rmr, lgg_runs, resumen_celdas, incidencias, r_counters, custom_map=custom_rmr_map, collector=collector)
@@ -2360,37 +2388,39 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
 
     # --- 3. PROCESAR COLLAR PARA EOH ---
     conf_col = config.get("collar")
-    if wb_col and conf_col:
-        ws_col = wb_col[conf_col["sheet"]]
-        h_idx, c_map = find_header_row_and_mapping(ws_col, COLLAR_PATTERNS)
-        
-        print(f"[*] Escaneando Collar. Fila {h_idx + 1} a {ws_col.max_row}", flush=True)
-        for r in range(h_idx + 1, ws_col.max_row + 1):
-            row_dict, _ = get_row_dict(ws_col, r, c_map)
-            t_val = row_dict.get("taladro")
-            e_val = row_dict.get("eoh")
-            if not t_val: continue
+    if wb_col:
+        ws_col = get_sheet_safe(wb_col, conf_col.get("sheet") if conf_col else None, ["collar", "hoja1"])
+        if ws_col:
+            h_idx, c_map = find_header_row_and_mapping(ws_col, COLLAR_PATTERNS)
             
-            t_str = safe_str(t_val)
-            e_float = safe_float(sanitize_val(e_val, float))
-            eoh_collar[t_str] = e_float
+            print(f"[*] Escaneando Collar. Fila {h_idx + 1} a {ws_col.max_row}", flush=True)
+            for r in range(h_idx + 1, ws_col.max_row + 1):
+                row_dict, _ = get_row_dict(ws_col, r, c_map)
+                t_val = row_dict.get("taladro")
+                e_val = row_dict.get("eoh")
+                if not t_val: continue
+                
+                t_str = safe_str(t_val)
+                e_float = safe_float(sanitize_val(e_val, float))
+                eoh_collar[t_str] = e_float
 
     # --- 4. PROCESAR SURVEY PARA DEPTH ---
     conf_sur = config.get("survey")
-    if wb_sur and conf_sur:
-        ws_sur = wb_sur[conf_sur["sheet"]]
-        h_idx, s_map = find_header_row_and_mapping(ws_sur, SURVEY_PATTERNS)
-        
-        print(f"[*] Escaneando Survey. Fila {h_idx + 1} a {ws_sur.max_row}", flush=True)
-        for r in range(h_idx + 1, ws_sur.max_row + 1):
-            row_dict, _ = get_row_dict(ws_sur, r, s_map)
-            t_val = row_dict.get("taladro")
-            d_val = row_dict.get("depth")
-            if not t_val: continue
+    if wb_sur:
+        ws_sur = get_sheet_safe(wb_sur, conf_sur.get("sheet") if conf_sur else None, ["survey", "trayectoria", "hoja1"])
+        if ws_sur:
+            h_idx, s_map = find_header_row_and_mapping(ws_sur, SURVEY_PATTERNS)
             
-            t_str = safe_str(t_val)
-            d_float = safe_float(sanitize_val(d_val, float))
-            max_survey[t_str] = max(max_survey.get(t_str, 0.0), d_float)
+            print(f"[*] Escaneando Survey. Fila {h_idx + 1} a {ws_sur.max_row}", flush=True)
+            for r in range(h_idx + 1, ws_sur.max_row + 1):
+                row_dict, _ = get_row_dict(ws_sur, r, s_map)
+                t_val = row_dict.get("taladro")
+                d_val = row_dict.get("depth")
+                if not t_val: continue
+                
+                t_str = safe_str(t_val)
+                d_float = safe_float(sanitize_val(d_val, float))
+                max_survey[t_str] = max(max_survey.get(t_str, 0.0), d_float)
 
     # --- 5. CRUCE CUÁDRUPLE (REGLA CRÍTICA DE PROFUNDIDAD FINAL) ---
     taladros_procesados = set(list(max_lgg.keys()) + list(max_est.keys()))

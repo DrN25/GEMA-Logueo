@@ -433,7 +433,12 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
         cell.border = border_thin
 
     r_camp = 11
-    for row in compact.get("distribucion_campania", []):
+    dist_camp = compact.get("distribucion_campania", [])
+    if isinstance(dist_camp, dict):
+        dist_camp = [{"campania": str(k), "discontinuidades": v, "alertas_cant": 0, "alertas_pct": 0, "vacios_cant": 0, "vacios_pct": 0} for k, v in dist_camp.items()]
+    for row in (dist_camp or []):
+        if not isinstance(row, dict):
+            continue
         ws_dash.cell(row=r_camp, column=2, value=row.get("campania")).font = font_bold
         ws_dash.cell(row=r_camp, column=2).alignment = alignment_center
         
@@ -471,7 +476,12 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
         cell.alignment = alignment_center
         cell.border = border_thin
 
-    for row in compact.get("distribucion_geotecnico", []):
+    dist_geo = compact.get("distribucion_geotecnico", [])
+    if isinstance(dist_geo, dict):
+        dist_geo = [{"geotecnico": str(k), "discontinuidades": v, "alertas_cant": 0, "alertas_pct": 0, "vacios_cant": 0, "vacios_pct": 0} for k, v in dist_geo.items()]
+    for row in (dist_geo or []):
+        if not isinstance(row, dict):
+            continue
         r_sect += 1
         ws_dash.cell(row=r_sect, column=2, value=row.get("geotecnico")).font = font_bold
         ws_dash.cell(row=r_sect, column=2).alignment = alignment_center
@@ -1696,6 +1706,7 @@ def obtener_resumen_ligero(audit_id: str = None, years: str = None):
         "audit_id": audit_id or "default",
         "fecha_auditoria": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "nombre_archivo": os.path.basename(raw_file),
+        "available_years": sorted([str(k) for k in diag.get("distribucion_filas_campana", {}).keys() if str(k) not in ("N/A", "")]),
         "consolidado_observaciones": consolidado_tabla,
         "resumen_por_celda_padre": resumen_celdas,
         "familia1": {
@@ -2033,6 +2044,7 @@ def run_revision_audit_pipeline(file_paths: dict, config: dict, audit_id: str, o
         compact["audit_id"] = audit_id
         compact["fecha_auditoria"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         compact["nombre_archivo"] = original_filename
+        compact["available_years"] = sorted([str(k) for k in diag.get("distribucion_filas_campana", {}).keys() if str(k) not in ("N/A", "")])
         compact["consolidado_observaciones"] = consolidado_tabla
         
         compact["familia1"] = {

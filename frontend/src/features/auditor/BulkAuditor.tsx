@@ -185,6 +185,15 @@ export default function BulkAuditor({
         }
         const data = await res.json();
 
+        // Check if backend reported an error
+        if (data.status === 'error') {
+          setProcessingAuditId('');
+          stopProcessingPolling();
+          setStatus('error');
+          setMessage(data.message || data.error_detail || 'Error en la validación.');
+          return;
+        }
+
         // Background process finished!
         setProcessingAuditId('');
         stopProcessingPolling();
@@ -203,6 +212,21 @@ export default function BulkAuditor({
       console.warn("Error consultando resumen en polling:", e);
     }
   };
+
+  // Auto-reset year filter if the loaded audit does not match currently selected years
+  useEffect(() => {
+    if (kpis) {
+      const auditYears: string[] = kpis.available_years && Array.isArray(kpis.available_years) && kpis.available_years.length > 0
+        ? kpis.available_years.map(String)
+        : (kpis.distribucion_campania && Array.isArray(kpis.distribucion_campania)
+            ? kpis.distribucion_campania.map((c: any) => String(c.campania))
+            : []);
+
+      if (auditYears.length > 0 && !auditYears.some((y: string) => selectedYears.includes(y))) {
+        setSelectedYears(ALL_AUDIT_YEARS);
+      }
+    }
+  }, [kpis]);
 
   const checkExcelStatus = async (auditId: string) => {
     stopExcelPolling();
@@ -263,6 +287,12 @@ export default function BulkAuditor({
       const resKpi = await fetch(kpiUrl);
       if (resKpi.ok) {
         const data = await resKpi.json();
+        if (data.status === 'error') {
+          setStatus('error');
+          setMessage(data.message || data.error_detail || 'Error cargando auditoría.');
+          setLoadingTable(false);
+          return;
+        }
         setKpis(data);
       }
       await fetchPaginatedIncidencias(1);
