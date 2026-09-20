@@ -35,10 +35,13 @@ export default function SheetSelectModal({
       });
       if (estMatch) setEstSheet(estMatch);
 
-      // Buscar coincidencia inteligente para Validación RMR
+      // Buscar coincidencia inteligente para Validación RMR (Prioridad: 'validacion', secundaria: 'rmr')
       const rmrMatch = sheets.find(s => {
-        const lower = s.toLowerCase();
-        return lower === 'validación_rmr' || lower === 'validacion_rmr' || lower === 'rmr' || lower.includes('rmr') || lower.includes('hoja1');
+        const lower = s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        return lower.includes('validacion');
+      }) || sheets.find(s => {
+        const lower = s.toLowerCase().trim();
+        return lower === 'rmr' || lower === 'bd rmr' || lower === 'bd_rmr' || lower === 'logueo_rmr';
       });
       if (rmrMatch) setRmrSheet(rmrMatch);
     }

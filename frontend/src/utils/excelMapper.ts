@@ -45,6 +45,11 @@ export const EXPECTED_FIELDS: MappingField[] = [
   { key: 'espesor', label: 'Espesor Relleno (mm)', required: false, synonyms: ['espesorrellenomm', 'espesorrelleno', 'espesor', 'espesormm'] },
   { key: 'agua_obs', label: 'Presencia Agua (ISRM)', required: false, synonyms: ['presenciadeaguaisrm', 'presenaguaisrm', 'presenciaagua', 'aguaobs', 'agua'] },
   { key: 'turno', label: 'Turno', required: false, synonyms: ['turno', 'shift'] },
+  { key: 'perf', label: 'Perf. (Avance m)', required: false, synonyms: ['perf', 'perfm', 'perforacion', 'avance', 'avancem'] },
+  { key: 'sum_frags_total', label: "∑ RQD+LRF+Frag's", required: false, synonyms: ['sumrqdlrfsumfrags10cm', 'sumrqdlrfquenoentranalrqdm', 'sumrqdlrffrags10cm', 'rqdlrffrags', 'rqdlrfsumfrags10cm'] },
+  { key: 'sum_frac_nat', label: '∑ Fracturas Natural.', required: false, synonyms: ['sumfracturasnaturales', 'sumfracnat', 'sumfn'] },
+  { key: 'fecha', label: 'Fecha', required: false, synonyms: ['fecha', 'date', 'fechalog'] },
+  { key: 'proyecto', label: 'Proyecto', required: false, synonyms: ['proyecto', 'project', 'proy'] },
   { key: 'comentarios', label: 'Comentarios', required: false, synonyms: ['comentarios', 'comentario', 'observaciones', 'observacion', 'comments'] },
   { key: 'campana', label: 'Campaña / Año', required: false, synonyms: ['campana', 'anio', 'campan', 'campaign', 'year'] }
 ];
@@ -238,10 +243,16 @@ export function processExcelData(
 
 export const EXPECTED_STRUCT_FIELDS: MappingField[] = [
   { key: 'taladro', label: 'Taladro / Sondaje', required: true, synonyms: ['taladro', 'sondaje', 'drillhole', 'holeid', 'taladroid'] },
+  { key: 'de', label: 'Desde / De (m)', required: false, synonyms: ['de', 'desde', 'dem', 'desdem', 'from'] },
+  { key: 'a', label: 'Hasta / A (m)', required: false, synonyms: ['a', 'hasta', 'am', 'hastam', 'to'] },
+  { key: 'corrida', label: 'Corrida (Avance)', required: false, synonyms: ['corrida', 'corridam', 'avance'] },
   { key: 'profundidad', label: 'Profundidad (m)', required: true, synonyms: ['profundidad', 'profundidadm', 'depth', 'depthm', 'prof'] },
+  { key: 'litologia', label: 'Litología', required: false, synonyms: ['litologia', 'lito', 'litho', 'lito1', 'litologia1'] },
   { key: 'tipo_estructura', label: 'Tipo Estructura', required: true, synonyms: ['tipodeestructura', 'tipoestructura', 'tipoest', 'estructura', 'structuretype', 'structtype'] },
   { key: 'alfa', label: 'Alfa (deg)', required: true, synonyms: ['alfa', 'alpha', 'buzamientoalfa', 'alfao', 'alfae'] },
   { key: 'beta', label: 'Beta (deg)', required: false, synonyms: ['beta', 'buzamientobeta', 'betao', 'betae'] },
+  { key: 'dip', label: 'Dip (°) (Tradicional)', required: false, synonyms: ['dip', 'inclinacion', 'dipdeg', 'inc'] },
+  { key: 'azimuth', label: 'Azimut (°) (Tradicional)', required: false, synonyms: ['azimuth', 'azimut', 'azimutm', 'azi', 'azm'] },
   { key: 'forma', label: 'Forma', required: true, synonyms: ['forma', 'shape'] },
   { key: 'rugosidad', label: 'Rugosidad (ISRM)', required: true, synonyms: ['rugosidadisrm', 'rugosidad', 'roughness'] },
   { key: 'jrc10', label: 'JNRC10 / JRC', required: false, synonyms: ['jrc10', 'jnrc10', 'jrc', 'jrc10rugosidad'] },
@@ -253,7 +264,8 @@ export const EXPECTED_STRUCT_FIELDS: MappingField[] = [
   { key: 'dureza_pared', label: 'Dureza Pared (ISRM)', required: false, synonyms: ['durezadepared', 'durezadepareddeestructura', 'durezapared', 'wallstrength', 'dureza'] },
   { key: 'agua', label: 'Presen. Agua (ISRM)', required: false, synonyms: ['presenaguaisrm', 'presenciadeaguaisrm', 'agua', 'aguaobs', 'water'] },
   { key: 'geotecnico', label: 'Geotécnico', required: false, synonyms: ['geotecnico', 'geologo', 'loggedby', 'geotechnician'] },
-  { key: 'comentario', label: 'Comentario / Intervalo', required: false, synonyms: ['comentarios', 'comentario', 'intervalocomentario', 'observacion', 'observaciones', 'remarks'] }
+  { key: 'comentario', label: 'Comentario / Intervalo', required: false, synonyms: ['comentarios', 'comentario', 'intervalocomentario', 'observacion', 'observaciones', 'remarks'] },
+  { key: 'proyecto', label: 'Proyecto', required: false, synonyms: ['proyecto', 'project', 'proy'] }
 ];
 
 export const EXPECTED_RMR_FIELDS: MappingField[] = [

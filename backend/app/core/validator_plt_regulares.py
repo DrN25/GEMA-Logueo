@@ -179,14 +179,16 @@ def extract_lgg_dataframe(lgg_source: Any) -> Optional[pd.DataFrame]:
             else:
                 wb = CalamineWorkbook.from_path(str(lgg_source))
 
-            sheet_name = "BD LGG" if "BD LGG" in wb.sheet_names else wb.sheet_names[0]
+            candidate_sheets = ["BD LGG", "LGG", "BD_LGG", "LOGUEO GENERAL", "BD LG EST", "LG EST.", "ESTRUCTURAL"]
+            sheet_name = next((s for s in candidate_sheets if s in wb.sheet_names), wb.sheet_names[0])
             sheet = wb.get_sheet_by_name(sheet_name)
             raw_rows = sheet.to_python()
         except Exception:
             import openpyxl
             wb_file = io.BytesIO(lgg_source) if isinstance(lgg_source, bytes) else lgg_source
             wb_px = openpyxl.load_workbook(wb_file, data_only=True)
-            sheet_name = "BD LGG" if "BD LGG" in wb_px.sheetnames else wb_px.sheetnames[0]
+            candidate_sheets = ["BD LGG", "LGG", "BD_LGG", "LOGUEO GENERAL", "BD LG EST", "LG EST.", "ESTRUCTURAL"]
+            sheet_name = next((s for s in candidate_sheets if s in wb_px.sheetnames), wb_px.sheetnames[0])
             ws = wb_px[sheet_name]
             raw_rows = [[cell.value for cell in row] for row in ws.iter_rows()]
 

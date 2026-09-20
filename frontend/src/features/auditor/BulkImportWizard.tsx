@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import {
     X, UploadCloud, FileSpreadsheet, Map, Compass,
-    ChevronRight, CheckCircle2, ChevronDown, ChevronUp, AlertCircle, RefreshCw
+    ChevronRight, CheckCircle2, ChevronDown, ChevronUp, AlertCircle, RefreshCw, Layers
 } from 'lucide-react';
 import {
     EXPECTED_FIELDS, EXPECTED_STRUCT_FIELDS, EXPECTED_RMR_FIELDS,
@@ -30,6 +30,7 @@ interface BulkImportWizardProps {
     onConfirm: (payload: {
         files: { lgg_est: File; collar: File | null; survey: File | null };
         config: {
+            formato: '2026' | 'tradicional' | 'auto';
             lgg: { sheet: string; mappings: Record<string, number>; headerRowIdx: number };
             est: { sheet: string; mappings: Record<string, number>; headerRowIdx: number };
             rmr?: { sheet: string; mappings: Record<string, number>; headerRowIdx: number };
@@ -41,6 +42,7 @@ interface BulkImportWizardProps {
 
 export default function BulkImportWizard({ isOpen, onClose, onConfirm }: BulkImportWizardProps) {
     const [step, setStep] = useState<1 | 2 | 3>(1);
+    const [formato, setFormato] = useState<'2026' | 'tradicional' | 'auto'>('2026');
 
     // Estados de Carga para no congelar la UI
     const [loadingFiles, setLoadingFiles] = useState({ LGG_EST: false, COLLAR: false, SURVEY: false });
@@ -64,6 +66,7 @@ export default function BulkImportWizard({ isOpen, onClose, onConfirm }: BulkImp
     useEffect(() => {
         if (!isOpen) {
             setStep(1);
+            setFormato('2026');
             setFileLggEst({ file: null, sheets: [], workbook: null });
             setFileCollar({ file: null, sheets: [], workbook: null });
             setFileSurvey({ file: null, sheets: [], workbook: null });
@@ -93,7 +96,13 @@ export default function BulkImportWizard({ isOpen, onClose, onConfirm }: BulkImp
                         setFileLggEst({ file, sheets, workbook });
                         const lggSheet = sheets.find(s => s.toLowerCase().includes('lgg') || s.toLowerCase().includes('general')) || sheets[0];
                         const estSheet = sheets.find(s => s.toLowerCase().includes('est')) || (sheets.length > 1 ? sheets[1] : sheets[0]);
-                        const rmrSheet = sheets.find(s => s.toLowerCase().includes('rmr') || s.toLowerCase().includes('validacion_rmr'));
+                        const rmrSheet = sheets.find(s => {
+                            const lower = s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                            return lower.includes('validacion');
+                        }) || sheets.find(s => {
+                            const lower = s.toLowerCase().trim();
+                            return lower === 'rmr' || lower === 'bd rmr' || lower === 'bd_rmr' || lower === 'logueo_rmr';
+                        });
 
                         analyzeSheet(workbook, lggSheet, EXPECTED_FIELDS, setMapLgg);
                         analyzeSheet(workbook, estSheet, EXPECTED_STRUCT_FIELDS, setMapEst);
@@ -263,6 +272,87 @@ export default function BulkImportWizard({ isOpen, onClose, onConfirm }: BulkImp
                                 Sube el archivo principal de <strong>Logueo General (LGG), Estructural y Validación RMR</strong>. Opcionalmente, carga los archivos de <strong>Collar</strong> y <strong>Survey</strong> para habilitar las validaciones espaciales cruzadas.
                             </div>
 
+                            {/* SELECTOR DE FORMATO DE PLANILLA */}
+                            <div className="bg-navy-900/40 border border-navy-800 rounded-xl p-4 space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <Layers size={16} className="text-cyan-400" />
+                                        <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">Formato de Plantilla a Auditar:</span>
+                                    </div>
+                                    <span className="text-[11px] font-bold text-cyan-400 font-mono">
+                                        {formato === '2026' ? 'Reglas 2026 activas' : formato === 'tradicional' ? 'Reglas Tradicionales activas' : 'Detección Automática'}
+                                    </span>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                    {/* Opción 1: Formato 2026 */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormato('2026')}
+                                        className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer relative ${
+                                            formato === '2026'
+                                                ? 'bg-cyan-500/10 border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.15)] ring-1 ring-cyan-500/30'
+                                                : 'bg-navy-950/60 border-navy-800 hover:border-slate-700 hover:bg-navy-900/50'
+                                        }`}
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs font-black text-slate-100 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
+                                                Formato 2026
+                                            </span>
+                                            {formato === '2026' && <CheckCircle2 size={15} className="text-cyan-400" />}
+                                        </div>
+                                        <p className="text-[11px] text-slate-400 mt-1.5 leading-snug">
+                                            45 col LGG, 27 col Estructural. Orientación por Línea, Alfa y Beta (sin Dip/Azimut).
+                                        </p>
+                                    </button>
+
+                                    {/* Opción 2: Formato Tradicional */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormato('tradicional')}
+                                        className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer relative ${
+                                            formato === 'tradicional'
+                                                ? 'bg-cyan-500/10 border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.15)] ring-1 ring-cyan-500/30'
+                                                : 'bg-navy-950/60 border-navy-800 hover:border-slate-700 hover:bg-navy-900/50'
+                                        }`}
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs font-black text-slate-100 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-full bg-slate-400"></span>
+                                                Formato Tradicional
+                                            </span>
+                                            {formato === 'tradicional' && <CheckCircle2 size={15} className="text-cyan-400" />}
+                                        </div>
+                                        <p className="text-[11px] text-slate-400 mt-1.5 leading-snug">
+                                            Campañas 2020-2025. Incluye Dip (°) y Azimut (°) estructurales, Lito 1 y Lito 2.
+                                        </p>
+                                    </button>
+
+                                    {/* Opción 3: Detección Automática */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormato('auto')}
+                                        className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer relative ${
+                                            formato === 'auto'
+                                                ? 'bg-cyan-500/10 border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.15)] ring-1 ring-cyan-500/30'
+                                                : 'bg-navy-950/60 border-navy-800 hover:border-slate-700 hover:bg-navy-900/50'
+                                        }`}
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs font-black text-slate-100 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-full bg-indigo-400"></span>
+                                                Detección Automática
+                                            </span>
+                                            {formato === 'auto' && <CheckCircle2 size={15} className="text-cyan-400" />}
+                                        </div>
+                                        <p className="text-[11px] text-slate-400 mt-1.5 leading-snug">
+                                            Identifica el formato automáticamente según los nombres de columna del Excel.
+                                        </p>
+                                    </button>
+                                </div>
+                            </div>
+
                             <div className="grid grid-cols-1 gap-4">
                                 <div
                                     className={`border-2 border-dashed rounded-xl p-6 flex flex-col items-center justify-center text-center transition-all ${loadingFiles.LGG_EST ? 'border-cyan-500/20 bg-cyan-900/10 pointer-events-none' : fileLggEst.file ? 'border-emerald-500/50 bg-emerald-500/5' : 'border-cyan-500/30 hover:border-cyan-500/60 bg-navy-900/20 cursor-pointer'}`}
@@ -334,7 +424,11 @@ export default function BulkImportWizard({ isOpen, onClose, onConfirm }: BulkImp
                                 </p>
                             </div>
 
-                            <div className="bg-navy-900/50 border border-navy-800 rounded-xl p-4 text-left space-y-3 inline-block mx-auto min-w-[300px]">
+                            <div className="bg-navy-900/50 border border-navy-800 rounded-xl p-4 text-left space-y-3 inline-block mx-auto min-w-[320px]">
+                                <div className="flex items-center gap-2 text-sm text-slate-300">
+                                    <CheckCircle2 size={16} className="text-cyan-400" />
+                                    <span>Formato: <span className="font-bold text-slate-100">{formato === '2026' ? 'Formato 2026 (Nuevo)' : formato === 'tradicional' ? 'Formato Tradicional (2020-2025)' : 'Detección Automática'}</span></span>
+                                </div>
                                 <div className="flex items-center gap-2 text-sm text-slate-300">
                                     <CheckCircle2 size={16} className="text-emerald-400" />
                                     <span>Base LGG y Estructural <span className="font-bold text-slate-100">Lista</span></span>
@@ -379,6 +473,7 @@ export default function BulkImportWizard({ isOpen, onClose, onConfirm }: BulkImp
                                 onConfirm({
                                     files: { lgg_est: fileLggEst.file!, collar: fileCollar.file, survey: fileSurvey.file },
                                     config: {
+                                        formato,
                                         lgg: { sheet: mapLgg.sheetName, mappings: mapLgg.mappings, headerRowIdx: mapLgg.headerRowIdx },
                                         est: { sheet: mapEst.sheetName, mappings: mapEst.mappings, headerRowIdx: mapEst.headerRowIdx },
                                         ...(mapRmr.sheetName ? { rmr: { sheet: mapRmr.sheetName, mappings: mapRmr.mappings, headerRowIdx: mapRmr.headerRowIdx } } : {}),

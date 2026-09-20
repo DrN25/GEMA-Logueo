@@ -112,6 +112,10 @@ def simplify_message(msg):
         return "Presencia de Agua en RMR difiere de las observaciones de LGG."
     if "INCOMPATIBILIDAD DE LITOLOGÍA ENTRE LA CORRIDA Y LA JUNTA" in msg_up or "INCOMPATIBILIDAD DE LITOLOGIA ENTRE LA CORRIDA Y LA JUNTA" in msg_up or ("INCOMPATIBILIDAD" in msg_up and "LITOLOG" in msg_up and "JUNTA" in msg_up):
         return "Incompatibilidad de litología entre la corrida y la junta."
+    if "LITOLOGÍA DE JUNTA" in msg_up or "LITOLOGIA DE JUNTA" in msg_up or ("LITOLOG" in msg_up and "JUNTA" in msg_up):
+        return "Litología de junta no coincide con las litologías registradas en LGG para la corrida."
+    if "COMBINACIÓN LITOLÓGICA EN RMR" in msg_up or "COMBINACION LITOLOGICA EN RMR" in msg_up:
+        return "Combinación litológica en RMR no coincide con LGG."
     if "LITOLOGÍA" in msg_up or "LITOLOGIA" in msg_up:
         return "Litología en RMR difiere de Litho 1 en LGG."
     if "ESPESOR DE RELLENO EN RMR" in msg_up:
@@ -255,8 +259,28 @@ def simplify_message(msg):
         return "El ángulo Azimut es inválido. Debe estar entre 0° y 360°."
     if "PROFUNDIDADES FINALES" in msg_up or "COINCIDEN ENTRE MÓDULOS" in msg_up:
         return "Las profundidades finales del taladro no coinciden entre módulos (LGG, Estructural, Collar, Survey)."
-    if "EXCEDE EL LÍMITE FINAL REGISTRADO EN LGG" in msg_up:
+    if "EXCEDE EL LÍMITE FINAL REGISTRADO EN LGG" in msg_up or "EXCEDE EL LIMITE FINAL REGISTRADO EN LGG" in msg_up:
         return "La profundidad en logueo estructural excede el límite final registrado en LGG."
+    if "DISCREPANCIA EN LONGITUD DE AVANCE DE CORRIDA" in msg_up:
+        return "Discrepancia en longitud de avance de corrida (Estructural vs LGG)."
+    if "REGISTRO DE ESTRUCTURA ORIENTADA" in msg_up or "NO ORIENTADA" in msg_up:
+        return "Registro de estructura orientada en corrida con línea de orientación 'N'."
+    if "LÍMITE CRÍTICO DE 1.6M" in msg_up or "LIMITE CRITICO DE 1.6M" in msg_up:
+        return "Longitud de corrida perforada excede el límite crítico de 1.6m."
+    if "LITOLOGÍA DE JUNTA" in msg_up or "LITOLOGIA DE JUNTA" in msg_up:
+        return "Incompatibilidad de litología entre la corrida y la junta."
+    if "SUMA DE FRAGMENTOS" in msg_up and "NO COINCIDE CON RQD" in msg_up:
+        return "La suma de fragmentos no coincide con RQD+LRF+Frag<10cm."
+    if "ÍNDICE R" in msg_up or "INDICE R" in msg_up:
+        return "El índice R no coincide con el código ISRM registrado en Resistencia."
+    if "LÍNEA DE ORIENTACIÓN NO VÁLIDA" in msg_up or "LINEA DE ORIENTACION NO VALIDA" in msg_up:
+        return "Línea de orientación no válida."
+    if "SUMA DE FRACTURAS NATURALES" in msg_up:
+        return "La suma de fracturas naturales no coincide con el número registrado."
+    if "VALOR DE PERF." in msg_up:
+        return "El valor de Perf. no coincide con el avance calculado A - De."
+    if "OFFSET" in msg_up:
+        return "El valor de Offset debe estar entre 0° y 360°."
     if "ENTERO" in msg_up:
         return "El valor del campo debe ser un número entero."
         
@@ -862,10 +886,15 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
             continue
         st = est_by_dh[t_clean]
         st["estructuras"] += 1
+        de_val = st_item.get("de")
+        a_val = st_item.get("a")
         p = st_item.get("profundidad")
-        if p is not None:
-            st["prof_min"] = min(st["prof_min"], float(p))
-            st["prof_max"] = max(st["prof_max"], float(p))
+        d_min = de_val if de_val is not None else p
+        a_max = a_val if a_val is not None else p
+        if d_min is not None:
+            st["prof_min"] = min(st["prof_min"], float(d_min))
+        if a_max is not None:
+            st["prof_max"] = max(st["prof_max"], float(a_max))
         if st["campana"] == "S/C":
             m_c = re.search(r'FE[A-Z]{2}(\d{2})-', t_clean)
             if m_c:
@@ -1171,7 +1200,7 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
 
     return wb
 
-def run_logueo_audit_pipeline(file_path: str, lgg_sheet: str, est_sheet: str, audit_id: str):
+def run_logueo_audit_pipeline(file_path: str, lgg_sheet: str, est_sheet: str, audit_id: str, formato: str = "auto"):
     raw_json_out = os.path.join(history_dir, f"{audit_id}_diagnostico.json")
     compact_json_out = os.path.join(history_dir, f"{audit_id}_compact.json")
     excel_pregenerated_out = os.path.join(history_dir, f"{audit_id}_reporte_completo.xlsx")
@@ -1180,10 +1209,10 @@ def run_logueo_audit_pipeline(file_path: str, lgg_sheet: str, est_sheet: str, au
     t_str = lambda: datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     print(f"[*] [{t_str()}] Inicio de validación geotécnica física y cruzada para el reporte {audit_id}", flush=True)
-    print(f"[*] [{t_str()}] Hojas de trabajo: LGG='{lgg_sheet}', Estructural='{est_sheet}'", flush=True)
+    print(f"[*] [{t_str()}] Hojas de trabajo: LGG='{lgg_sheet}', Estructural='{est_sheet}', Formato='{formato}'", flush=True)
     
     print(f"[*] [{t_str()}] Leyendo y cruzando datos de Excel...", flush=True)
-    validate_logueo_bulk_sheets(file_path, lgg_sheet, est_sheet, raw_json_out)
+    validate_logueo_bulk_sheets(file_path, lgg_sheet, est_sheet, raw_json_out, formato=formato)
     
     elapsed_val = round(time.time() - start_time, 2)
     print(f"[+] [{t_str()}] Finalización de validación y guardado de JSON diagnóstico en ({elapsed_val}s)", flush=True)
@@ -1456,7 +1485,8 @@ async def importar_excel_bulk(
     
     shutil.move(temp_path, file_path)
     
-    background_tasks.add_task(run_logueo_audit_pipeline, file_path, lgg_sheet, est_sheet, audit_id)
+    formato = payload.get("formato", "auto")
+    background_tasks.add_task(run_logueo_audit_pipeline, file_path, lgg_sheet, est_sheet, audit_id, formato)
     return {"status": "procesando", "audit_id": audit_id}
 
 @router.get("/logueo/auditorias")
@@ -1475,6 +1505,7 @@ def listar_auditorias():
                         "audit_id": audit_id,
                         "fecha": meta.get("fecha_auditoria", "Desconocida"),
                         "archivo": meta.get("nombre_archivo", "Desconocido.xlsx"),
+                        "formato": meta.get("formato_evaluado", "2026"),
                         "total_filas": meta.get("familia1", {}).get("total_discontinuidades", 0),
                         "total_vacios": meta.get("familia2", {}).get("total_vacios", 0),
                         "total_advertencias": meta.get("familia2", {}).get("total_advertencias", 0),

@@ -586,8 +586,13 @@ export default function BulkAuditor({
                 </div>
                 <div>
                   <h1 className="text-xs font-black uppercase tracking-widest">Auditoría Geotécnica de Integridad</h1>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Planilla Activa: <span className="font-bold text-slate-100">{kpis?.nombre_archivo || 'Por Defecto'}</span>
+                  <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-2">
+                    <span>Planilla Activa: <span className="font-bold text-slate-100">{kpis?.nombre_archivo || 'Por Defecto'}</span></span>
+                    {kpis?.formato_evaluado && (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-cyan-500/10 border border-cyan-500/30 text-cyan-300">
+                        {kpis.formato_evaluado === '2026' ? 'Formato 2026' : 'Formato Tradicional'}
+                      </span>
+                    )}
                   </p>
                 </div>
               </div>

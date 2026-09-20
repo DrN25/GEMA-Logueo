@@ -512,6 +512,85 @@ MASTER_ERROR_RULES = [
         "msg": "La Longitud de Corrida en RMR debe ser mayor a 0.",
         "severity": "ALERTA",
         "group": "RMR"
+    },
+    # --- FORMATO 2026: REGLAS ADICIONALES LGG Y ESTRUCTURAL ---
+    {
+        "code": "R150",
+        "msg": "Discrepancia en avance reportado vs intervalo perforado.",
+        "severity": "ALERTA",
+        "group": "LGG"
+    },
+    {
+        "code": "R151",
+        "msg": "Discrepancia en suma total de testigos físicos reportada.",
+        "severity": "ALERTA",
+        "group": "LGG"
+    },
+    {
+        "code": "R152",
+        "msg": "La suma de testigos físicos reportada difiere de la longitud recuperada.",
+        "severity": "ALERTA",
+        "group": "LGG"
+    },
+    {
+        "code": "R153",
+        "msg": "Inconsistencia entre índice numérico R y clasificación ISRM.",
+        "severity": "ALERTA",
+        "group": "LGG"
+    },
+    {
+        "code": "R154",
+        "msg": "Valor de línea de orientación no admitido.",
+        "severity": "ALERTA",
+        "group": "LGG"
+    },
+    {
+        "code": "R155",
+        "msg": "Ángulo OFFSET fuera de rango o incongruente con línea de orientación.",
+        "severity": "ALERTA",
+        "group": "LGG"
+    },
+    {
+        "code": "R156",
+        "msg": "Discrepancia en sumatoria reportada de fracturas naturales.",
+        "severity": "ALERTA",
+        "group": "LGG"
+    },
+    {
+        "code": "R157",
+        "msg": "Fecha de logueo geomecánico inválida o futura.",
+        "severity": "ALERTA",
+        "group": "LGG"
+    },
+    {
+        "code": "R158",
+        "msg": "Turno operativo no válido.",
+        "severity": "ADVERTENCIA",
+        "group": "LGG"
+    },
+    {
+        "code": "R159",
+        "msg": "Proyecto no registrado o discrepante entre hojas del mismo sondaje.",
+        "severity": "ALERTA",
+        "group": "General"
+    },
+    {
+        "code": "R220",
+        "msg": "Discrepancia en longitud de avance de corrida en Estructural.",
+        "severity": "ALERTA",
+        "group": "Estructural"
+    },
+    {
+        "code": "R221",
+        "msg": "Número correlativo de Corrida no coincide con la corrida de LGG.",
+        "severity": "ALERTA",
+        "group": "Estructural"
+    },
+    {
+        "code": "R222",
+        "msg": "Registro de estructura orientada en corrida no orientada.",
+        "severity": "ADVERTENCIA",
+        "group": "Estructural"
     }
 ]
 

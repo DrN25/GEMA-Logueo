@@ -4,6 +4,7 @@ export interface AuditHistoryItem {
   audit_id: string;
   fecha: string;
   archivo: string;
+  formato?: string;
   total_filas: number;
   total_vacios: number;
   total_advertencias: number;
@@ -50,9 +51,16 @@ export default function AuditHistory({
                     {audit.total_filas} registros
                   </span>
                 </div>
-                <div className="text-xs text-slate-500 mt-1.5 flex gap-2 font-semibold">
-                  <span>{audit.fecha}</span>
-                  <span className="text-red-400 font-bold">{audit.total_alertas} Alertas</span>
+                <div className="text-xs text-slate-500 mt-1.5 flex items-center justify-between gap-2 font-semibold">
+                  <div className="flex gap-2">
+                    <span>{audit.fecha}</span>
+                    <span className="text-red-400 font-bold">{audit.total_alertas} Alertas</span>
+                  </div>
+                  {audit.formato && (
+                    <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-navy-800 border border-navy-700 text-cyan-400">
+                      {audit.formato === '2026' ? '2026' : 'Trad.'}
+                    </span>
+                  )}
                 </div>
               </button>
             );
