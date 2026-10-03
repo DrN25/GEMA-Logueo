@@ -36,6 +36,11 @@ def simplify_message(msg):
     msg_up = msg_clean.upper()
 
     # --- REGLAS RMR Y CRUCE RMR-LGG ---
+    if "DESCUADRE EN RMR'76" in msg_up or "DESCUADRE EN RMR 76" in msg_up or ("DESCUADRE" in msg_up and "76" in msg_up) or "RMR'76" in msg_up or "RMR 76" in msg_up:
+        return "Descuadre en RMR'76: la suma de sub-ratings registrados no coincide con el total reportado."
+    if "DESCUADRE EN RMR'89" in msg_up or "DESCUADRE EN RMR 89" in msg_up or ("DESCUADRE" in msg_up and "89" in msg_up) or "RMR'89" in msg_up or "RMR 89" in msg_up:
+        return "Descuadre en RMR'89: la suma de sub-ratings registrados no coincide con el total reportado."
+
     if "ESPACIAMIENTO" in msg_up and ("NO COINCIDE CON LA FÓRMULA" in msg_up or "NO COINCIDE CON LA FORMULA" in msg_up or "LONG.CORRIDA" in msg_up):
         return "Espaciamiento de fracturas en RMR no coincide con la fórmula calculada."
     if "COMBINACIÓN LITOLÓGICA EN RMR" in msg_up or "COMBINACION LITOLOGICA EN RMR" in msg_up or ("COMBINACIÓN LITOL" in msg_up and "RMR" in msg_up and "LGG" in msg_up):
