@@ -62,7 +62,7 @@ class ValidationContext:
                 a = run.get("a", 0.0) or 0.0
                 if t not in self.max_lgg_by_taladro or a > self.max_lgg_by_taladro[t]:
                     self.max_lgg_by_taladro[t] = a
-            runs.sort(key=lambda r: (r.get("de", 0.0) or 0.0))
+            runs.sort(key=lambda r: (r.get("_fila_excel", 0) if "_fila_excel" in r else (r.get("de", 0.0) or 0.0)))
 
         if not self.est_by_taladro and self.est_structures:
             for struct in self.est_structures:
@@ -123,8 +123,38 @@ class ValidationContext:
         """Encuentra la corrida de LGG en cuyo intervalo cae una profundidad determinada (de <= depth <= a)."""
         runs = self.lgg_by_taladro.get(taladro, [])
         for r in runs:
-            r_de = r.get("de", 0.0) or 0.0
-            r_a = r.get("a", 0.0) or 0.0
-            if r_de <= depth <= r_a:
+            r_de = r.get("de")
+            r_a = r.get("a")
+            if r_de is not None and r_a is not None and r_de <= depth <= r_a:
                 return r
         return None
+
+    def find_lgg_run_for_structure(self, taladro: str, de: Optional[float], a: Optional[float], depth: Optional[float]) -> Optional[Dict[str, Any]]:
+        """Encuentra la corrida asociada a una estructura según tramo exacto (de/a) o profundidad contenida."""
+        runs = self.lgg_by_taladro.get(taladro, [])
+        if de is not None and a is not None:
+            for r in runs:
+                r_de = r.get("de")
+                r_a = r.get("a")
+                if r_de is not None and r_a is not None:
+                    if abs(r_de - de) < 0.01 and abs(r_a - a) < 0.01:
+                        return r
+        if depth is not None:
+            for r in runs:
+                r_de = r.get("de")
+                r_a = r.get("a")
+                if r_de is not None and r_a is not None:
+                    if r_de <= depth <= r_a:
+                        return r
+        return None
+
+    def has_exact_lgg_run(self, taladro: str, de: float, a: float, tol: float = 0.001) -> bool:
+        """Verifica si existe una corrida con coincidencia estricta en Desde y Hasta."""
+        runs = self.lgg_by_taladro.get(taladro, [])
+        for r in runs:
+            r_de = r.get("de")
+            r_a = r.get("a")
+            if r_de is not None and r_a is not None:
+                if abs(r_de - de) < tol and abs(r_a - a) < tol:
+                    return True
+        return False

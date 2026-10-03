@@ -616,6 +616,484 @@ def validate_rmr_sheet_data(
     r_counters["total_ok"] += (total_rmr_filas - len(rows_with_alert))
     return total_rmr_filas
 
+
+
+def validate_lgg_sheet_data(
+    ws_lgg,
+    is_2026: bool,
+    resumen_celdas: dict,
+    incidencias: list,
+    l_counters: dict,
+    collector: FaltantesCollector = None,
+    filas_por_campana: dict = None,
+    filas_por_geotecnico: dict = None,
+    max_lgg: dict = None
+):
+    """
+    Escanea la hoja LGG, extrae corridas y evalúa las reglas geomecánicas desacopladas (app.core.engine.rules.lgg_rules).
+    """
+    from app.core.engine.context import ValidationContext
+    from app.core.engine.rules.lgg_rules import (
+        LGG_MandatoryFieldsRule,
+        LGG_CatalogsAndFormatsRule,
+        LGG_PhysicalAndGeometricRule,
+        LGG_FracturesAndFRFRule,
+        LGG_GeomechanicalCompatibilityRule
+    )
+
+    h_idx, l_map = find_header_row_and_mapping(ws_lgg, LGG_PATTERNS)
+    lgg_claves_detectadas = set(l_map.keys())
+    fallback_lgg = FALLBACK_LGG_MAP_2026 if is_2026 else FALLBACK_LGG_MAP
+    for k, v in fallback_lgg.items():
+        if k not in l_map:
+            l_map[k] = v
+
+    lgg_extra = [k for k in CAMPOS_EXTRA_A_CAPTURAR["LGG"] if k in lgg_claves_detectadas]
+
+    print(f"[*] Iniciando escaneo de LGG V2. Fila inicial: {h_idx + 1}, Fila máxima: {ws_lgg.max_row}", flush=True)
+
+    lgg_runs = []
+    lgg_runs_by_taladro = defaultdict(list)
+    if max_lgg is None:
+        max_lgg = {}
+    unique_lgg_runs = []
+    empty_streak = 0
+    current_taladro = None
+    total_lgg_filas = 0
+
+    for r in range(h_idx + 1, ws_lgg.max_row + 1):
+        if r % 500 == 0:
+            print(f"  ... [LGG V2] Fila {r} / {ws_lgg.max_row}", flush=True)
+        row_dict, is_empty = get_row_dict(ws_lgg, r, l_map)
+
+        t_val = row_dict.get("taladro")
+        if t_val is not None and str(t_val).strip() != "":
+            current_taladro = safe_str(t_val)
+        else:
+            row_dict["taladro"] = current_taladro
+
+        if is_empty:
+            empty_streak += 1
+            if empty_streak >= 20:
+                print(f"[*] [LGG V2] Freno de emergencia en fila {r}.", flush=True)
+                break
+            continue
+
+        if not current_taladro:
+            continue
+
+        empty_streak = 0
+        total_lgg_filas += 1
+        taladro = current_taladro
+        corrida_num = safe_int(row_dict.get("corrida", 0))
+        camp = sanitize_val(row_dict.get("campana"), int)
+        geo = sanitize_val(row_dict.get("geologo"), str)
+        celda_padre = taladro
+        celda_hija = f"{taladro}-C{corrida_num}"
+
+        if camp and filas_por_campana is not None:
+            filas_por_campana[str(camp)] = filas_por_campana.get(str(camp), 0) + 1
+        if geo and filas_por_geotecnico is not None:
+            filas_por_geotecnico[geo] = filas_por_geotecnico.get(geo, 0) + 1
+
+        if celda_padre not in resumen_celdas:
+            resumen_celdas[celda_padre] = {
+                "total_hijas": 0, "vacios": 0, "advertencias": 0, "alertas": 0,
+                "estado_celda": "OK", "dist_celda": 0.0, "campania": str(camp) if camp else "N/A"
+            }
+
+        resumen_celdas[celda_padre]["total_hijas"] += 1
+
+        de = sanitize_val(row_dict.get("de"), float)
+        a = sanitize_val(row_dict.get("a"), float)
+        rec_m = sanitize_val(row_dict.get("rec_m"), float)
+        rqd_m = sanitize_val(row_dict.get("rqd_m"), float)
+        lrf_m = sanitize_val(row_dict.get("lrf_m"), float)
+        small_frag_m = sanitize_val(row_dict.get("small_frag_m"), float)
+        frac_nat = sanitize_val(row_dict.get("frac_nat"), int)
+        b30 = sanitize_val(row_dict.get("frac_buz30"), int)
+        b60 = sanitize_val(row_dict.get("frac_buz60"), int)
+        b90 = sanitize_val(row_dict.get("frac_buz90"), int)
+        abertura = sanitize_val(row_dict.get("abertura"), float)
+        espesor = sanitize_val(row_dict.get("espesor"), float)
+        jrc10 = safe_int(sanitize_val(row_dict.get("jrc10"), int))
+
+        raw_resistencia = row_dict.get("resistencia")
+        resistencia_can = get_canonical_value(raw_resistencia, VALID_STRENGTHS)
+        resistencia = resistencia_can or "R4"
+
+        raw_intemperismo = row_dict.get("intemperismo")
+        intemperismo_can = get_canonical_value(raw_intemperismo, VALID_WEATHERING)
+        weathering = intemperismo_can or "UWF"
+
+        raw_relleno1 = row_dict.get("relleno1")
+        relleno1 = get_canonical_value(raw_relleno1, VALID_RELLENO)
+
+        tipo_est1_raw = safe_str(sanitize_val(row_dict.get("tipo_est1"), str))
+        tipo_est1_can = get_canonical_value(tipo_est1_raw, VALID_STRUCTURES)
+        tipo_est1 = "JN" if tipo_est1_raw.upper() == "J" else (tipo_est1_can or "JN")
+
+        tipo_est2_raw = safe_str(sanitize_val(row_dict.get("tipo_est2"), str))
+        tipo_est2_can = get_canonical_value(tipo_est2_raw, VALID_STRUCTURES)
+        tipo_est2 = tipo_est2_can or ""
+
+        if a is not None:
+            max_lgg[taladro] = max(max_lgg.get(taladro, 0.0), a)
+            resumen_celdas[celda_padre]["dist_celda"] = max(resumen_celdas[celda_padre]["dist_celda"], a)
+
+        capturar_faltantes_extra(collector, "LGG", row_dict, lgg_extra, r, celda_padre, celda_hija, camp, geo)
+
+        frf_val = sanitize_val(row_dict.get("frf"), int) if "frf" in l_map else None
+
+        lgg_run_entry = {
+            "_fila_excel": r,
+            "_celda_padre": celda_padre,
+            "_celda_hija": celda_hija,
+            "_raw_dict": row_dict,
+            "taladro": taladro, "de": de, "a": a, "corrida": corrida_num,
+            "resistencia": resistencia,
+            "lito1": safe_str(row_dict.get("lito1")),
+            "lito2": safe_str(row_dict.get("lito2")),
+            "lito3": safe_str(row_dict.get("lito3")),
+            "rec_m": rec_m,
+            "rqd_m": rqd_m,
+            "lrf_m": lrf_m,
+            "small_frag_m": small_frag_m,
+            "frac_nat": frac_nat,
+            "frac_buz30": b30,
+            "frac_buz60": b60,
+            "frac_buz90": b90,
+            "frf": frf_val,
+            "abertura": abertura,
+            "rugosidad": row_dict.get("rugosidad"),
+            "jrc10": jrc10,
+            "intemperismo": weathering,
+            "relleno1": relleno1,
+            "espesor": espesor,
+            "tipo_est1": tipo_est1,
+            "tipo_est2": tipo_est2,
+            "linea_orientacion": str(row_dict.get("linea_orientacion")).strip().upper() if row_dict.get("linea_orientacion") else None,
+            "proyecto": safe_str(row_dict.get("proyecto")),
+            "campana": camp,
+            "geologo": geo
+        }
+        lgg_runs.append(lgg_run_entry)
+        lgg_runs_by_taladro[taladro].append(lgg_run_entry)
+
+    # --- EVALUACIÓN DE REGLAS LGG DESACOPLADAS ---
+    ctx = ValidationContext(
+        lgg_runs=lgg_runs,
+        lgg_by_taladro=lgg_runs_by_taladro,
+        is_2026=is_2026,
+        metadata={"lgg_columns": set(l_map.keys()), "skip_lgg_max_advance": True}
+    )
+
+    rows_with_alert = set()
+    lgg_rules = [
+        LGG_MandatoryFieldsRule(),
+        LGG_CatalogsAndFormatsRule(),
+        LGG_PhysicalAndGeometricRule(),
+        LGG_FracturesAndFRFRule(),
+        LGG_GeomechanicalCompatibilityRule()
+    ]
+
+    for rule in lgg_rules:
+        anomalies = rule.evaluate(ctx)
+        for anom in anomalies:
+            incidencias.append({
+                "fila_excel": anom.row_excel,
+                "celda_padre": anom.celda_padre,
+                "celda_hija": anom.celda_hija,
+                "columna": anom.columna,
+                "valor_actual": anom.valor_actual,
+                "tipo_incidencia": anom.severity.value,
+                "mensaje": anom.mensaje,
+                "campania": safe_str(anom.campania) or "N/A",
+                "geotecnico": safe_str(anom.geotecnico) or "N/A",
+                "sector_geotecnico": safe_str(anom.sector_geotecnico) or "N/A",
+                "modulo": anom.modulo
+            })
+            sev_val = anom.severity.value
+            if sev_val == "VACIO":
+                l_counters["total_vacios"] += 1
+                if anom.celda_padre in resumen_celdas:
+                    resumen_celdas[anom.celda_padre]["vacios"] += 1
+            elif sev_val == "SIN_INFORMACION":
+                l_counters["total_sin_informacion"] += 1
+                if anom.celda_padre in resumen_celdas:
+                    if "sin_informacion" not in resumen_celdas[anom.celda_padre]:
+                        resumen_celdas[anom.celda_padre]["sin_informacion"] = 0
+                    resumen_celdas[anom.celda_padre]["sin_informacion"] += 1
+            elif sev_val == "ADVERTENCIA":
+                l_counters["total_advertencias"] += 1
+                if anom.celda_padre in resumen_celdas:
+                    resumen_celdas[anom.celda_padre]["advertencias"] += 1
+            elif sev_val == "ALERTA":
+                l_counters["total_alertas"] += 1
+                if anom.celda_padre in resumen_celdas:
+                    resumen_celdas[anom.celda_padre]["alertas"] += 1
+                if anom.row_excel > 0:
+                    rows_with_alert.add(anom.row_excel)
+
+    l_counters["total_ok"] += (total_lgg_filas - len(rows_with_alert))
+
+    for run in lgg_runs:
+        r = run["_fila_excel"]
+        has_err = r in rows_with_alert
+        de_val = run.get("de")
+        a_val = run.get("a")
+        c_num = run.get("corrida")
+        unique_lgg_runs.append({
+            "fila_excel": r,
+            "taladro": run.get("taladro"),
+            "de": de_val,
+            "a": a_val,
+            "corrida": f"{de_val:.2f} - {a_val:.2f}" if (de_val is not None and a_val is not None) else f"C{c_num}",
+            "longitud": round(a_val - de_val, 2) if (de_val is not None and a_val is not None) else 0.0,
+            "rec_m": run.get("rec_m"),
+            "rqd_m": run.get("rqd_m"),
+            "lito1": run.get("lito1"),
+            "lito2": run.get("lito2"),
+            "lito3": run.get("lito3"),
+            "resistencia": run.get("resistencia"),
+            "estado": "NO CONFORME" if has_err else "CONFORME"
+        })
+
+    return total_lgg_filas, lgg_runs, lgg_runs_by_taladro, max_lgg, unique_lgg_runs
+
+
+def validate_est_sheet_data(
+    ws_est,
+    is_2026: bool,
+    lgg_runs: list,
+    lgg_runs_by_taladro: dict,
+    max_lgg: dict,
+    resumen_celdas: dict,
+    incidencias: list,
+    e_counters: dict,
+    collector: FaltantesCollector = None,
+    max_est: dict = None
+):
+    """
+    Escanea la hoja Estructural, extrae estructuras y evalúa las reglas geomecánicas desacopladas (app.core.engine.rules.est_rules).
+    """
+    from app.core.engine.context import ValidationContext
+    from app.core.engine.rules.est_rules import (
+        Estructural_MandatoryFieldsRule,
+        Estructural_GeometryAndAnglesRule,
+        Estructural_SpatialContainmentRule,
+        Estructural_CrossCheckWithLGGRule
+    )
+
+    h_idx, e_map = find_header_row_and_mapping(ws_est, EST_PATTERNS)
+    est_claves_detectadas = set(e_map.keys())
+    fallback_est = FALLBACK_EST_MAP_2026 if is_2026 else FALLBACK_EST_MAP
+    for k, v in fallback_est.items():
+        if k not in e_map:
+            e_map[k] = v
+
+    est_extra = [k for k in CAMPOS_EXTRA_A_CAPTURAR["Estructural"] if k in est_claves_detectadas]
+
+    print(f"[*] Iniciando escaneo de EST V2. Fila inicial: {h_idx + 1}, Fila máxima: {ws_est.max_row}", flush=True)
+
+    est_structures = []
+    est_by_taladro = defaultdict(list)
+    if max_est is None:
+        max_est = {}
+    unique_est_structures = []
+    empty_streak = 0
+    current_taladro_est = None
+    total_est_filas = 0
+
+    for r in range(h_idx + 1, ws_est.max_row + 1):
+        if r % 500 == 0:
+            print(f"  ... [EST V2] Fila {r} / {ws_est.max_row}", flush=True)
+        row_dict, is_empty = get_row_dict(ws_est, r, e_map)
+
+        t_val = row_dict.get("taladro")
+        if t_val is not None and str(t_val).strip() != "":
+            current_taladro_est = safe_str(t_val)
+        else:
+            row_dict["taladro"] = current_taladro_est
+
+        if is_empty:
+            empty_streak += 1
+            if empty_streak >= 20:
+                print(f"[*] [EST V2] Freno de emergencia en fila {r}.", flush=True)
+                break
+            continue
+
+        if not current_taladro_est:
+            continue
+
+        empty_streak = 0
+        total_est_filas += 1
+        taladro = current_taladro_est
+        celda_padre = taladro
+        celda_hija = f"{taladro}-E{r}"
+
+        if celda_padre not in resumen_celdas:
+            resumen_celdas[celda_padre] = {
+                "total_hijas": 0, "vacios": 0, "advertencias": 0, "alertas": 0,
+                "estado_celda": "OK", "dist_celda": 0.0, "campania": "N/A"
+            }
+
+        resumen_celdas[celda_padre]["total_hijas"] += 1
+
+        depth = sanitize_val(row_dict.get("profundidad"), float)
+        camp = sanitize_val(row_dict.get("campana"), int)
+        geo = sanitize_val(row_dict.get("geotecnico"), str)
+
+        abertura = sanitize_val(row_dict.get("abertura"), float)
+        espesor = sanitize_val(row_dict.get("espesor"), float)
+
+        dip = sanitize_val(row_dict.get("dip"), float)
+        azimuth = sanitize_val(row_dict.get("azimuth"), float)
+
+        est_de = sanitize_val(row_dict.get("de"), float)
+        est_a = sanitize_val(row_dict.get("a"), float)
+
+        alfa = sanitize_val(row_dict.get("alfa"), float)
+        beta = sanitize_val(row_dict.get("beta"), float)
+        jrc10 = sanitize_val(row_dict.get("jrc10"), int)
+
+        raw_forma = sanitize_val(row_dict.get("forma"), str)
+        tipo_est = safe_str(sanitize_val(row_dict.get("tipo_estructura"), str))
+
+        raw_relleno1 = row_dict.get("relleno1")
+        relleno1 = get_canonical_value(raw_relleno1, VALID_RELLENO)
+
+        raw_dureza = sanitize_val(row_dict.get("dureza_pared"), str)
+        dureza_pared = get_canonical_value(raw_dureza, VALID_STRENGTHS) if raw_dureza is not None else None
+
+        est_end = est_a if est_a is not None else depth
+        if est_end is not None:
+            max_est[taladro] = max(max_est.get(taladro, 0.0), est_end)
+
+        if camp:
+            resumen_celdas[celda_padre]["campania"] = str(camp)
+
+        capturar_faltantes_extra(collector, "Estructural", row_dict, est_extra, r, celda_padre, celda_hija, camp, geo)
+
+        est_entry = {
+            "_fila_excel": r,
+            "_celda_padre": celda_padre,
+            "_celda_hija": celda_hija,
+            "_raw_dict": row_dict,
+            "taladro": taladro,
+            "profundidad": depth,
+            "de": est_de,
+            "a": est_a,
+            "alfa": alfa,
+            "beta": beta,
+            "dip": dip,
+            "azimuth": azimuth,
+            "abertura": abertura,
+            "espesor": espesor,
+            "jrc10": jrc10,
+            "forma": raw_forma,
+            "tipo_estructura": tipo_est,
+            "relleno1": relleno1,
+            "dureza_pared": dureza_pared,
+            "campana": camp,
+            "geotecnico": geo,
+            "corrida": row_dict.get("corrida"),
+            "corrida_avance": row_dict.get("corrida_avance"),
+            "lito1": safe_str(row_dict.get("lito1")),
+            "lito2": safe_str(row_dict.get("lito2")),
+            "lito3": safe_str(row_dict.get("lito3")),
+        }
+        est_structures.append(est_entry)
+        est_by_taladro[taladro].append(est_entry)
+
+    # --- EVALUACIÓN DE REGLAS ESTRUCTURAL DESACOPLADAS ---
+    ctx = ValidationContext(
+        lgg_runs=lgg_runs,
+        lgg_by_taladro=lgg_runs_by_taladro,
+        est_structures=est_structures,
+        est_by_taladro=est_by_taladro,
+        is_2026=is_2026,
+        metadata={"est_columns": set(e_map.keys()), "max_lgg": max_lgg}
+    )
+
+    rows_with_alert = set()
+    est_rules = [
+        Estructural_MandatoryFieldsRule(),
+        Estructural_GeometryAndAnglesRule(),
+        Estructural_SpatialContainmentRule(),
+        Estructural_CrossCheckWithLGGRule()
+    ]
+
+    for rule in est_rules:
+        anomalies = rule.evaluate(ctx)
+        for anom in anomalies:
+            incidencias.append({
+                "fila_excel": anom.row_excel,
+                "celda_padre": anom.celda_padre,
+                "celda_hija": anom.celda_hija,
+                "columna": anom.columna,
+                "valor_actual": anom.valor_actual,
+                "tipo_incidencia": anom.severity.value,
+                "mensaje": anom.mensaje,
+                "campania": safe_str(anom.campania) or "N/A",
+                "geotecnico": safe_str(anom.geotecnico) or "N/A",
+                "sector_geotecnico": safe_str(anom.sector_geotecnico) or "N/A",
+                "modulo": anom.modulo
+            })
+            sev_val = anom.severity.value
+            if sev_val == "VACIO":
+                e_counters["total_vacios"] += 1
+                if anom.celda_padre in resumen_celdas:
+                    resumen_celdas[anom.celda_padre]["vacios"] += 1
+            elif sev_val == "SIN_INFORMACION":
+                e_counters["total_sin_informacion"] += 1
+                if anom.celda_padre in resumen_celdas:
+                    if "sin_informacion" not in resumen_celdas[anom.celda_padre]:
+                        resumen_celdas[anom.celda_padre]["sin_informacion"] = 0
+                    resumen_celdas[anom.celda_padre]["sin_informacion"] += 1
+            elif sev_val == "ADVERTENCIA":
+                e_counters["total_advertencias"] += 1
+                if anom.celda_padre in resumen_celdas:
+                    resumen_celdas[anom.celda_padre]["advertencias"] += 1
+            elif sev_val == "ALERTA":
+                e_counters["total_alertas"] += 1
+                if anom.celda_padre in resumen_celdas:
+                    resumen_celdas[anom.celda_padre]["alertas"] += 1
+                if anom.row_excel > 0:
+                    rows_with_alert.add(anom.row_excel)
+
+    e_counters["total_ok"] += (total_est_filas - len(rows_with_alert))
+
+    for s in est_structures:
+        r = s["_fila_excel"]
+        has_err = r in rows_with_alert
+        est_de = s.get("de")
+        est_a = s.get("a")
+        unique_est_structures.append({
+            "fila_excel": r,
+            "taladro": s.get("taladro"),
+            "de": est_de,
+            "a": est_a,
+            "profundidad": s.get("profundidad"),
+            "corrida": f"{est_de:.2f} - {est_a:.2f}" if (est_de is not None and est_a is not None) else (f"C{s.get('corrida')}" if s.get("corrida") else "N/A"),
+            "tipo_est": s.get("tipo_estructura"),
+            "alfa": s.get("alfa"),
+            "beta": s.get("beta"),
+            "dip": s.get("dip") if not is_2026 else None,
+            "azimuth": s.get("azimuth") if not is_2026 else None,
+            "abertura": s.get("abertura"),
+            "espesor": s.get("espesor"),
+            "relleno": s.get("relleno1"),
+            "dureza_pared": s.get("dureza_pared"),
+            "lito1": s.get("lito1"),
+            "lito2": s.get("lito2") if not is_2026 else None,
+            "lito3": s.get("lito3") if not is_2026 else None,
+            "estado": "NO CONFORME" if has_err else "CONFORME"
+        })
+
+    return total_est_filas, unique_est_structures, max_est
+
+
 def validate_logueo_bulk_sheets(file_path: str, lgg_sheet: str, est_sheet: str, output_json_path: str, formato: str = "auto"):
     """
     Función de compatibilidad unificada que delega la ejecución de archivo único al motor V2.
@@ -688,687 +1166,35 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
             if "corrida_avance" in e_map_pre or ("dip" not in e_map_pre and "azimuth" not in e_map_pre and "alfa" in e_map_pre):
                 is_2026 = True
 
-    # --- 1. PROCESAR LGG ---
+
+    # --- 1. PROCESAR LGG (MOTOR DESACOPLADO) ---
     ws_lgg = get_sheet_safe(wb_main, conf_lgg.get("sheet") if conf_lgg else None, ["lgg", "general"])
     if ws_lgg:
-        h_idx, l_map = find_header_row_and_mapping(ws_lgg, LGG_PATTERNS)
-        lgg_claves_detectadas = set(l_map.keys())
-        fallback_lgg = FALLBACK_LGG_MAP_2026 if is_2026 else FALLBACK_LGG_MAP
-        for k, v in fallback_lgg.items():
-            if k not in l_map: l_map[k] = v
+        l_counters = {"total_ok": 0, "total_vacios": 0, "total_sin_informacion": 0, "total_advertencias": 0, "total_alertas": 0}
+        total_lgg_filas, lgg_runs, lgg_runs_by_taladro, max_lgg, unique_lgg_runs = validate_lgg_sheet_data(
+            ws_lgg, is_2026, resumen_celdas, incidencias, l_counters, collector=collector,
+            filas_por_campana=filas_por_campana, filas_por_geotecnico=filas_por_geotecnico, max_lgg=max_lgg
+        )
+        total_vacios += l_counters["total_vacios"]
+        total_sin_informacion += l_counters["total_sin_informacion"]
+        total_advertencias += l_counters["total_advertencias"]
+        total_alertas += l_counters["total_alertas"]
+        total_ok += l_counters["total_ok"]
 
-        lgg_extra = [k for k in CAMPOS_EXTRA_A_CAPTURAR["LGG"] if k in lgg_claves_detectadas]
-            
-        print(f"[*] Iniciando escaneo de LGG V2. Fila inicial: {h_idx + 1}, Fila máxima: {ws_lgg.max_row}", flush=True)
-        
-        empty_streak = 0
-        current_taladro = None
-        
-        for r in range(h_idx + 1, ws_lgg.max_row + 1):
-            if r % 500 == 0: print(f"  ... [LGG V2] Fila {r} / {ws_lgg.max_row}", flush=True)
-            row_dict, is_empty = get_row_dict(ws_lgg, r, l_map)
-            
-            t_val = row_dict.get("taladro")
-            if t_val is not None and str(t_val).strip() != "":
-                current_taladro = safe_str(t_val)
-            else:
-                row_dict["taladro"] = current_taladro
-                
-            if is_empty:
-                empty_streak += 1
-                if empty_streak >= 20:
-                    print(f"[*] [LGG V2] Freno de emergencia en fila {r}.", flush=True)
-                    break
-                continue
-            
-            if not current_taladro: continue
-            
-            empty_streak = 0
-            total_lgg_filas += 1
-            taladro = current_taladro
-            
-            corrida_num = safe_int(row_dict.get("corrida", 0))
-            camp = sanitize_val(row_dict.get("campana"), int)
-            geo = sanitize_val(row_dict.get("geologo"), str)
-            celda_padre = taladro
-            celda_hija = f"{taladro}-C{corrida_num}"
-
-            if camp: filas_por_campana[str(camp)] = filas_por_campana.get(str(camp), 0) + 1
-            if geo: filas_por_geotecnico[geo] = filas_por_geotecnico.get(geo, 0) + 1
-
-            if celda_padre not in resumen_celdas:
-                resumen_celdas[celda_padre] = {"total_hijas": 0, "vacios": 0, "advertencias": 0, "alertas": 0, "estado_celda": "OK", "dist_celda": 0.0, "campania": str(camp) if camp else "N/A"}
-
-            resumen_celdas[celda_padre]["total_hijas"] += 1
-            row_has_errors = False
-
-            def reg_err(col, val, tipo, msg, mod="LGG", hija=celda_hija):
-                nonlocal total_vacios, total_sin_informacion, total_advertencias, total_alertas, row_has_errors
-                incidencias.append({"fila_excel": r, "celda_padre": celda_padre, "celda_hija": hija, "columna": col, "valor_actual": val, "tipo_incidencia": tipo, "mensaje": msg, "campania": str(camp) if camp else "N/A", "geotecnico": geo if geo else "N/A", "sector_geotecnico": "N/A", "modulo": mod})
-                if tipo == "VACIO":
-                    total_vacios += 1
-                    resumen_celdas[celda_padre]["vacios"] += 1
-                elif tipo == "SIN_INFORMACION":
-                    total_sin_informacion += 1
-                    if "sin_informacion" not in resumen_celdas[celda_padre]:
-                        resumen_celdas[celda_padre]["sin_informacion"] = 0
-                    resumen_celdas[celda_padre]["sin_informacion"] += 1
-                elif tipo == "ADVERTENCIA":
-                    total_advertencias += 1
-                    resumen_celdas[celda_padre]["advertencias"] += 1
-                elif tipo == "ALERTA":
-                    total_alertas += 1
-                    resumen_celdas[celda_padre]["alertas"] += 1
-                    row_has_errors = True
-
-            # --- 1. PARSEO Y SANITIZACIÓN INMEDIATA ---
-            de = sanitize_val(row_dict.get("de"), float)
-            a = sanitize_val(row_dict.get("a"), float)
-
-            rec_m = sanitize_val(row_dict.get("rec_m"), float)
-            rqd_m = sanitize_val(row_dict.get("rqd_m"), float)
-            lrf_m = sanitize_val(row_dict.get("lrf_m"), float)
-            small_frag_m = sanitize_val(row_dict.get("small_frag_m"), float)
-
-            frac_nat = sanitize_val(row_dict.get("frac_nat"), int)
-            b30 = sanitize_val(row_dict.get("frac_buz30"), int)
-            b60 = sanitize_val(row_dict.get("frac_buz60"), int)
-            b90 = sanitize_val(row_dict.get("frac_buz90"), int)
-
-            abertura = sanitize_val(row_dict.get("abertura"), float)
-            espesor = sanitize_val(row_dict.get("espesor"), float)
-
-            raw_resistencia = row_dict.get("resistencia")
-            resistencia_can = get_canonical_value(raw_resistencia, VALID_STRENGTHS)
-            resistencia = resistencia_can or "R4"
-
-            raw_intemperismo = row_dict.get("intemperismo")
-            intemperismo_can = get_canonical_value(raw_intemperismo, VALID_WEATHERING)
-            weathering = intemperismo_can or "UWF"
-
-            raw_relleno1 = row_dict.get("relleno1")
-            relleno1_can = get_canonical_value(raw_relleno1, VALID_RELLENO)
-            relleno1 = relleno1_can
-
-            raw_agua_obs = row_dict.get("agua_obs")
-            agua_obs_can = get_canonical_value(raw_agua_obs, VALID_AGUA)
-
-            jrc10 = safe_int(sanitize_val(row_dict.get("jrc10"), int))
-
-            raw_rugosidad = row_dict.get("rugosidad")
-            rugosidad_can = get_canonical_value(raw_rugosidad, VALID_RUGOSITY)
-
-            tipo_est1_raw = safe_str(sanitize_val(row_dict.get("tipo_est1"), str))
-            tipo_est2_raw = safe_str(sanitize_val(row_dict.get("tipo_est2"), str))
-
-            # --- 2. VALIDAR CAMPOS OBLIGATORIOS VACÍOS ---
-            if is_2026:
-                mandatory_lgg = [
-                    "de", "a", "perf", "rec_m", "rqd_m", "lrf_m", "small_frag_m", "sum_frags_total", "frac_nat", "sum_frac_nat", "lito1", 
-                    "resistencia", "linea_orientacion", "tipo_est1", "frac_buz30", "frac_buz60", "frac_buz90", 
-                    "abertura", "rugosidad", "jrc10", "intemperismo", "relleno1", "espesor", 
-                    "agua_obs", "campana", "geologo", "fecha", "turno", "proyecto"
-                ]
-            else:
-                mandatory_lgg = ["corrida", "de", "a", "rec_m", "rqd_m", "lrf_m", "frac_nat", "lito1", "resistencia", "tipo_est1", "frac_buz30", "frac_buz60", "frac_buz90", "abertura", "rugosidad", "jrc10", "intemperismo", "relleno1", "espesor", "agua_obs", "campana", "geologo"]
-            for key in mandatory_lgg:
-                if key not in l_map: continue
-                val_raw = row_dict.get(key)
-                if val_raw is None or str(val_raw).strip() == "":
-                    reg_err(key, None, "VACIO", f"El campo obligatorio '{key}' se encuentra vacío.")
-                elif str(val_raw).strip() in ["-1", "-1.0", "-1,0"]:
-                    reg_err(key, val_raw, "SIN_INFORMACION", f"El campo obligatorio '{key}' no contiene información (-1).")
-
-            capturar_faltantes_extra(collector, "LGG", row_dict, lgg_extra, r, celda_padre, celda_hija, camp, geo)
-
-            # --- 3. VALIDACIÓN DE CATÁLOGOS ---
-            tipo_est1_can = get_canonical_value(tipo_est1_raw, VALID_STRUCTURES)
-            if tipo_est1_raw and not tipo_est1_can:
-                if tipo_est1_raw.upper() == "J":
-                    tipo_est1 = "JN"
-                    reg_err("tipo_est1", "J", "ADVERTENCIA", "Código de estructura 'J' reconocido como 'JN' (Junta).")
-                else:
-                    reg_err("tipo_est1", tipo_est1_raw, "ALERTA", f"Código de estructura 1 no válido. Permitidos: {', '.join(VALID_STRUCTURES)}")
-                    tipo_est1 = "JN"
-            else:
-                tipo_est1 = tipo_est1_can or "JN"
-
-            tipo_est2_can = get_canonical_value(tipo_est2_raw, VALID_STRUCTURES)
-            if tipo_est2_raw and not tipo_est2_can:
-                reg_err("tipo_est2", tipo_est2_raw, "ALERTA", f"Código de estructura 2 no válido. Permitidos: {', '.join(VALID_STRUCTURES)}")
-                tipo_est2 = ""
-            else:
-                tipo_est2 = tipo_est2_can or ""
-
-            # --- 4. REGLAS DE CONSISTENCIA GEOMECÁNICA ---
-            if a is not None:
-                max_lgg[taladro] = max(max_lgg.get(taladro, 0.0), a)
-                resumen_celdas[celda_padre]["dist_celda"] = max(resumen_celdas[celda_padre]["dist_celda"], a)
-
-            raw_de = row_dict.get("de")
-            if de is not None and de < -0.0001:
-                reg_err("de", raw_de, "ALERTA", f"El valor de 'de:' ({de}m) no puede ser negativo.")
-            raw_a = row_dict.get("a")
-            if a is not None and a < -0.0001:
-                reg_err("a", raw_a, "ALERTA", f"El valor de 'a:' ({a}m) no puede ser negativo.")
-            raw_rec = row_dict.get("rec_m")
-            if rec_m is not None and rec_m < -0.0001:
-                reg_err("rec_m", raw_rec, "ALERTA", f"La longitud recuperada ({rec_m}m) no puede ser negativa.")
-            raw_rqd = row_dict.get("rqd_m")
-            if rqd_m is not None and rqd_m < -0.0001:
-                reg_err("rqd_m", raw_rqd, "ALERTA", f"El metraje RQD ({rqd_m}m) no puede ser negativo.")
-            raw_lrf = row_dict.get("lrf_m")
-            if lrf_m is not None and lrf_m < -0.0001:
-                reg_err("lrf_m", raw_lrf, "ALERTA", f"La longitud de roca fracturada LRF ({lrf_m}m) no puede ser negativa.")
-            raw_small = row_dict.get("small_frag_m")
-            if small_frag_m is not None and small_frag_m < -0.0001:
-                reg_err("small_frag_m", raw_small, "ALERTA", f"El metraje de fragmentos <10cm ({small_frag_m}m) no puede ser negativo.")
-
-            raw_frac_nat = row_dict.get("frac_nat")
-            if frac_nat is not None and frac_nat < -0.0001:
-                reg_err("frac_nat", raw_frac_nat, "ALERTA", f"El número de fracturas naturales ({frac_nat}) no puede ser negativo.")
-            raw_b30 = row_dict.get("frac_buz30")
-            if b30 is not None and b30 < -0.0001:
-                reg_err("frac_buz30", raw_b30, "ALERTA", f"El número de fracturas en Buz<30° ({b30}) no puede ser negativo.")
-            raw_b60 = row_dict.get("frac_buz60")
-            if b60 is not None and b60 < -0.0001:
-                reg_err("frac_buz60", raw_b60, "ALERTA", f"El número de fracturas en 30°-60° ({b60}) no puede ser negativo.")
-            raw_b90 = row_dict.get("frac_buz90")
-            if b90 is not None and b90 < -0.0001:
-                reg_err("frac_buz90", raw_b90, "ALERTA", f"El número de fracturas en Buz>60° ({b90}) no puede ser negativo.")
-
-            raw_abertura = row_dict.get("abertura")
-            if abertura is not None and abertura < -0.0001:
-                reg_err("abertura", raw_abertura, "ALERTA", f"La abertura de junta ({abertura}mm) no puede ser negativa.")
-            raw_espesor = row_dict.get("espesor")
-            if espesor is not None and espesor < -0.0001:
-                reg_err("espesor", raw_espesor, "ALERTA", f"El espesor de relleno ({espesor}mm) no puede ser negativo.")
-            raw_camp = row_dict.get("campana")
-            if camp is not None and camp < -0.0001:
-                reg_err("campana", raw_camp, "ALERTA", f"El año de campaña ({camp}) no puede ser negativo.")
-
-            for key, val_raw in [("frac_nat", raw_frac_nat), ("frac_buz30", raw_b30), ("frac_buz60", raw_b60), ("frac_buz90", raw_b90)]:
-                if val_raw is not None and val_raw != -1:
-                    try:
-                        f_val = float(val_raw)
-                        if not f_val.is_integer():
-                            reg_err(key, val_raw, "ALERTA", f"El campo '{key}' ({val_raw}) debe ser un número entero.")
-                    except ValueError:
-                        pass
-
-            if "frf" in l_map:
-                frf_raw = row_dict.get("frf")
-                frf_val = sanitize_val(frf_raw, int)
-                if frf_val is not None and frf_val != -1:
-                    if frf_val < 0:
-                        reg_err("frf", frf_raw, "ALERTA", f"El valor de FRF no puede ser negativo. Datos evaluados -> FRF: {frf_val}.")
-                    try:
-                        f_frf = float(frf_raw)
-                        if not f_frf.is_integer():
-                            reg_err("frf", frf_raw, "ALERTA", f"El valor de FRF debe ser un número entero. Datos evaluados -> FRF: {frf_raw}.")
-                    except ValueError:
-                        pass
-                    if lrf_m is not None:
-                        calc_frf = math.floor(round(lrf_m * 100) / 5) + 1 if lrf_m > 0 else 0
-                        if frf_val != calc_frf:
-                            reg_err("frf", frf_raw, "ALERTA", f"El valor de FRF ({frf_val}) no coincide con el calculado por la fórmula: FRF = PISO( REDOND(LRF * 100) / 5 ) + 1 (si LRF > 0, sino 0). Calculado: {calc_frf} basado en LRF ({lrf_m}m).")
-
-            if de is not None and celda_padre in last_a_by_taladro:
-                prev_a = last_a_by_taladro[celda_padre]
-                if abs(de - prev_a) > 0.001:
-                    gap = round(abs(de - prev_a), 4)
-                    reg_err("de", de, "ALERTA", f"Ruptura de continuidad espacial detectada. Datos evaluados -> Profundidad de inicio 'De': {de}m, Profundidad final anterior 'A': {prev_a}m (Brecha calculada: {gap}m).")
-            if a is not None:
-                last_a_by_taladro[celda_padre] = a
-
-            if de is not None and a is not None:
-                perf = round(a - de, 2)
-                if perf <= 0: reg_err("a", a, "ALERTA", f"Longitud de corrida perforada debe ser positiva. Datos evaluados -> De: {de}m, A: {a}m, Avance calculado: {perf}m.")
-                
-                if rec_m is not None and round(rec_m, 4) > round(perf, 4): reg_err("rec_m", rec_m, "ALERTA", f"La longitud recuperada es mayor que el avance perforado. Datos evaluados -> Recuperada: {rec_m}m, Avance de corrida: {perf}m (De: {de}m, A: {a}m).")
-                if rqd_m is not None and rec_m is not None and round(rqd_m, 4) > round(rec_m, 4): reg_err("rqd_m", rqd_m, "ALERTA", f"Metraje RQD es mayor que la longitud recuperada. Datos evaluados -> RQD: {rqd_m}m, Recuperada: {rec_m}m, Avance de corrida: {perf}m (De: {de}m, A: {a}m).")
-                if lrf_m is not None and rec_m is not None and round(lrf_m, 4) > round(rec_m, 4): reg_err("lrf_m", lrf_m, "ALERTA", f"La longitud de roca fracturada LRF es mayor que la longitud recuperada. Datos evaluados -> LRF: {lrf_m}m, Recuperada: {rec_m}m, Avance de corrida: {perf}m (De: {de}m, A: {a}m).")
-
-                if rqd_m is not None and lrf_m is not None and small_frag_m is not None:
-                    sum_frags = round(rqd_m + lrf_m + small_frag_m, 2)
-                    if rec_m is not None and round(sum_frags, 2) > round(rec_m, 2) + 0.02:
-                        reg_err("rqd_m", rqd_m, "ALERTA", f"La suma de fragmentos físicos supera la longitud recuperada. Datos evaluados -> Suma: {sum_frags}m (RQD: {rqd_m}m + LRF: {lrf_m}m + <10cm: {small_frag_m}m), Longitud Recuperada: {rec_m}m, Avance de corrida: {perf}m (De: {de}m, A: {a}m).")
-                    elif round(sum_frags, 4) > round(perf, 4):
-                        reg_err("rqd_m", rqd_m, "ALERTA", f"La suma de fragmentos físicos supera el avance perforado. Datos evaluados -> Suma de fragmentos: {sum_frags}m (RQD: {rqd_m}m + LRF: {lrf_m}m + <10cm: {small_frag_m}m), Avance de corrida: {perf}m (De: {de}m, A: {a}m), Longitud Recuperada: {rec_m}m.")
-
-            if b30 is not None and b60 is not None and b90 is not None and frac_nat is not None:
-                sum_bins = b30 + b60 + b90
-                if sum_bins != frac_nat:
-                    reg_err("frac_nat", frac_nat, "ADVERTENCIA", f"La sumatoria de fracturas por buzamiento no coincide con el conteo general. Datos evaluados -> Conteo General (Frac_Nat): {frac_nat}, Suma por buzamiento: {sum_bins} (Buz <30°: {b30} + 30°-60°: {b60} + >60°: {b90}).")
-
-            exceptions = {"F", "RF", "VN", "SZ", "F+10", "BED"}
-            if espesor is not None and abertura is not None:
-                if espesor > abertura and (tipo_est1 not in exceptions and tipo_est2 not in exceptions):
-                    reg_err("espesor", espesor, "ALERTA", f"El espesor de relleno no puede ser mayor que la abertura de junta. Datos evaluados -> Espesor: {espesor}mm (Tipo Relleno: '{relleno1}'), Abertura de Junta: {abertura}mm, Estructuras: '{tipo_est1}' / '{tipo_est2}'.")
-
-                if espesor > 0 and abertura <= 0:
-                    reg_err("abertura", abertura, "ADVERTENCIA", f"Se declaró espesor de relleno de junta pero la abertura es 0mm. Datos evaluados -> Espesor: {espesor}mm (Tipo Relleno: '{relleno1}'), Abertura de Junta: {abertura}mm.")
-                elif espesor == 0 and abertura > 0 and relleno1 not in [None, "-1"]: 
-                    reg_err("espesor", espesor, "ADVERTENCIA", f"La abertura de junta es mayor a 0mm pero no se ha registrado espesor de relleno. Datos evaluados -> Abertura de Junta: {abertura}mm, Espesor: {espesor}mm (Tipo Relleno: '{relleno1}').")
-
-            if is_2026:
-                raw_perf_col = row_dict.get("perf")
-                perf_col = sanitize_val(raw_perf_col, float)
-                if perf_col is not None and de is not None and a is not None:
-                    calc_perf = round(a - de, 2)
-                    if abs(perf_col - calc_perf) > 0.01:
-                        reg_err("perf", raw_perf_col, "ALERTA", f"El valor de Perf. ({perf_col}m) no coincide con el avance calculado A - De ({calc_perf}m).")
-
-                raw_sum_frags = row_dict.get("sum_frags_total")
-                sum_frags_col = sanitize_val(raw_sum_frags, float)
-                if sum_frags_col is not None:
-                    if rqd_m is not None and lrf_m is not None and small_frag_m is not None:
-                        calc_sum = round(rqd_m + lrf_m + small_frag_m, 2)
-                        if abs(sum_frags_col - calc_sum) > 0.01:
-                            reg_err("sum_frags_total", raw_sum_frags, "ALERTA", f"La suma de fragmentos ({sum_frags_col}m) no coincide con RQD+LRF+Frag<10cm ({calc_sum}m).")
-                    if de is not None and a is not None:
-                        calc_perf = round(a - de, 2)
-                        if round(sum_frags_col, 4) > round(calc_perf, 4):
-                            reg_err("sum_frags_total", raw_sum_frags, "ALERTA", f"La suma de fragmentos ({sum_frags_col}m) excede el avance perforado ({calc_perf}m).")
-
-                raw_r = row_dict.get("r_indice")
-                if raw_r is not None and str(raw_r).strip() not in ["", "-1", "-1.0"]:
-                    r_val = sanitize_val(raw_r, int)
-                    raw_res = row_dict.get("resistencia")
-                    if r_val is not None and raw_res:
-                        res_upper = str(raw_res).upper().strip()
-                        if res_upper.startswith("R") and len(res_upper) > 1 and res_upper[1].isdigit():
-                            if r_val != int(res_upper[1]):
-                                reg_err("r_indice", raw_r, "ALERTA", f"El índice R ({r_val}) no coincide con el código ISRM registrado en Resistencia ({raw_res}).")
-
-                raw_ori = row_dict.get("linea_orientacion")
-                if raw_ori is not None and str(raw_ori).strip() not in ["", "-1"]:
-                    ori_str = str(raw_ori).strip().upper()
-                    if ori_str not in VALID_ORIENTACION:
-                        reg_err("linea_orientacion", raw_ori, "ALERTA", f"Línea de orientación no válida ('{raw_ori}'). Permitidos: {', '.join(sorted(VALID_ORIENTACION))}.")
-
-                raw_off = row_dict.get("offset")
-                if raw_off is not None and str(raw_off).strip() not in ["", "-", "-1"]:
-                    off_val = sanitize_val(raw_off, float)
-                    if off_val is not None and (off_val < 0.0 or off_val > 360.0):
-                        reg_err("offset", raw_off, "ALERTA", f"El valor de Offset ({off_val}°) debe estar entre 0° y 360°.")
-
-                raw_sum_fn = row_dict.get("sum_frac_nat")
-                if raw_sum_fn is not None and str(raw_sum_fn).strip() not in ["", "-1"]:
-                    sum_fn_val = sanitize_val(raw_sum_fn, int)
-                    if sum_fn_val is not None and frac_nat is not None:
-                        if sum_fn_val != frac_nat:
-                            reg_err("sum_frac_nat", raw_sum_fn, "ALERTA", f"La suma de fracturas naturales ({sum_fn_val}) no coincide con el número de fracturas naturales registrado ({frac_nat}).")
-
-                raw_turno = row_dict.get("turno")
-                if raw_turno is not None and str(raw_turno).strip() not in ["", "-1"]:
-                    turno_str = str(raw_turno).strip().upper()
-                    if turno_str not in VALID_TURNOS:
-                        reg_err("turno", raw_turno, "ADVERTENCIA", f"Turno no válido ('{raw_turno}'). Permitidos: {', '.join(sorted(VALID_TURNOS))}.")
-
-            if raw_resistencia is not None and not resistencia_can:
-                pass
-            if raw_intemperismo is not None and not intemperismo_can:
-                pass
-            if raw_relleno1 is not None and not relleno1_can:
-                pass
-            if raw_agua_obs is not None and not agua_obs_can:
-                pass
-            if raw_rugosidad is not None and not rugosidad_can:
-                reg_err("rugosidad", raw_rugosidad, "ALERTA", f"Código de Rugosidad no válido. Permitidos: {', '.join(VALID_RUGOSITY)}")
-
-            frf_val = sanitize_val(row_dict.get("frf"), int) if "frf" in l_map else None
-
-            lgg_run_entry = {
-                "taladro": taladro, "de": de, "a": a, "corrida": corrida_num,
-                "resistencia": resistencia,
-                "lito1": safe_str(row_dict.get("lito1")),
-                "lito2": safe_str(row_dict.get("lito2")),
-                "lito3": safe_str(row_dict.get("lito3")),
-                "rec_m": rec_m,
-                "rqd_m": rqd_m,
-                "lrf_m": lrf_m,
-                "small_frag_m": small_frag_m,
-                "frac_nat": frac_nat,
-                "frf": frf_val,
-                "abertura": abertura,
-                "rugosidad": raw_rugosidad if raw_rugosidad is not None else row_dict.get("rugosidad"),
-                "jrc10": jrc10,
-                "intemperismo": weathering if 'weathering' in locals() else row_dict.get("intemperismo"),
-                "relleno1": relleno1 if 'relleno1' in locals() else row_dict.get("relleno1"),
-                "espesor": espesor,
-                "tipo_est1": tipo_est1 if 'tipo_est1' in locals() else row_dict.get("tipo_est1"),
-                "linea_orientacion": str(row_dict.get("linea_orientacion")).strip().upper() if row_dict.get("linea_orientacion") else None,
-                "proyecto": safe_str(row_dict.get("proyecto"))
-            }
-            lgg_runs.append(lgg_run_entry)
-            lgg_runs_by_taladro[taladro].append(lgg_run_entry)
-            if not row_has_errors: total_ok += 1
-
-            unique_lgg_runs.append({
-                "fila_excel": r,
-                "taladro": taladro,
-                "de": de,
-                "a": a,
-                "corrida": f"{de:.2f} - {a:.2f}" if (de is not None and a is not None) else f"C{corrida_num}",
-                "longitud": round(a - de, 2) if (de is not None and a is not None) else 0.0,
-                "rec_m": rec_m,
-                "rqd_m": rqd_m,
-                "lito1": safe_str(row_dict.get("lito1")),
-                "lito2": safe_str(row_dict.get("lito2")),
-                "lito3": safe_str(row_dict.get("lito3")),
-                "resistencia": resistencia,
-                "estado": "CONFORME" if not row_has_errors else "NO CONFORME"
-            })
-
-    # --- 2. PROCESAR ESTRUCTURAL ---
+    # --- 2. PROCESAR ESTRUCTURAL (MOTOR DESACOPLADO) ---
     conf_est = config.get("est")
     ws_est = get_sheet_safe(wb_main, conf_est.get("sheet") if conf_est else None, ["est"])
     if ws_est:
-        h_idx, e_map = find_header_row_and_mapping(ws_est, EST_PATTERNS)
-        est_claves_detectadas = set(e_map.keys())
-        fallback_est = FALLBACK_EST_MAP_2026 if is_2026 else FALLBACK_EST_MAP
-        for k, v in fallback_est.items():
-            if k not in e_map: e_map[k] = v
-
-        est_extra = [k for k in CAMPOS_EXTRA_A_CAPTURAR["Estructural"] if k in est_claves_detectadas]
-            
-        print(f"[*] Iniciando escaneo de EST V2. Fila inicial: {h_idx + 1}, Fila máxima: {ws_est.max_row}", flush=True)
-        
-        empty_streak = 0
-        current_taladro_est = None
-        
-        for r in range(h_idx + 1, ws_est.max_row + 1):
-            if r % 500 == 0: print(f"  ... [EST V2] Fila {r} / {ws_est.max_row}", flush=True)
-            row_dict, is_empty = get_row_dict(ws_est, r, e_map)
-            
-            t_val = row_dict.get("taladro")
-            if t_val is not None and str(t_val).strip() != "":
-                current_taladro_est = safe_str(t_val)
-            else:
-                row_dict["taladro"] = current_taladro_est
-                
-            if is_empty:
-                empty_streak += 1
-                if empty_streak >= 20:
-                    print(f"[*] [EST V2] Freno de emergencia en fila {r}.", flush=True)
-                    break
-                continue
-            
-            if not current_taladro_est: continue
-            
-            empty_streak = 0
-            total_est_filas += 1
-            taladro = current_taladro_est
-            celda_padre = taladro
-            celda_hija = f"{taladro}-E{r}"
-
-            if celda_padre not in resumen_celdas:
-                resumen_celdas[celda_padre] = {"total_hijas": 0, "vacios": 0, "advertencias": 0, "alertas": 0, "estado_celda": "OK", "dist_celda": 0.0, "campania": "N/A"}
-            
-            resumen_celdas[celda_padre]["total_hijas"] += 1
-            row_has_errors = False
-
-            def reg_err_est(col, val, tipo, msg):
-                nonlocal total_vacios, total_sin_informacion, total_advertencias, total_alertas, row_has_errors
-                incidencias.append({"fila_excel": r, "celda_padre": celda_padre, "celda_hija": celda_hija, "columna": col, "valor_actual": val, "tipo_incidencia": tipo, "mensaje": msg, "campania": str(camp) if camp else "N/A", "geotecnico": geo if geo else "N/A", "sector_geotecnico": "N/A", "modulo": "Estructural"})
-                if tipo == "VACIO":
-                    total_vacios += 1
-                    resumen_celdas[celda_padre]["vacios"] += 1
-                elif tipo == "SIN_INFORMACION":
-                    total_sin_informacion += 1
-                    if "sin_informacion" not in resumen_celdas[celda_padre]:
-                        resumen_celdas[celda_padre]["sin_informacion"] = 0
-                    resumen_celdas[celda_padre]["sin_informacion"] += 1
-                elif tipo == "ADVERTENCIA":
-                    total_advertencias += 1
-                    resumen_celdas[celda_padre]["advertencias"] += 1
-                elif tipo == "ALERTA":
-                    total_alertas += 1
-                    resumen_celdas[celda_padre]["alertas"] += 1
-                    row_has_errors = True
-
-            # --- 1. PARSEO Y SANITIZACIÓN INMEDIATA (ESTRUCTURAL) ---
-            depth = sanitize_val(row_dict.get("profundidad"), float)
-            camp = sanitize_val(row_dict.get("campana"), int)
-            geo = sanitize_val(row_dict.get("geotecnico"), str)
-
-            abertura = sanitize_val(row_dict.get("abertura"), float)
-            espesor = sanitize_val(row_dict.get("espesor"), float)
-
-            dip = sanitize_val(row_dict.get("dip"), float)
-            azimuth = sanitize_val(row_dict.get("azimuth"), float)
-
-            est_de = sanitize_val(row_dict.get("de"), float)
-            est_a = sanitize_val(row_dict.get("a"), float)
-
-            alfa = sanitize_val(row_dict.get("alfa"), float)
-            beta = sanitize_val(row_dict.get("beta"), float)
-            jrc10 = sanitize_val(row_dict.get("jrc10"), int)
-            
-            raw_forma = sanitize_val(row_dict.get("forma"), str)
-            forma_can = get_canonical_value(raw_forma, VALID_FORMA) if raw_forma is not None else None
-            
-            tipo_est = safe_str(sanitize_val(row_dict.get("tipo_estructura"), str))
-            
-            raw_relleno1 = row_dict.get("relleno1")
-            relleno1_can = get_canonical_value(raw_relleno1, VALID_RELLENO)
-            relleno1 = relleno1_can
-
-            raw_dureza = sanitize_val(row_dict.get("dureza_pared"), str)
-            dureza_can = get_canonical_value(raw_dureza, VALID_STRENGTHS) if raw_dureza is not None else None
-            dureza_pared = dureza_can
-
-            # --- 2. VALIDACIONES MAESTRAS (EST) ---
-            est_end = est_a if est_a is not None else depth
-            if est_end is not None:
-                max_est[taladro] = max(max_est.get(taladro, 0.0), est_end)
-                
-                lgg_max_for_t = max_lgg.get(taladro, 0.0)
-                if lgg_max_for_t > 0 and est_end > lgg_max_for_t:
-                    reg_err_est("a", est_end, "ALERTA", f"La profundidad final en logueo estructural ('a:') excede el límite final registrado en LGG. Datos evaluados -> Estructural ('a:'): {est_end}m, Profundidad Máxima LGG: {lgg_max_for_t}m.")
-
-            if depth is not None:
-                lgg_max_for_t = max_lgg.get(taladro, 0.0)
-                if lgg_max_for_t > 0 and depth > lgg_max_for_t:
-                    reg_err_est("profundidad", depth, "ALERTA", f"La profundidad en logueo estructural excede el límite final registrado en LGG. Datos evaluados -> Profundidad Estructural: {depth}m, Profundidad Máxima LGG: {lgg_max_for_t}m.")
-
-            if camp:
-                resumen_celdas[celda_padre]["campania"] = str(camp)
-
-            if is_2026:
-                mandatory_est = [
-                    "profundidad", "alfa", "beta", "forma", "rugosidad", "jrc10", "abertura", 
-                    "weathering", "espesor", "relleno1", "dureza_pared", "agua", "geotecnico", "campana",
-                    "corrida"
-                ]
-            else:
-                mandatory_est = ["profundidad", "alfa", "beta", "forma", "rugosidad", "jrc10", "abertura", "weathering", "espesor", "relleno1", "dureza_pared", "agua", "geotecnico", "campana", "dip", "azimuth"]
-            for key in mandatory_est:
-                if key not in e_map: continue
-                val_raw = row_dict.get(key)
-                if val_raw is None or str(val_raw).strip() == "":
-                    reg_err_est(key, None, "VACIO", f"El campo obligatorio '{key}' se encuentra vacío.")
-                elif str(val_raw).strip() in ["-1", "-1.0", "-1,0"]:
-                    reg_err_est(key, val_raw, "SIN_INFORMACION", f"El campo obligatorio '{key}' no contiene información (-1).")
-
-            capturar_faltantes_extra(collector, "Estructural", row_dict, est_extra, r, celda_padre, celda_hija, camp, geo)
-
-            raw_depth = row_dict.get("profundidad")
-            if depth is not None and depth < -0.0001:
-                reg_err_est("profundidad", raw_depth, "ALERTA", f"Profundidad ({depth}m) no puede ser negativa.")
-            raw_abertura = row_dict.get("abertura")
-            if abertura is not None and abertura < -0.0001:
-                reg_err_est("abertura", raw_abertura, "ALERTA", f"La abertura ({abertura}mm) no puede ser negativa.")
-            raw_espesor = row_dict.get("espesor")
-            if espesor is not None and espesor < -0.0001:
-                reg_err_est("espesor", raw_espesor, "ALERTA", f"El espesor de relleno ({espesor}mm) no puede ser negativo.")
-            raw_camp = row_dict.get("campana")
-            if camp is not None and camp < -0.0001:
-                reg_err_est("campana", raw_camp, "ALERTA", f"El año de campaña ({camp}) no puede ser negativo.")
-
-            if not is_2026:
-                raw_dip = row_dict.get("dip")
-                if dip is not None:
-                    if dip < 0.0 or dip > 90.0:
-                        reg_err_est("dip", raw_dip, "ALERTA", f"El ángulo Dip es inválido. Datos evaluados -> Dip: {dip}°. Debe estar entre 0° y 90°.")
-
-                raw_azimuth = row_dict.get("azimuth")
-                if azimuth is not None:
-                    if azimuth < 0.0 or azimuth > 360.0:
-                        reg_err_est("azimuth", raw_azimuth, "ALERTA", f"El ángulo Azimut es inválido. Datos evaluados -> Azimut: {azimuth}°. Debe estar entre 0° y 360°.")
-
-            taladro_runs = lgg_runs_by_taladro.get(taladro, [])
-            matching_run = None
-            if est_de is not None and est_a is not None:
-                for run in taladro_runs:
-                    if abs(run["de"] - est_de) < 0.01 and abs(run["a"] - est_a) < 0.01:
-                        matching_run = run
-                        break
-
-            if matching_run is None and depth is not None:
-                for run in taladro_runs:
-                    if run["de"] <= depth <= run["a"]:
-                        matching_run = run
-                        break
-
-            if depth is not None and matching_run is None:
-                reg_err_est("profundidad", depth, "ALERTA", f"Profundidad huérfana de junta no corresponde a ningún tramo de corrida en LGG. Datos evaluados -> Profundidad de Junta: {depth}m, Taladro: '{taladro}'.")
-
-            raw_de = row_dict.get("de")
-            raw_a = row_dict.get("a")
-            if est_de is not None and est_a is not None:
-                has_exact_match = False
-                for run in taladro_runs:
-                    if abs(run["de"] - est_de) < 0.001 and abs(run["a"] - est_a) < 0.001:
-                        has_exact_match = True
-                        break
-                if not has_exact_match:
-                    reg_err_est("de", raw_de, "ALERTA", f"La corrida asociada (de/a) no existe de forma exacta en las corridas de LGG para el taladro. Datos evaluados -> Tramo Estructural de corrida: {est_de}m - {est_a}m, Taladro: '{taladro}'.")
-                if depth is not None and (depth < est_de or depth > est_a):
-                    reg_err_est("profundidad", depth, "ALERTA", f"La profundidad se encuentra fuera del tramo de corrida especificado. Datos evaluados -> Profundidad de Junta: {depth}m, Tramo especificado: {est_de}m - {est_a}m.")
-
-            if is_2026:
-                raw_corr_av = row_dict.get("corrida_avance")
-                if raw_corr_av is not None and str(raw_corr_av).strip() not in ["", "-1"]:
-                    av_val = sanitize_val(raw_corr_av, float)
-                    if av_val is not None:
-                        if av_val <= 0:
-                            reg_err_est("corrida_avance", raw_corr_av, "ALERTA", f"Longitud de corrida perforada debe ser positiva. Datos evaluados -> Avance: {av_val}m.")
-                        elif round(av_val, 2) > 1.6:
-                            reg_err_est("corrida_avance", raw_corr_av, "ALERTA", f"Longitud de corrida perforada excede el límite crítico de 1.6m. Datos evaluados -> Avance: {av_val}m.")
-                        if matching_run and matching_run.get("de") is not None and matching_run.get("a") is not None:
-                            lgg_perf = round(matching_run["a"] - matching_run["de"], 2)
-                            if abs(av_val - lgg_perf) > 0.02:
-                                reg_err_est("corrida_avance", raw_corr_av, "ALERTA", f"Discrepancia en longitud de avance de corrida: Estructural ({av_val}m) vs LGG ({lgg_perf}m, {matching_run['de']}m - {matching_run['a']}m).")
-
-            if alfa is not None:
-                if alfa < 0.0 or alfa > 90.0:
-                    reg_err_est("alfa", alfa, "ALERTA", f"El ángulo Alfa es inválido. Datos evaluados -> Alfa: {alfa}°. Debe estar entre 0° y 90° o ser -1.")
-                elif not float(alfa).is_integer():
-                    reg_err_est("alfa", alfa, "ADVERTENCIA", f"El ángulo Alfa debería ser un número entero. Datos evaluados -> Alfa: {alfa}°.")
-
-            if beta is not None:
-                if beta < 0.0 or beta > 360.0:
-                    reg_err_est("beta", beta, "ALERTA", f"El ángulo Beta es inválido. Datos evaluados -> Beta: {beta}°. Debe estar entre 0° y 360° o ser -1.")
-                elif not float(beta).is_integer():
-                    reg_err_est("beta", beta, "ADVERTENCIA", f"El ángulo Beta debería ser un número entero. Datos evaluados -> Beta: {beta}°.")
-
-            if jrc10 is not None:
-                if jrc10 > 20:
-                    reg_err_est("jrc10", jrc10, "ALERTA", f"El valor de JRC10 es inválido. No se permiten valores mayores a 20. Datos evaluados -> JRC10: {jrc10}.")
-                elif jrc10 < 0:
-                    reg_err_est("jrc10", jrc10, "ALERTA", f"El valor de JRC10 no puede ser negativo. Datos evaluados -> JRC10: {jrc10}.")
-
-            if raw_forma is not None and not forma_can:
-                reg_err_est("forma", raw_forma, "ALERTA", f"Forma de junta no válida. Permitidos: Plano (1) a Irregular (6). Datos evaluados -> Forma: '{raw_forma}'.")
-
-            exceptions = {"F", "RF", "VN", "SZ", "F+10", "BED"}
-            if espesor is not None and abertura is not None:
-                if espesor > abertura and tipo_est not in exceptions:
-                    reg_err_est("espesor", espesor, "ALERTA", f"El espesor de relleno no puede ser mayor que la abertura de junta excepto en estructuras F, RF, VN, SZ, F+10 o BED. Datos evaluados -> Espesor: {espesor}mm (Tipo Relleno: '{relleno1}'), Abertura de Junta: {abertura}mm, Estructura: '{tipo_est}'.")
-
-                if espesor > 0 and (not relleno1 or relleno1 in ["-1", "cwf"]):
-                    reg_err_est(
-                        "relleno1", 
-                        relleno1, 
-                        "ADVERTENCIA", 
-                        f"Se declaró espesor de relleno pero el tipo de relleno está sin definir o es CWF. Datos evaluados -> Espesor: {espesor}mm, Tipo Relleno: '{relleno1}'."
-                    )
-                elif relleno1 and relleno1 not in ["-1", "cwf"] and abertura <= 0:
-                    reg_err_est("relleno1", relleno1, "ADVERTENCIA", f"El tipo de relleno está definido pero la abertura de junta es 0mm. Datos evaluados -> Tipo Relleno: '{relleno1}', Abertura de Junta: {abertura}mm, Espesor: {espesor}mm.")
-
-            if matching_run:
-                # Regla R215: Incompatibilidad de litología entre corrida y junta
-                est_l1 = safe_str(row_dict.get("lito1"))
-                if is_2026:
-                    if est_l1 and est_l1.upper() not in ("-1", "NAN", "", "NONE"):
-                        litos_lgg = {
-                            safe_str(matching_run.get(k)).strip().upper()
-                            for k in ("lito1", "lito2", "lito3")
-                            if safe_str(matching_run.get(k)).strip().upper() not in ("-1", "NAN", "", "NONE")
-                        }
-                        if litos_lgg and est_l1.strip().upper() not in litos_lgg:
-                            lito_lgg_str = "/".join(sorted(litos_lgg))
-                            reg_err_est("lito1", est_l1, "ADVERTENCIA", f"Litología de junta '{est_l1}' no coincide con las litologías registradas en LGG para la corrida ({lito_lgg_str}).")
-                else:
-                    est_l2 = safe_str(row_dict.get("lito2"))
-                    est_l3 = safe_str(row_dict.get("lito3"))
-                    lgg_l1 = safe_str(matching_run.get("lito1"))
-                    lgg_l2 = safe_str(matching_run.get("lito2"))
-                    lgg_l3 = safe_str(matching_run.get("lito3"))
-                    if est_l1 and est_l1.upper() not in ("-1", "NAN", "", "NONE") and lgg_l1 and lgg_l1.upper() not in ("-1", "NAN", "", "NONE"):
-                        if est_l1.strip().upper() != lgg_l1.strip().upper() or (est_l2 and lgg_l2 and est_l2.strip().upper() not in ("-1", "NAN", "") and est_l2.strip().upper() != lgg_l2.strip().upper()):
-                            lito_est_str = f"{est_l1}/{est_l2}/{est_l3}".strip("/")
-                            lito_lgg_str = f"{lgg_l1}/{lgg_l2}/{lgg_l3}".strip("/")
-                            reg_err_est("lito1", lito_est_str, "ADVERTENCIA", f"Incompatibilidad de litología entre la corrida y la junta. Datos evaluados -> Estructural: '{lito_est_str}', LGG: '{lito_lgg_str}'.")
-
-                # Regla R222: Coherencia línea de orientación (si Línea = N y se orientó la estructura)
-                if is_2026:
-                    lgg_ori = matching_run.get("linea_orientacion")
-                    if lgg_ori == "N":
-                        if beta is not None and beta >= 0:
-                            reg_err_est("beta", beta, "ADVERTENCIA", f"Registro de estructura orientada (Beta={beta}°) en corrida con línea de orientación 'N' (no orientada).")
-
-                if raw_dureza is not None and not dureza_can:
-                    reg_err_est("dureza_pared", raw_dureza, "ALERTA", f"Código de Resistencia ISRM no válido. Permitidos: {', '.join(VALID_STRENGTHS)}")
-                
-                # Solo comparar compatibilidad si ambas durezas son válidas y distintas de "-1"
-                if dureza_pared and dureza_pared != "-1":
-                    res_matriz = matching_run["resistencia"]
-                    r_levels = {"R0": 0, "R1": 1, "R2": 2, "R3": 3, "R4": 4, "R5": 5, "R6": 6}
-                    if res_matriz and res_matriz != "-1" and dureza_pared in r_levels and res_matriz in r_levels:
-                        if r_levels[dureza_pared] > r_levels[res_matriz]:
-                            reg_err_est(
-                                "dureza_pared", 
-                                raw_dureza, 
-                                "ADVERTENCIA", 
-                                f"Incompatibilidad geológica (Dureza de pared de junta supera la resistencia maxima estimada de la corrida). Datos evaluados -> Dureza de Pared de Junta en Estructural: {dureza_pared}, Resistencia Maxima Estimada en LGG: {res_matriz}."
-                            )
-
-            if not row_has_errors: total_ok += 1
-
-            unique_est_structures.append({
-                "fila_excel": r,
-                "taladro": taladro,
-                "de": est_de,
-                "a": est_a,
-                "profundidad": depth,
-                "corrida": f"{est_de:.2f} - {est_a:.2f}" if (est_de is not None and est_a is not None) else (f"C{row_dict.get('corrida')}" if row_dict.get("corrida") else "N/A"),
-                "tipo_est": tipo_est,
-                "alfa": alfa,
-                "beta": beta,
-                "dip": dip if not is_2026 else None,
-                "azimuth": azimuth if not is_2026 else None,
-                "abertura": abertura,
-                "espesor": espesor,
-                "relleno": relleno1,
-                "dureza_pared": dureza_pared,
-                "lito1": safe_str(row_dict.get("lito1")),
-                "lito2": safe_str(row_dict.get("lito2")) if not is_2026 else None,
-                "lito3": safe_str(row_dict.get("lito3")) if not is_2026 else None,
-                "estado": "CONFORME" if not row_has_errors else "NO CONFORME"
-            })
+        e_counters = {"total_ok": 0, "total_vacios": 0, "total_sin_informacion": 0, "total_advertencias": 0, "total_alertas": 0}
+        total_est_filas, unique_est_structures, max_est = validate_est_sheet_data(
+            ws_est, is_2026, lgg_runs, lgg_runs_by_taladro, max_lgg, resumen_celdas, incidencias, e_counters,
+            collector=collector, max_est=max_est
+        )
+        total_vacios += e_counters["total_vacios"]
+        total_sin_informacion += e_counters["total_sin_informacion"]
+        total_advertencias += e_counters["total_advertencias"]
+        total_alertas += e_counters["total_alertas"]
+        total_ok += e_counters["total_ok"]
 
     # --- 2.5. PROCESAR HOJA RMR (SI EXISTE) ---
     conf_rmr = config.get("rmr")
