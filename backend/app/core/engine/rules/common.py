@@ -67,3 +67,29 @@ def get_canonical_value(val: Any, valid_set: Set[str]) -> Optional[str]:
         if code.lower() == s_lower:
             return code
     return None
+
+
+def is_missing_or_no_info(val: Any) -> bool:
+    """
+    Retorna True ÚNICAMENTE si el valor está ausente (None, vacío, '-', NaN) o representa
+    el código estándar de 'Sin Información' (-1).
+    CRÍTICO: 0 o 0.0 es un dato físico legítimo y retorna False.
+    """
+    if val is None:
+        return True
+    try:
+        if isinstance(val, float) and val != val:  # math.isnan check without extra import
+            return True
+    except Exception:
+        pass
+    s = str(val).strip()
+    s_upper = s.upper()
+    if s_upper in ("", "-", "—", "N/A", "NAN", "NONE", "NULL", "UNDEFINED"):
+        return True
+    s_norm = s.replace(",", ".")
+    try:
+        f = float(s_norm)
+        return abs(f - (-1.0)) < 1e-6
+    except (ValueError, TypeError):
+        return False
+

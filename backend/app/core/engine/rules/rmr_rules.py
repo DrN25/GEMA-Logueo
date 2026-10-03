@@ -8,6 +8,7 @@ from app.core.engine.base_rule import BaseRule
 from app.core.engine.models import Anomaly, Severity
 from app.core.engine.context import ValidationContext
 from app.calculator import FILLING_CLASSES, _norm_code
+from app.core.engine.rules.common import is_missing_or_no_info
 
 # Tabla de Relleno canónica (admite códigos y nombres descriptivos)
 CANONICAL_FILLING_CLASS = {
@@ -277,21 +278,37 @@ class RMR_FormulasAndRatingsRule(BaseRule):
                                 f"RQD (%) en RMR ({rqd_pct}%) no coincide con la fórmula RQD(m)/Long.Corrida(m). Datos evaluados -> RQD({rqd_m}m) / Long.Corrida({long_corrida}m) * 100 = {exp_rqd_pct}%.")
 
                 # 3. Total de Fracturas = FRF + FracNat
-                if frf is not None and fn is not None and total_frac is not None:
-                    exp_tot = round(frf + fn)
-                    if abs(total_frac - exp_tot) > 0.01:
-                        add_err("R410", "total_frac", total_frac, Severity.ALERTA,
-                                f"Total de Fracturas en RMR ({total_frac}) no coincide con FRF + FracNat. Datos evaluados -> FRF({frf}) + FracNat({fn}) = {exp_tot}.")
+                if total_frac is not None and total_frac < 0:
+                    # Suprimir cascada secundaria si la dependencia raíz (FRF o FracNat) es negativa o incompleta
+                    if not (frf is not None and frf < 0 or fn is not None and fn < 0 or is_missing_or_no_info(frf) or is_missing_or_no_info(fn)):
+                        add_err("R130", "total_frac", total_frac, Severity.ALERTA,
+                                f"Total de Fracturas en RMR ({total_frac}) no puede ser negativo.")
+                elif frf is not None and fn is not None and total_frac is not None:
+                    if frf >= 0 and fn >= 0:
+                        exp_tot = round(frf + fn)
+                        if abs(total_frac - exp_tot) > 0.01:
+                            add_err("R410", "total_frac", total_frac, Severity.ALERTA,
+                                    f"Total de Fracturas en RMR ({total_frac}) no coincide con FRF + FracNat. Datos evaluados -> FRF({frf}) + FracNat({fn}) = {exp_tot}.")
 
                 # 4. FF/1m
-                if total_frac is not None and long_corrida is not None and long_corrida > 0 and ff_1m is not None:
+                if ff_1m is not None and ff_1m < 0:
+                    # Suprimir cascada secundaria si total_frac es negativo o incompleto
+                    if not (total_frac is not None and total_frac < 0 or is_missing_or_no_info(total_frac) or is_missing_or_no_info(long_corrida)):
+                        add_err("R130", "ff_1m", ff_1m, Severity.ALERTA,
+                                f"FF/1m en RMR ({ff_1m}) no puede ser negativo.")
+                elif total_frac is not None and total_frac > 0 and long_corrida is not None and long_corrida > 0 and ff_1m is not None:
                     exp_ff = round(total_frac / long_corrida)
                     if abs(ff_1m - exp_ff) > 1.0:
                         add_err("R424", "ff_1m", ff_1m, Severity.ALERTA,
                                 f"FF/1m en RMR ({ff_1m}) no coincide con TotalFracturas / Long.Corrida. Datos evaluados -> TotalFracturas({total_frac}) / Long.Corrida({long_corrida}m) = {exp_ff}.")
 
                 # 5. Espaciamiento
-                if total_frac is not None and long_corrida is not None and long_corrida > 0 and espaciamiento is not None:
+                if espaciamiento is not None and espaciamiento < 0:
+                    # Suprimir cascada secundaria si total_frac es negativo o incompleto
+                    if not (total_frac is not None and total_frac < 0 or is_missing_or_no_info(total_frac) or is_missing_or_no_info(long_corrida)):
+                        add_err("R130", "espaciamiento_mm", espaciamiento, Severity.ALERTA,
+                                f"Espaciamiento en RMR ({espaciamiento}mm) no puede ser negativo.")
+                elif total_frac is not None and total_frac >= 0 and long_corrida is not None and long_corrida > 0 and espaciamiento is not None:
                     exp_esp = round(long_corrida * 1000) if round(total_frac) == 0 else round(long_corrida * 1000 / total_frac)
                     if abs(espaciamiento - exp_esp) > 2.0:
                         add_err("R411", "espaciamiento_mm", espaciamiento, Severity.ALERTA,

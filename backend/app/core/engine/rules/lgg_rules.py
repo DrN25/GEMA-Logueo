@@ -12,7 +12,8 @@ from app.core.rules import WEATHERING_COMPATIBILITY
 from app.core.engine.rules.common import (
     VALID_STRUCTURES, VALID_STRENGTHS, VALID_RUGOSITY, VALID_WEATHERING,
     VALID_RELLENO, VALID_AGUA, VALID_ORIENTACION, VALID_TURNOS,
-    get_canonical_value, sanitize_val, safe_str, safe_int, safe_float
+    get_canonical_value, sanitize_val, safe_str, safe_int, safe_float,
+    is_missing_or_no_info
 )
 
 
@@ -225,7 +226,15 @@ class LGG_PhysicalAndGeometricRule(BaseRule):
 
                 raw_fn = raw_dict.get("frac_nat")
                 if frac_nat is not None and frac_nat < -0.0001:
-                    add_err("R130", "frac_nat", raw_fn, Severity.ALERTA, f"El número de fracturas naturales ({frac_nat}) no puede ser negativo.")
+                    raw_b30 = raw_dict.get("frac_buz30")
+                    raw_b60 = raw_dict.get("frac_buz60")
+                    raw_b90 = raw_dict.get("frac_buz90")
+                    if is_missing_or_no_info(raw_b30) or is_missing_or_no_info(raw_b60) or is_missing_or_no_info(raw_b90):
+                        add_err("R130", "frac_nat", raw_fn, Severity.ALERTA,
+                                f"Campo calculado 'frac_nat' ({frac_nat}) resulta negativo debido a que los insumos de fracturas por buzamiento están vacíos o sin información (-1).")
+                    else:
+                        add_err("R130", "frac_nat", raw_fn, Severity.ALERTA,
+                                f"El número de fracturas naturales ({frac_nat}) no puede ser negativo.")
                 raw_b30 = raw_dict.get("frac_buz30")
                 if b30 is not None and b30 < -0.0001:
                     add_err("R131", "frac_buz30", raw_b30, Severity.ALERTA, f"El número de fracturas en Buz<30° ({b30}) no puede ser negativo.")
@@ -380,7 +389,13 @@ class LGG_FracturesAndFRFRule(BaseRule):
                     frf_val = sanitize_val(frf_raw, int)
                     if frf_val is not None and frf_val != -1:
                         if frf_val < 0:
-                            add_err("R118", "frf", frf_raw, Severity.ALERTA, f"El valor de FRF no puede ser negativo. Datos evaluados -> FRF: {frf_val}.")
+                            raw_lrf = raw_dict.get("lrf_m")
+                            if is_missing_or_no_info(raw_lrf):
+                                add_err("R130", "frf", frf_raw, Severity.ALERTA,
+                                        f"El valor de FRF ({frf_val}) es negativo porque el insumo de metraje LRF está vacío o sin información (-1).")
+                            else:
+                                add_err("R118", "frf", frf_raw, Severity.ALERTA,
+                                        f"El valor de FRF no puede ser negativo. Datos evaluados -> FRF: {frf_val}.")
                         try:
                             f_frf = float(frf_raw)
                             if not f_frf.is_integer():
