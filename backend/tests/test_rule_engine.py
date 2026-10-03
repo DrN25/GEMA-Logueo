@@ -194,3 +194,39 @@ def test_heavy_abrupt_competence_drop_rule():
     assert len(anomalies) == 1
     assert anomalies[0].rule_code == "R_HVY_COMPETENCE_DROP"
 
+
+def test_rqd_weak_weathered_compatibility_r141():
+    """Verifica la regla R141 de incompatibilidad geomecánica en RQD para roca blanda (R0-R1) o meteorización intensa (>=IV)."""
+    lgg_runs = [
+        # Caso 1: R1 + HWA con RQD = 0 -> Correcto, sin anomalía
+        {"_fila_excel": 2, "taladro": "T1", "corrida": 1, "rqd_m": 0.0, "resistencia": "R1", "intemperismo": "HWA", "_raw_dict": {"resistencia": "R1", "intemperismo": "HWA"}},
+        # Caso 2: R1 + HWA con RQD > 0 -> Alerta R141 (ambos factores)
+        {"_fila_excel": 3, "taladro": "T1", "corrida": 2, "rqd_m": 0.6, "resistencia": "R1", "intemperismo": "HWA", "_raw_dict": {"resistencia": "R1", "intemperismo": "HWA"}},
+        # Caso 3: R0 + SWD con RQD > 0 -> Alerta R141 (resistencia blanda)
+        {"_fila_excel": 4, "taladro": "T1", "corrida": 3, "rqd_m": 0.4, "resistencia": "R0", "intemperismo": "SWD", "_raw_dict": {"resistencia": "R0", "intemperismo": "SWD"}},
+        # Caso 4: R3 + CWC con RQD > 0 -> Alerta R141 (meteorización grado V)
+        {"_fila_excel": 5, "taladro": "T1", "corrida": 4, "rqd_m": 0.5, "resistencia": "R3", "intemperismo": "CWC", "_raw_dict": {"resistencia": "R3", "intemperismo": "CWC"}},
+        # Caso 5: R3 + SWD con RQD > 0 -> Competente, sin anomalía
+        {"_fila_excel": 6, "taladro": "T1", "corrida": 5, "rqd_m": 1.2, "resistencia": "R3", "intemperismo": "SWD", "_raw_dict": {"resistencia": "R3", "intemperismo": "SWD"}},
+        # Caso 6: R1 con RQD vacío / None -> No debe disparar R141 (lo maneja R100_EMPTY)
+        {"_fila_excel": 7, "taladro": "T1", "corrida": 6, "rqd_m": None, "resistencia": "R1", "intemperismo": "HWA", "_raw_dict": {"resistencia": "R1", "intemperismo": "HWA"}},
+    ]
+    ctx = ValidationContext(lgg_runs=lgg_runs)
+    rule = LGG_GeomechanicalCompatibilityRule()
+    anomalies = rule.evaluate(ctx)
+
+    r141_anoms = [a for a in anomalies if a.rule_code == "R141"]
+    assert len(r141_anoms) == 3
+
+    # Filas 3, 4, 5 dispararon anomalías
+    rows_flagged = {a.row_excel for a in r141_anoms}
+    assert rows_flagged == {3, 4, 5}
+
+    # Todas son de severidad ADVERTENCIA
+    assert all(a.severity == Severity.ADVERTENCIA for a in r141_anoms)
+
+    # Ningún mensaje debe contener la palabra 'procedimiento'
+    for a in r141_anoms:
+        assert "procedimiento" not in a.mensaje.lower(), f"Mensaje no debe mencionar procedimiento: {a.mensaje}"
+
+

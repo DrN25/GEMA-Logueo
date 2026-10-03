@@ -109,6 +109,19 @@ def validate_row_qaqc(data: Dict[str, Any]) -> List[Dict[str, str]]:
         valid_weatherings = WEATHERING_COMPATIBILITY.get(resistencia)
         if valid_weatherings and weathering not in valid_weatherings:
             alerts.append({"type": "WARNING", "field": "intemperismo", "message": f"Incompatibilidad geológica: Roca con resistencia {resistencia} no puede registrar intemperismo {weathering}. Permitidos: {', '.join(valid_weatherings)}."})
+
+        # R141: Incompatibilidad geomecánica en RQD
+        if rqd_m > 0.001:
+            res_str = str(resistencia).upper().strip()
+            wth_str = str(weathering).upper().strip()
+            is_w = res_str in ("R0", "R1")
+            is_m = wth_str in ("HWA", "CWC", "RS")
+            if is_w and is_m:
+                alerts.append({"type": "WARNING", "field": "rqd_m", "message": f"Incompatibilidad geomecánica en RQD: Tramos con baja resistencia ('{res_str}') y meteorización intensa ('{wth_str}') no deben aportar al cómputo de RQD por desmoronamiento y falta de competencia estructural (se registró RQD={rqd_m}m)."})
+            elif is_w:
+                alerts.append({"type": "WARNING", "field": "rqd_m", "message": f"Incompatibilidad geomecánica en RQD: Tramos con resistencia '{res_str}' (<= 5 MPa) no deben aportar al cómputo de RQD por tratarse de roca extremadamente blanda (se registró RQD={rqd_m}m)."})
+            elif is_m:
+                alerts.append({"type": "WARNING", "field": "rqd_m", "message": f"Incompatibilidad geomecánica en RQD: Tramos con grado de meteorización IV o superior ('{wth_str}') deben ser excluidos del cómputo de RQD por desmoronamiento o descomposición (se registró RQD={rqd_m}m)."})
     except Exception as e:
         alerts.append({"type": "CRITICAL", "field": "global", "message": f"Error al procesar reglas de consistencia: {str(e)}"})
     return alerts

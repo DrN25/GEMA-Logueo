@@ -451,4 +451,26 @@ class LGG_GeomechanicalCompatibilityRule(BaseRule):
                 elif espesor == 0 and abertura > 0 and relleno1 not in [None, "-1"]:
                     add_err("R110", "espesor", espesor, Severity.ADVERTENCIA, f"La abertura de junta es mayor a 0mm pero no se ha registrado espesor de relleno. Datos evaluados -> Abertura de Junta: {abertura}mm, Espesor: {espesor}mm (Tipo Relleno: '{relleno1}').")
 
+            # R141: Incompatibilidad geomecánica en RQD (Roca blanda R0-R1 o meteorización intensa IV-VI no debe computar RQD)
+            rqd_m = run.get("rqd_m")
+            if rqd_m is not None and rqd_m > 0.001:
+                raw_dict = run.get("_raw_dict", run)
+                raw_res = raw_dict.get("resistencia")
+                raw_wth = raw_dict.get("intemperismo")
+                res_can = get_canonical_value(raw_res, VALID_STRENGTHS)
+                wth_can = get_canonical_value(raw_wth, VALID_WEATHERING)
+
+                is_weak = res_can in ("R0", "R1")
+                is_weathered = wth_can in ("HWA", "CWC", "RS")
+
+                if is_weak and is_weathered:
+                    add_err("R141", "rqd_m", rqd_m, Severity.ADVERTENCIA,
+                            f"Incompatibilidad geomecánica en RQD: Tramos con baja resistencia ('{res_can}') y meteorización intensa ('{wth_can}') no deben aportar al cómputo de RQD por desmoronamiento y falta de competencia estructural (se registró RQD={rqd_m}m).")
+                elif is_weak:
+                    add_err("R141", "rqd_m", rqd_m, Severity.ADVERTENCIA,
+                            f"Incompatibilidad geomecánica en RQD: Tramos con resistencia '{res_can}' (<= 5 MPa) no deben aportar al cómputo de RQD por tratarse de roca extremadamente blanda (se registró RQD={rqd_m}m).")
+                elif is_weathered:
+                    add_err("R141", "rqd_m", rqd_m, Severity.ADVERTENCIA,
+                            f"Incompatibilidad geomecánica en RQD: Tramos con grado de meteorización IV o superior ('{wth_can}') deben ser excluidos del cómputo de RQD por desmoronamiento o descomposición (se registró RQD={rqd_m}m).")
+
         return anomalies

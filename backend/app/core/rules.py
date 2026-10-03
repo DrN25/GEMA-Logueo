@@ -260,8 +260,8 @@ MASTER_ERROR_RULES = [
     },
     {
         "code": "R141",
-        "msg": "El número de fracturas naturales debe ser un número entero.",
-        "severity": "ALERTA",
+        "msg": "Incompatibilidad geomecánica en RQD: roca muy blanda (R0-R1) o con meteorización grado IV o superior no debe computar RQD.",
+        "severity": "ADVERTENCIA",
         "group": "LGG"
     },
 
