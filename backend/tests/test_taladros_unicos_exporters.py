@@ -9,7 +9,7 @@ if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
 from app.services.plt_excel_exporter_regulares import export_plt_regulares_to_excel
-from app.routers.auditoria import generar_excel_reporte_core
+from app.services.ddh_excel_exporter import generar_excel_reporte_core
 
 class TestTaladrosUnicosExporters(unittest.TestCase):
     @classmethod
