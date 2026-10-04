@@ -145,8 +145,20 @@ MASTER_ERROR_RULES = [
         "group": "LGG"
     },
     {
+        "code": "R100_DUP_CORRIDA",
+        "msg": "Número de corrida duplicado en el mismo taladro.",
+        "severity": "ALERTA",
+        "group": "LGG"
+    },
+    {
         "code": "R122",
         "msg": "Ruptura de continuidad espacial detectada.",
+        "severity": "ALERTA",
+        "group": "LGG"
+    },
+    {
+        "code": "R122_OVERLAP",
+        "msg": "Intervalo solapado o traslape espacial detectado en corridas LGG.",
         "severity": "ALERTA",
         "group": "LGG"
     },
@@ -266,6 +278,12 @@ MASTER_ERROR_RULES = [
     },
 
     # --- LOGUEO ESTRUCTURAL ---
+    {
+        "code": "R200_DUP",
+        "msg": "Estructura duplicada: registro idéntico de discontinuidad en la misma corrida.",
+        "severity": "ADVERTENCIA",
+        "group": "Estructural"
+    },
     {
         "code": "R201",
         "msg": "Profundidad huérfana de junta no corresponde a ningún tramo de corrida en LGG.",

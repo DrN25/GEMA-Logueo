@@ -8,6 +8,7 @@ __pycache__
 # Archivos pesados y de usuario
 backend/uploads/
 Sistema/backend/uploads/
+scratch/
 *.xlsx
 *.csv
 

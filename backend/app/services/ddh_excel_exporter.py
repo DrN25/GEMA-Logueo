@@ -191,6 +191,12 @@ def simplify_message(msg):
         return "La longitud recuperada es mayor que el avance perforado."
 
     # 7. Resto de reglas específicas
+    if "INTERVALO SOLAPADO" in msg_up or "TRASLAPE ESPACIAL" in msg_up:
+        return "Intervalo solapado o traslape espacial detectado en corridas LGG."
+    if "NÚMERO DE CORRIDA DUPLICADO" in msg_up or "NUMERO DE CORRIDA DUPLICADO" in msg_up or "CORRIDA DUPLICADA" in msg_up:
+        return "Número de corrida duplicado en el mismo taladro."
+    if "ESTRUCTURA DUPLICADA" in msg_up:
+        return "Estructura duplicada: registro idéntico de discontinuidad en la misma corrida."
     if "RUPTURA DE CONTINUIDAD" in msg_up:
         return "Ruptura de continuidad espacial detectada."
     if "LÍMITE CRÍTICO DE 1.6M" in msg_up or "LIMITE CRITICO DE 1.6M" in msg_up:

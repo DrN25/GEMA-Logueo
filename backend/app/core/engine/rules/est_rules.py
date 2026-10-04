@@ -78,6 +78,7 @@ class Estructural_GeometryAndAnglesRule(BaseRule):
     def evaluate(self, ctx: ValidationContext) -> List[Anomaly]:
         anomalies: List[Anomaly] = []
         exceptions = {"F", "RF", "VN", "SZ", "F+10", "BED"}
+        seen_structures_by_taladro: Dict[str, Dict[tuple, int]] = {}
 
         for s in ctx.est_structures:
             r_idx = s.get("_fila_excel", 0)
@@ -106,6 +107,24 @@ class Estructural_GeometryAndAnglesRule(BaseRule):
                     columna=col, valor_actual=val, severity=sev, mensaje=msg, modulo="Estructural",
                     campania=camp, geotecnico=geo
                 ))
+
+            # 0. Control de estructuras idénticas duplicadas en el taladro
+            if taladro not in seen_structures_by_taladro:
+                seen_structures_by_taladro[taladro] = {}
+
+            if depth is not None and depth > 0 and tipo_est and tipo_est != "-1" and alfa is not None and beta is not None:
+                try:
+                    alfa_f = float(alfa)
+                    beta_f = float(beta)
+                    d_key = (round(float(depth), 3), tipo_est.upper().strip(), round(alfa_f, 1), round(beta_f, 1))
+                    if d_key in seen_structures_by_taladro[taladro]:
+                        prev_row = seen_structures_by_taladro[taladro][d_key]
+                        add_err("R200_DUP", "profundidad", depth, Severity.ADVERTENCIA,
+                                f"Estructura duplicada detectada: Registro idéntico de discontinuidad en profundidad {depth}m (Tipo: '{tipo_est}', Alfa: {alfa}°, Beta: {beta}°), previamente registrada en la fila {prev_row}.")
+                    else:
+                        seen_structures_by_taladro[taladro][d_key] = r_idx
+                except (ValueError, TypeError):
+                    pass
 
             # 1. Valores negativos no permitidos
             raw_depth = raw_dict.get("profundidad")

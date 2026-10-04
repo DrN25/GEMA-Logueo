@@ -172,6 +172,7 @@ class LGG_PhysicalAndGeometricRule(BaseRule):
 
         for taladro, runs in ctx.lgg_by_taladro.items():
             last_a_by_taladro: Dict[str, float] = {}
+            seen_corridas_by_taladro: Dict[int, int] = {}
 
             for run in runs:
                 r_idx = run.get("_fila_excel", 0)
@@ -203,6 +204,21 @@ class LGG_PhysicalAndGeometricRule(BaseRule):
                         columna=col, valor_actual=val, severity=sev, mensaje=msg, modulo="LGG",
                         campania=camp, geotecnico=geo
                     ))
+
+                # 0. Control de número de corrida duplicado en el mismo taladro
+                raw_corr = raw_dict.get("corrida")
+                if raw_corr is not None and str(raw_corr).strip() not in ["", "-1"]:
+                    try:
+                        c_num = int(float(raw_corr))
+                        if c_num > 0:
+                            if c_num in seen_corridas_by_taladro:
+                                prev_row = seen_corridas_by_taladro[c_num]
+                                add_err("R100_DUP_CORRIDA", "corrida", raw_corr, Severity.ALERTA,
+                                        f"Número de corrida duplicado: La corrida #{c_num} se encuentra registrada más de una vez en el taladro '{taladro}' (registrada previamente en la fila {prev_row}).")
+                            else:
+                                seen_corridas_by_taladro[c_num] = r_idx
+                    except (ValueError, TypeError):
+                        pass
 
                 # 1. Valores negativos no permitidos
                 raw_de = raw_dict.get("de")
@@ -266,12 +282,16 @@ class LGG_PhysicalAndGeometricRule(BaseRule):
                         except (ValueError, TypeError):
                             pass
 
-                # 3. Continuidad espacial por taladro
+                # 3. Continuidad espacial por taladro (Brechas vs Solapamientos)
                 if de is not None and celda_padre in last_a_by_taladro:
                     prev_a = last_a_by_taladro[celda_padre]
-                    if abs(de - prev_a) > 0.001:
-                        gap = round(abs(de - prev_a), 4)
-                        add_err("R122", "de", de, Severity.ALERTA, f"Ruptura de continuidad espacial detectada. Datos evaluados -> Profundidad de inicio 'De': {de}m, Profundidad final anterior 'A': {prev_a}m (Brecha calculada: {gap}m).")
+                    diff = round(de - prev_a, 4)
+                    if abs(diff) > 0.001:
+                        if diff < 0:
+                            overlap = round(abs(diff), 4)
+                            add_err("R122_OVERLAP", "de", de, Severity.ALERTA, f"Intervalo solapado o traslape espacial detectado. Datos evaluados -> Profundidad de inicio 'De': {de}m, Profundidad final anterior 'A': {prev_a}m (Solapamiento de {overlap}m medido dos veces).")
+                        else:
+                            add_err("R122", "de", de, Severity.ALERTA, f"Ruptura de continuidad espacial detectada. Datos evaluados -> Profundidad de inicio 'De': {de}m, Profundidad final anterior 'A': {prev_a}m (Brecha calculada: {diff}m).")
                 if a is not None:
                     last_a_by_taladro[celda_padre] = a
 
