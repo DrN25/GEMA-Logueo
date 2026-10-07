@@ -99,8 +99,10 @@ class RMR_CrossCheckWithLGGRule(BaseRule):
         for taladro, rmr_runs in ctx.rmr_by_taladro.items():
             for rmr in rmr_runs:
                 r_idx = rmr.get("_fila_excel", 0)
-                corrida_num = rmr.get("corrida", 0)
-                celda_hija = f"{taladro}-RMR{corrida_num if corrida_num > 0 else r_idx}"
+                corrida_raw = rmr.get("corrida")
+                corrida_num = corrida_raw if corrida_raw is not None else 0
+                corrida_id = corrida_raw if (corrida_raw is not None and str(corrida_raw).strip() != "") else r_idx
+                celda_hija = f"{taladro}-RMR{corrida_id}"
                 camp = str(rmr.get("campana") or "N/A")
 
                 de = rmr.get("de")
@@ -237,8 +239,10 @@ class RMR_FormulasAndRatingsRule(BaseRule):
         for taladro, rmr_runs in ctx.rmr_by_taladro.items():
             for rmr in rmr_runs:
                 r_idx = rmr.get("_fila_excel", 0)
-                corrida_num = rmr.get("corrida", 0)
-                celda_hija = f"{taladro}-RMR{corrida_num if corrida_num > 0 else r_idx}"
+                corrida_raw = rmr.get("corrida")
+                corrida_num = corrida_raw if corrida_raw is not None else 0
+                corrida_id = corrida_raw if (corrida_raw is not None and str(corrida_raw).strip() != "") else r_idx
+                celda_hija = f"{taladro}-RMR{corrida_id}"
                 camp = str(rmr.get("campana") or "N/A")
 
                 a = rmr.get("a")
@@ -332,7 +336,59 @@ class RMR_FormulasAndRatingsRule(BaseRule):
                         add_err("R310", "presencia_agua", pres_agua, Severity.ALERTA,
                                 f"Presencia de Agua ({pres_agua}) no coincide con tabla teórica (esperado {expected_water} según profundidad {a}m).")
 
-                # 8. Descuadre RMR'76 (Suma directa de sub-ratings registrados, vacíos = 0.0)
+                # 8. Condición de Juntas RMR'76 = Persistencia + Abertura + Rugosidad + Relleno + Intemperismo
+                r76_juntas_val = rmr.get("r76_juntas")
+                r76_per = rmr.get("r76_persistencia")
+                r76_ab = rmr.get("r76_abertura")
+                r76_rug = rmr.get("r76_rugosidad")
+                r76_rel = rmr.get("r76_relleno")
+                r76_int = rmr.get("r76_intemperismo")
+
+                sub_params_76 = [r76_per, r76_ab, r76_rug, r76_rel, r76_int]
+                has_sub_76 = any(x is not None for x in sub_params_76)
+
+                if r76_juntas_val is not None:
+                    if r76_juntas_val < 0 or r76_juntas_val > 30:
+                        add_err("R_RMR76_JUNTAS_RANGE", "r76_juntas", r76_juntas_val, Severity.ALERTA,
+                                f"Puntaje de Condición de Juntas en RMR'76 ({r76_juntas_val}) fuera del rango permitido de 0 a 30.")
+                    elif has_sub_76:
+                        exp_juntas_76 = (r76_per or 0.0) + (r76_ab or 0.0) + (r76_rug or 0.0) + (r76_rel or 0.0) + (r76_int or 0.0)
+                        if abs(r76_juntas_val - exp_juntas_76) > 0.5:
+                            add_err("R_RMR76_JUNTAS_MISMATCH", "r76_juntas", r76_juntas_val, Severity.ALERTA,
+                                    f"Descuadre en Condición de Juntas (RMR'76): Excel registra {r76_juntas_val}, pero la suma de los 5 parámetros es {exp_juntas_76}. Desglose -> Persistencia({r76_per or 0.0}) + Abertura({r76_ab or 0.0}) + Rugosidad({r76_rug or 0.0}) + Relleno({r76_rel or 0.0}) + Intemperismo({r76_int or 0.0}) = {exp_juntas_76}.")
+                elif has_sub_76:
+                    exp_juntas_76 = (r76_per or 0.0) + (r76_ab or 0.0) + (r76_rug or 0.0) + (r76_rel or 0.0) + (r76_int or 0.0)
+                    if exp_juntas_76 > 0:
+                        add_err("R_RMR76_JUNTAS_MISMATCH", "r76_juntas", None, Severity.ALERTA,
+                                f"Condición de Juntas en RMR'76 se encuentra vacía en Excel, pero sus 5 parámetros suman {exp_juntas_76}. Desglose -> Persistencia({r76_per or 0.0}) + Abertura({r76_ab or 0.0}) + Rugosidad({r76_rug or 0.0}) + Relleno({r76_rel or 0.0}) + Intemperismo({r76_int or 0.0}) = {exp_juntas_76}.")
+
+                # 9. Condición de Juntas RMR'89 = Persistencia + Abertura + Rugosidad + Relleno + Intemperismo
+                r89_juntas_val = rmr.get("r89_juntas")
+                r89_per = rmr.get("r89_persistencia")
+                r89_ab = rmr.get("r89_abertura")
+                r89_rug = rmr.get("r89_rugosidad")
+                r89_rel = rmr.get("r89_relleno")
+                r89_int = rmr.get("r89_intemperismo")
+
+                sub_params_89 = [r89_per, r89_ab, r89_rug, r89_rel, r89_int]
+                has_sub_89 = any(x is not None for x in sub_params_89)
+
+                if r89_juntas_val is not None:
+                    if r89_juntas_val < 0 or r89_juntas_val > 30:
+                        add_err("R_RMR89_JUNTAS_RANGE", "r89_juntas", r89_juntas_val, Severity.ALERTA,
+                                f"Puntaje de Condición de Juntas en RMR'89 ({r89_juntas_val}) fuera del rango permitido de 0 a 30.")
+                    elif has_sub_89:
+                        exp_juntas_89 = (r89_per or 0.0) + (r89_ab or 0.0) + (r89_rug or 0.0) + (r89_rel or 0.0) + (r89_int or 0.0)
+                        if abs(r89_juntas_val - exp_juntas_89) > 0.5:
+                            add_err("R_RMR89_JUNTAS_MISMATCH", "r89_juntas", r89_juntas_val, Severity.ALERTA,
+                                    f"Descuadre en Condición de Juntas (RMR'89): Excel registra {r89_juntas_val}, pero la suma de los 5 parámetros es {exp_juntas_89}. Desglose -> Persistencia({r89_per or 0.0}) + Abertura({r89_ab or 0.0}) + Rugosidad({r89_rug or 0.0}) + Relleno({r89_rel or 0.0}) + Intemperismo({r89_int or 0.0}) = {exp_juntas_89}.")
+                elif has_sub_89:
+                    exp_juntas_89 = (r89_per or 0.0) + (r89_ab or 0.0) + (r89_rug or 0.0) + (r89_rel or 0.0) + (r89_int or 0.0)
+                    if exp_juntas_89 > 0:
+                        add_err("R_RMR89_JUNTAS_MISMATCH", "r89_juntas", None, Severity.ALERTA,
+                                f"Condición de Juntas en RMR'89 se encuentra vacía en Excel, pero sus 5 parámetros suman {exp_juntas_89}. Desglose -> Persistencia({r89_per or 0.0}) + Abertura({r89_ab or 0.0}) + Rugosidad({r89_rug or 0.0}) + Relleno({r89_rel or 0.0}) + Intemperismo({r89_int or 0.0}) = {exp_juntas_89}.")
+
+                # 10. Descuadre RMR'76 (Suma directa de sub-ratings registrados, vacíos = 0.0)
                 rmr76_excel = rmr.get("rmr76")
                 r76_res = rmr.get("r76_resistencia") or 0.0
                 r76_rqd = rmr.get("r76_rqd") or 0.0
@@ -349,7 +405,7 @@ class RMR_FormulasAndRatingsRule(BaseRule):
                         add_err("R_RMR76_MISMATCH", "rmr76", rmr76_excel, Severity.ALERTA,
                                 f"Descuadre en RMR'76: Excel registra {rmr76_excel}, pero la suma de sub-ratings registrados es {expected_rmr76}. Desglose -> Resistencia({r76_res}) + RQD({r76_rqd}) + Espaciamiento({r76_esp}) + Condición de Juntas({r76_juntas}) + Presencia de Agua({r76_agua}) = {expected_rmr76}.")
 
-                # 9. Descuadre RMR'89 (Suma directa de sub-ratings registrados, vacíos = 0.0)
+                # 11. Descuadre RMR'89 (Suma directa de sub-ratings registrados, vacíos = 0.0)
                 rmr89_excel = rmr.get("rmr89")
                 r89_res = rmr.get("r89_resistencia") or 0.0
                 r89_rqd = rmr.get("r89_rqd") or 0.0

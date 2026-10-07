@@ -230,3 +230,135 @@ def test_rqd_weak_weathered_compatibility_r141():
         assert "procedimiento" not in a.mensaje.lower(), f"Mensaje no debe mencionar procedimiento: {a.mensaje}"
 
 
+def test_rmr_condicion_de_juntas_validation():
+    """Valida la regla geomecánica Condición de Juntas = Persistencia + Abertura + Rugosidad + Relleno + Intemperismo."""
+    rule = RMR_FormulasAndRatingsRule()
+
+    # Caso 1: Fila conforme (76 y 89 cuadran exactamente)
+    row_ok = {
+        "_fila_excel": 2, "sondaje": "T1", "corrida": 1,
+        # RMR 76
+        "r76_persistencia": 2.0, "r76_abertura": 4.0, "r76_rugosidad": 3.0, "r76_relleno": 4.0, "r76_intemperismo": 5.0,
+        "r76_juntas": 18.0,
+        "r76_resistencia": 7.0, "r76_rqd": 13.0, "r76_espaciamiento": 10.0, "r76_agua": 10.0, "rmr76": 58.0,
+        # RMR 89
+        "r89_persistencia": 4.0, "r89_abertura": 4.0, "r89_rugosidad": 3.0, "r89_relleno": 4.0, "r89_intemperismo": 5.0,
+        "r89_juntas": 20.0,
+        "r89_resistencia": 7.0, "r89_rqd": 13.0, "r89_espaciamiento": 10.0, "r89_agua": 10.0, "rmr89": 60.0,
+    }
+
+    # Caso 2: Descuadre en Condición de Juntas RMR 89 (reporta 22, pero suma es 20)
+    row_mismatch_89 = {
+        "_fila_excel": 3, "sondaje": "T1", "corrida": 2,
+        "r89_persistencia": 4.0, "r89_abertura": 4.0, "r89_rugosidad": 3.0, "r89_relleno": 4.0, "r89_intemperismo": 5.0,
+        "r89_juntas": 22.0,  # Descuadre
+    }
+
+    # Caso 3: Descuadre en Condición de Juntas RMR 76 (reporta 15, pero suma es 18)
+    row_mismatch_76 = {
+        "_fila_excel": 4, "sondaje": "T1", "corrida": 3,
+        "r76_persistencia": 2.0, "r76_abertura": 4.0, "r76_rugosidad": 3.0, "r76_relleno": 4.0, "r76_intemperismo": 5.0,
+        "r76_juntas": 15.0,  # Descuadre
+    }
+
+    # Caso 4: Parámetros presentes pero celda de juntas vacía en Excel
+    row_empty_juntas = {
+        "_fila_excel": 5, "sondaje": "T1", "corrida": 4,
+        "r89_persistencia": 4.0, "r89_abertura": 4.0, "r89_rugosidad": 3.0, "r89_relleno": 4.0, "r89_intemperismo": 5.0,
+        "r89_juntas": None,  # Vacía
+    }
+
+    # Caso 5: Valor de juntas fuera de rango (0 a 30)
+    row_out_of_range = {
+        "_fila_excel": 6, "sondaje": "T1", "corrida": 5,
+        "r89_juntas": 35.0,
+    }
+
+    # Caso 6: Tramo OVD / Suelo (todo None, sin logueo geomecánico) -> NO debe generar anomalías
+    row_ovd = {
+        "_fila_excel": 7, "sondaje": "T1", "corrida": 6,
+        "r76_persistencia": None, "r76_abertura": None, "r76_rugosidad": None, "r76_relleno": None, "r76_intemperismo": None,
+        "r76_juntas": None, "rmr76": None,
+        "r89_persistencia": None, "r89_abertura": None, "r89_rugosidad": None, "r89_relleno": None, "r89_intemperismo": None,
+        "r89_juntas": None, "rmr89": None,
+    }
+
+    ctx = ValidationContext(rmr_runs=[row_ok, row_mismatch_89, row_mismatch_76, row_empty_juntas, row_out_of_range, row_ovd])
+    anomalies = rule.evaluate(ctx)
+
+    # Filtrar solo anomalías relacionadas a condición de juntas
+    juntas_anoms = [a for a in anomalies if "JUNTAS" in a.rule_code]
+    anom_by_row = {a.row_excel: a for a in juntas_anoms}
+
+    # Fila 2 (OK) no debe tener anomalías
+    assert 2 not in anom_by_row
+
+    # Fila 3: R_RMR89_JUNTAS_MISMATCH
+    assert 3 in anom_by_row
+    assert anom_by_row[3].rule_code == "R_RMR89_JUNTAS_MISMATCH"
+    assert "Persistencia(4.0)" in anom_by_row[3].mensaje
+
+    # Fila 4: R_RMR76_JUNTAS_MISMATCH
+    assert 4 in anom_by_row
+    assert anom_by_row[4].rule_code == "R_RMR76_JUNTAS_MISMATCH"
+    assert "Excel registra 15.0" in anom_by_row[4].mensaje
+
+    # Fila 5: R_RMR89_JUNTAS_MISMATCH por celda vacía
+    assert 5 in anom_by_row
+    assert anom_by_row[5].rule_code == "R_RMR89_JUNTAS_MISMATCH"
+    assert "se encuentra vacía" in anom_by_row[5].mensaje
+
+    # Fila 6: R_RMR89_JUNTAS_RANGE
+    assert 6 in anom_by_row
+    assert anom_by_row[6].rule_code == "R_RMR89_JUNTAS_RANGE"
+
+    # Fila 7 (OVD): no debe tener anomalías
+    assert 7 not in anom_by_row
+
+
+def test_rmr_subratings_column_resolution():
+    """Verifica que resolve_rmr_subratings_from_sheet identifique con precisión los bloques RMR'76 y RMR'89 sin colisiones."""
+    import openpyxl
+    from app.core.adapters.excel.rmr_reader import resolve_rmr_subratings_from_sheet
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Validación_RMR"
+
+    # Encabezados en fila 1:
+    # Col 1..5: Datos de entrada (Persistencia, Abertura, Rugosidad, Relleno, Intemperismo)
+    # Col 6..10: Bloque RMR 76 (con rmr76 al final)
+    # Col 11..15: Bloque RMR 89 (con rmr89 al final)
+    headers = [
+        "Sondaje", "De", "A", "Abertura (mm)", "Rugosidad ISRM",  # 1..5
+        # Bloque 76:
+        "R76 Resistencia", "R76 RQD", "Espaciamiento", "Persistencia", "Abertura", "Rugosidad", "Relleno", "Intemperismo", "Condición de Juntas", "Presencia de Agua", "RMR 76",  # 6..16
+        # Bloque 89:
+        "R89 Resistencia", "R89 RQD", "Espaciamiento", "Persistencia", "Abertura", "Rugosidad", "Relleno", "Intemperismo", "Condición de Juntas", "Presencia de Agua", "RMR 89",  # 17..27
+    ]
+    ws.append(headers)
+
+    res = resolve_rmr_subratings_from_sheet(ws, h_idx=1)
+
+    # Debe haber encontrado rmr76 en col 16 y rmr89 en col 27
+    assert res["rmr76"] == 16
+    assert res["rmr89"] == 27
+
+    # Subratings de 76 deben ser anteriores a col 16
+    assert res["r76_persistencia"] == 9
+    assert res["r76_abertura"] == 10
+    assert res["r76_rugosidad"] == 11
+    assert res["r76_relleno"] == 12
+    assert res["r76_intemperismo"] == 13
+    assert res["r76_juntas"] == 14
+
+    # Subratings de 89 deben estar entre col 17 y 27
+    assert res["r89_persistencia"] == 20
+    assert res["r89_abertura"] == 21
+    assert res["r89_rugosidad"] == 22
+    assert res["r89_relleno"] == 23
+    assert res["r89_intemperismo"] == 24
+    assert res["r89_juntas"] == 25
+
+
+

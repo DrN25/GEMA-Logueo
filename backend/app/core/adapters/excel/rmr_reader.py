@@ -9,8 +9,125 @@ from app.core.report_config import CAMPOS_EXTRA_A_CAPTURAR
 from app.core.engine.rules.common import sanitize_val, safe_str, safe_int
 from app.core.adapters.excel.patterns import RMR_PATTERNS, FALLBACK_RMR_MAP
 from app.core.adapters.excel.helpers import (
-    find_header_row_and_mapping, get_row_dict, capturar_faltantes_extra, FaltantesCollector
+    find_header_row_and_mapping, get_row_dict, capturar_faltantes_extra, FaltantesCollector, normalize_text
 )
+
+
+def resolve_rmr_subratings_from_sheet(ws_rmr, h_idx: int) -> Dict[str, int]:
+    """
+    Escanea la fila de encabezados para resolver inequívocamente las columnas de sub-ratings
+    de RMR'76 y RMR'89 según su bloque posicional, evitando colisiones con las columnas de entrada
+    (p. ej. Abertura en mm, códigos de Resistencia o Presencia de Agua de LGG).
+    """
+    col_rmr76 = None
+    col_rmr89 = None
+    juntas_cols = []
+    persistencia_cols = []
+
+    max_c = getattr(ws_rmr, "max_column", 100) or 100
+    headers = {}
+    for c in range(1, max_c + 1):
+        cell_v = ws_rmr.cell(row=h_idx, column=c).value
+        if cell_v is not None and str(cell_v).strip():
+            h_norm = normalize_text(cell_v)
+            headers[c] = h_norm
+            if "rmr76" in h_norm or "rmr1976" in h_norm or h_norm == "rmr76total":
+                col_rmr76 = c
+            elif "rmr89" in h_norm or "rmr1989" in h_norm or h_norm == "rmr89total":
+                col_rmr89 = c
+            if "condicion" in h_norm and "junta" in h_norm:
+                juntas_cols.append(c)
+            elif "persistencia" in h_norm:
+                persistencia_cols.append(c)
+
+    sub_map = {}
+    if col_rmr76:
+        sub_map["rmr76"] = col_rmr76
+    if col_rmr89:
+        sub_map["rmr89"] = col_rmr89
+
+    # Asignación de Condición de Juntas
+    if len(juntas_cols) >= 2:
+        sub_map["r76_juntas"] = juntas_cols[0]
+        sub_map["r89_juntas"] = juntas_cols[1]
+    elif len(juntas_cols) == 1:
+        if col_rmr76 and juntas_cols[0] > col_rmr76:
+            sub_map["r89_juntas"] = juntas_cols[0]
+        else:
+            sub_map["r76_juntas"] = juntas_cols[0]
+
+    # Asignación de Persistencia
+    if len(persistencia_cols) >= 2:
+        sub_map["r76_persistencia"] = persistencia_cols[0]
+        sub_map["r89_persistencia"] = persistencia_cols[1]
+    elif len(persistencia_cols) == 1:
+        if col_rmr76 and persistencia_cols[0] > col_rmr76:
+            sub_map["r89_persistencia"] = persistencia_cols[0]
+        else:
+            sub_map["r76_persistencia"] = persistencia_cols[0]
+
+    c_j76 = sub_map.get("r76_juntas")
+    c_j89 = sub_map.get("r89_juntas")
+
+    # Búsqueda acotada dentro del bloque RMR'76 (hacia atrás desde c_j76)
+    if c_j76:
+        search_start = max(1, c_j76 - 10)
+        for c in range(c_j76 - 1, search_start - 1, -1):
+            h = headers.get(c, "")
+            if not h:
+                continue
+            if "abertura" in h and "r76_abertura" not in sub_map and "(mm)" not in h and "mm" not in h.split():
+                sub_map["r76_abertura"] = c
+            elif "rugosidad" in h and "r76_rugosidad" not in sub_map:
+                sub_map["r76_rugosidad"] = c
+            elif "relleno" in h and "r76_relleno" not in sub_map and "clasificacion" not in h and "espesor" not in h:
+                sub_map["r76_relleno"] = c
+            elif "intemperismo" in h and "r76_intemperismo" not in sub_map:
+                sub_map["r76_intemperismo"] = c
+            elif "resistencia" in h and "r76_resistencia" not in sub_map:
+                sub_map["r76_resistencia"] = c
+            elif "rqd" in h and "r76_rqd" not in sub_map:
+                sub_map["r76_rqd"] = c
+            elif "espaciamiento" in h and "r76_espaciamiento" not in sub_map and "(mm)" not in h and "mm" not in h.split():
+                sub_map["r76_espaciamiento"] = c
+
+        # Presencia de Agua en RMR'76 (entre c_j76 y col_rmr76)
+        end_76 = col_rmr76 if col_rmr76 else c_j76 + 3
+        for c in range(c_j76 + 1, min(max_c + 1, end_76)):
+            h = headers.get(c, "")
+            if "agua" in h and "r76_agua" not in sub_map:
+                sub_map["r76_agua"] = c
+
+    # Búsqueda acotada dentro del bloque RMR'89 (hacia atrás desde c_j89)
+    if c_j89:
+        start_89 = col_rmr76 if col_rmr76 else max(1, c_j89 - 10)
+        for c in range(c_j89 - 1, start_89, -1):
+            h = headers.get(c, "")
+            if not h:
+                continue
+            if "abertura" in h and "r89_abertura" not in sub_map and "(mm)" not in h and "mm" not in h.split():
+                sub_map["r89_abertura"] = c
+            elif "rugosidad" in h and "r89_rugosidad" not in sub_map:
+                sub_map["r89_rugosidad"] = c
+            elif "relleno" in h and "r89_relleno" not in sub_map and "clasificacion" not in h and "espesor" not in h:
+                sub_map["r89_relleno"] = c
+            elif "intemperismo" in h and "r89_intemperismo" not in sub_map:
+                sub_map["r89_intemperismo"] = c
+            elif "resistencia" in h and "r89_resistencia" not in sub_map:
+                sub_map["r89_resistencia"] = c
+            elif "rqd" in h and "r89_rqd" not in sub_map:
+                sub_map["r89_rqd"] = c
+            elif "espaciamiento" in h and "r89_espaciamiento" not in sub_map and "(mm)" not in h and "mm" not in h.split():
+                sub_map["r89_espaciamiento"] = c
+
+        # Presencia de Agua en RMR'89 (entre c_j89 y col_rmr89)
+        end_89 = col_rmr89 if col_rmr89 else c_j89 + 3
+        for c in range(c_j89 + 1, min(max_c + 1, end_89)):
+            h = headers.get(c, "")
+            if "agua" in h and "r89_agua" not in sub_map:
+                sub_map["r89_agua"] = c
+
+    return sub_map
 
 
 def read_rmr_sheet(
@@ -26,6 +143,10 @@ def read_rmr_sheet(
     h_idx, rmr_map = find_header_row_and_mapping(ws_rmr, RMR_PATTERNS)
     if not (("sondaje" in rmr_map or "taladro" in rmr_map) and ("de" in rmr_map or "a" in rmr_map)):
         return 0, [], {}, {}, 75.0, 80.0
+
+    # Resolver dinámicamente los sub-ratings de RMR 76 y 89 por ubicación en la fila de cabecera
+    dyn_sub_map = resolve_rmr_subratings_from_sheet(ws_rmr, h_idx)
+    rmr_map.update(dyn_sub_map)
 
     for k, v in FALLBACK_RMR_MAP.items():
         if k not in rmr_map:
@@ -118,8 +239,11 @@ def read_rmr_sheet(
         for k in [
             "de", "a", "long_corrida", "rec_m", "rec_pct", "rqd_m", "rqd_pct", "lrf_m",
             "total_frac", "ff_1m", "espaciamiento_mm", "abertura_mm", "espesor_relleno",
-            "rmr76", "r76_resistencia", "r76_rqd", "r76_espaciamiento", "r76_juntas",
-            "r76_agua", "rmr89", "r89_resistencia", "r89_rqd", "r89_espaciamiento",
+            "rmr76", "r76_resistencia", "r76_rqd", "r76_espaciamiento", "r76_abertura",
+            "r76_rugosidad", "r76_relleno", "r76_intemperismo", "r76_persistencia",
+            "r76_juntas", "r76_agua",
+            "rmr89", "r89_resistencia", "r89_rqd", "r89_espaciamiento", "r89_abertura",
+            "r89_rugosidad", "r89_relleno", "r89_intemperismo", "r89_persistencia",
             "r89_juntas", "r89_agua"
         ]:
             if k in row_dict:

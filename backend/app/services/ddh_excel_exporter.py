@@ -145,6 +145,12 @@ def simplify_message(msg):
         return "Intemperismo en RMR no coincide con LGG."
     if "JRC10 EN RMR" in msg_up:
         return "JRC10 en RMR no coincide con LGG."
+    if "CONDICIÓN DE JUNTAS" in msg_up or "CONDICION DE JUNTAS" in msg_up:
+        if "89" in msg_up:
+            return "Descuadre en Condición de Juntas (RMR'89): la suma de los 5 parámetros de discontinuidad no coincide con el valor reportado."
+        if "76" in msg_up:
+            return "Descuadre en Condición de Juntas (RMR'76): la suma de los 5 parámetros de discontinuidad no coincide con el valor reportado."
+        return "Descuadre en Condición de Juntas: la suma de los 5 parámetros de discontinuidad no coincide con el valor reportado."
     if "RMR'76" in msg_up or "RMR 76" in msg_up:
         return "Descuadre matemático en RMR'76 registrado."
     if "RMR'89" in msg_up or "RMR 89" in msg_up:
