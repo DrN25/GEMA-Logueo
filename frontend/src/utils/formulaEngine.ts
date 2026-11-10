@@ -55,6 +55,7 @@ export function calculateSpacingRating89(spacingMm: number): number {
 }
 
 export function calculateApertureRating76(apertureMm: number): number {
+  if (apertureMm < 0) return 0;
   if (apertureMm === 0) return 5;
   if (apertureMm < 0.1) return 4;
   if (apertureMm <= 1.0) return 3;
@@ -63,6 +64,7 @@ export function calculateApertureRating76(apertureMm: number): number {
 }
 
 export function calculateApertureRating89(apertureMm: number): number {
+  if (apertureMm < 0) return 0;
   if (apertureMm === 0) return 6;
   if (apertureMm < 0.1) return 5;
   if (apertureMm <= 1.0) return 3;
@@ -112,9 +114,14 @@ export function getRockClass(rmrScore: number): string {
 export function calculateRowRmr(row: any, waterTableM: number = 97.0) {
   try {
     // --- DETECCIÓN DE DATOS INCOMPLETOS O VACÍOS ---
-    const numericFields = ['de', 'a', 'rec_m', 'rqd_m', 'lrf_m', 'small_frag_m', 'frac_nat', 'abertura', 'rugosidad', 'jrc10', 'espesor'];
+    // Nota: small_frag_m y jrc10 no se usan en el cálculo de RMR (según Excel de validación)
+    // y small_frag_m viene como -1.0 por defecto de BD cuando no se registra.
+    const numericFields = ['de', 'a', 'rec_m', 'rqd_m', 'lrf_m', 'frac_nat', 'abertura', 'rugosidad', 'espesor'];
     for (const key of numericFields) {
       const val = parseFloat(row[key]);
+      if (key === 'abertura' && val === -1) {
+        continue; // En Excel, abertura=-1 anula el puntaje de juntas sin invalidar la fila
+      }
       if (val === undefined || val === null || isNaN(val) || val === -1) {
         return { error: "Datos incompletos" }; // Retorno controlado sin lanzar excepciones
       }
@@ -164,23 +171,54 @@ export function calculateRowRmr(row: any, waterTableM: number = 97.0) {
     const sp_score_76 = calculateSpacingRating76(spacing_mm);
     const sp_score_89 = calculateSpacingRating89(spacing_mm);
 
-    const ab_score_76 = calculateApertureRating76(aperture);
-    const ab_score_89 = calculateApertureRating89(aperture);
+    // 4. Condición de Juntas (Ratings parciales)
+    let ab_score_76 = 0;
+    let ab_score_89 = 0;
+    let rg_score_76 = 0;
+    let rg_score_89 = 0;
+    let fl_score_76 = 0;
+    let fl_score_89 = 0;
+    let wt_score_76 = 0;
+    let wt_score_89 = 0;
+    let p_score_76 = 0;
+    let p_score_89 = 0;
+    let j_score_76 = 0;
+    let j_score_89 = 0;
 
-    const rg_score_76 = ROUGHNESS_RATINGS_76[roughness] || 0;
-    const rg_score_89 = ROUGHNESS_RATINGS_89[roughness] || 0;
+    if (aperture < 0) {
+      // En Excel, W2=-1 anula las celdas de juntas (AI2="", AM2="", AN2=""),
+      // aportando 0 al puntaje RMR total sin dar error al tramo.
+      ab_score_76 = 0;
+      ab_score_89 = 0;
+      rg_score_76 = 0;
+      rg_score_89 = 0;
+      fl_score_76 = 0;
+      fl_score_89 = 0;
+      wt_score_76 = 0;
+      wt_score_89 = 0;
+      p_score_76 = 0;
+      p_score_89 = 0;
+      j_score_76 = 0;
+      j_score_89 = 0;
+    } else {
+      ab_score_76 = calculateApertureRating76(aperture);
+      ab_score_89 = calculateApertureRating89(aperture);
 
-    const fl_score_76 = calculateFillingRating76(filling, thickness);
-    const fl_score_89 = calculateFillingRating89(filling, thickness);
+      rg_score_76 = ROUGHNESS_RATINGS_76[roughness] || 0;
+      rg_score_89 = ROUGHNESS_RATINGS_89[roughness] || 0;
 
-    const wt_score_76 = WEATHERING_RATINGS_76[weathering] || 0;
-    const wt_score_89 = WEATHERING_RATINGS_89[weathering] || 0;
+      fl_score_76 = calculateFillingRating76(filling, thickness);
+      fl_score_89 = calculateFillingRating89(filling, thickness);
 
-    const p_score_76 = Math.round((ab_score_76 + rg_score_76 + fl_score_76 + wt_score_76) / 4);
-    const p_score_89 = Math.round((ab_score_89 + rg_score_89 + fl_score_89 + wt_score_89) / 4);
+      wt_score_76 = WEATHERING_RATINGS_76[weathering] || 0;
+      wt_score_89 = WEATHERING_RATINGS_89[weathering] || 0;
 
-    const j_score_76 = ab_score_76 + rg_score_76 + fl_score_76 + wt_score_76 + p_score_76;
-    const j_score_89 = ab_score_89 + rg_score_89 + fl_score_89 + wt_score_89 + p_score_89;
+      p_score_76 = Math.round((ab_score_76 + rg_score_76 + fl_score_76 + wt_score_76) / 4);
+      p_score_89 = Math.round((ab_score_89 + rg_score_89 + fl_score_89 + wt_score_89) / 4);
+
+      j_score_76 = ab_score_76 + rg_score_76 + fl_score_76 + wt_score_76 + p_score_76;
+      j_score_89 = ab_score_89 + rg_score_89 + fl_score_89 + wt_score_89 + p_score_89;
+    }
 
     const water = calculateWaterRating(a, waterTableM);
 

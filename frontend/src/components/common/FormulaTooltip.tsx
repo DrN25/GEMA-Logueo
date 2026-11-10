@@ -251,18 +251,26 @@ export const FORMULA_DEFS: Record<string, FormulaDef> = {
 
   rmr_aperture_76: {
     title: "Rating Abertura (RMR'76)",
-    equation: "0mm→5 | <0.1mm→4 | 0.1-1.0mm→3 | 1-5mm→1 | >5mm→0",
-    description: "Puntaje de abertura de junta por rangos según Bieniawski 1976.",
+    equation: "<0mm (anulada)→0 | 0mm→5 | <0.1mm→4 | 0.1-1.0mm→3 | 1-5mm→1 | >5mm→0",
+    description: "Puntaje de abertura de junta por rangos según Bieniawski 1976. Un valor < 0 (ej. -1) anula el puntaje de juntas sin invalidar el tramo.",
     inputs: ["Abertura (mm)"],
-    calcExplanation: (p) => `Abertura: ${p?.aperture ?? '—'} mm → Rating: ${p?.val ?? '—'}`
+    calcExplanation: (p) => {
+      if (!p) return "";
+      const ap = p.aperture ?? 0;
+      return ap < 0 ? `Abertura: ${ap} mm (Juntas anuladas) → Rating: 0` : `Abertura: ${ap} mm → Rating: ${p.val ?? '—'}`;
+    }
   },
 
   rmr_aperture_89: {
     title: "Rating Abertura (RMR'89)",
-    equation: "0mm→6 | <0.1mm→5 | 0.1-1.0mm→3 | 1-5mm→1 | >5mm→0",
-    description: "Puntaje de abertura de junta por rangos según Bieniawski 1989.",
+    equation: "<0mm (anulada)→0 | 0mm→6 | <0.1mm→5 | 0.1-1.0mm→3 | 1-5mm→1 | >5mm→0",
+    description: "Puntaje de abertura de junta por rangos según Bieniawski 1989. Un valor < 0 (ej. -1) anula el puntaje de juntas sin invalidar el tramo.",
     inputs: ["Abertura (mm)"],
-    calcExplanation: (p) => `Abertura: ${p?.aperture ?? '—'} mm → Rating: ${p?.val ?? '—'}`
+    calcExplanation: (p) => {
+      if (!p) return "";
+      const ap = p.aperture ?? 0;
+      return ap < 0 ? `Abertura: ${ap} mm (Juntas anuladas) → Rating: 0` : `Abertura: ${ap} mm → Rating: ${p.val ?? '—'}`;
+    }
   },
 
   rmr_roughness_76: {

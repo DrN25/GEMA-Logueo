@@ -1,5 +1,17 @@
 import math
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Dict, Any
+
+def round_half_up(val: float | int | None, decimals: int = 0) -> int | float:
+    """Redondeo simétrico half-up (idéntico al ROUND de Excel, eliminando sesgo bancario half-to-even de Python)."""
+    if val is None:
+        return 0
+    d = Decimal(str(round(float(val), 10)))
+    if decimals == 0:
+        return int(d.quantize(Decimal('1'), rounding=ROUND_HALF_UP))
+    else:
+        q = Decimal('10') ** -decimals
+        return float(d.quantize(q, rounding=ROUND_HALF_UP))
 
 # Catálogos de puntuación estática
 STRENGTH_RATINGS = {
@@ -28,7 +40,7 @@ def calculate_rqd_rating(rqd_pct: float) -> int:
     elif rqd_pct > 100:
         return 20
     val = -0.000006 * (rqd_pct ** 3) + 0.0015 * (rqd_pct ** 2) + 0.0806 * rqd_pct + 3.0282
-    return round(val)
+    return int(round_half_up(val))
 
 def calculate_spacing_rating_76(spacing_mm: float) -> int:
     """Cálculo continuo logarítmico de espaciamiento para RMR'76."""
@@ -37,7 +49,7 @@ def calculate_spacing_rating_76(spacing_mm: float) -> int:
     elif spacing_mm >= 3000:
         return 30
     else:
-        return round(6.038 * math.log(spacing_mm) - 19.63)
+        return int(round_half_up(6.038 * math.log(spacing_mm) - 19.63))
 
 def calculate_spacing_rating_89(spacing_mm: float) -> int:
     """Cálculo continuo de espaciamiento para RMR'89 con capado de error."""
@@ -45,23 +57,25 @@ def calculate_spacing_rating_89(spacing_mm: float) -> int:
         return 5
     elif spacing_mm < 850:
         # Curva cuadrática
-        return round(-0.000005 * (spacing_mm ** 2) + 0.0136 * spacing_mm + 5.2849)
+        return int(round_half_up(-0.000005 * (spacing_mm ** 2) + 0.0136 * spacing_mm + 5.2849))
     elif spacing_mm <= 2000:
         # Curva lineal
-        return round(0.0056 * spacing_mm + 8.8775)
+        return int(round_half_up(0.0056 * spacing_mm + 8.8775))
     else:
         # Límite matemático (capado a puntaje máximo de 20 en lugar de error)
         return 20
 
 def calculate_aperture_rating_76(aperture_mm: float) -> int:
-    if aperture_mm == 0: return 5
+    if aperture_mm < 0: return 0
+    elif aperture_mm == 0: return 5
     elif aperture_mm < 0.1: return 4
     elif aperture_mm <= 1.0: return 3
     elif aperture_mm <= 5.0: return 1
     return 0
 
 def calculate_aperture_rating_89(aperture_mm: float) -> int:
-    if aperture_mm == 0: return 6
+    if aperture_mm < 0: return 0
+    elif aperture_mm == 0: return 6
     elif aperture_mm < 0.1: return 5
     elif aperture_mm <= 1.0: return 3
     elif aperture_mm <= 5.0: return 1
@@ -117,25 +131,27 @@ def calculate_row_rmr(data: Dict[str, Any], water_table_m: float = 97.0) -> Dict
         # Lectura de inputs del grid
         de = float(data.get("de", 0.0))
         a = float(data.get("a", 0.0))
-        perf = round(a - de, 2)
+        perf = round_half_up(a - de, 2)
         
         # Validar si el avance es ERROR
         if perf > 1.6:
             return {"error": "Longitud de corrida excede 1.6m"}
 
         # Validar que TODOS los campos requeridos estén completos (-1 / None / "")
-        # Mismos 17 campos que el frontend (formulaEngine.calculateRowRmr) para que
-        # nunca se persista un RMR que el usuario no vio. lito3 NO se exige
-        # (combinaciones sin lito3 son válidas).
+        # Mismos campos que el frontend (formulaEngine.calculateRowRmr) para que
+        # nunca se persista un RMR que el usuario no vio. lito3, small_frag_m y jrc10 NO se exigen
+        # (combinaciones sin lito3 son válidas y small_frag_m/jrc10 no se usan en RMR según Excel).
         required_numeric = (
-            "de", "a", "rec_m", "rqd_m", "lrf_m", "small_frag_m",
-            "frac_nat", "abertura", "rugosidad", "jrc10", "espesor",
+            "de", "a", "rec_m", "rqd_m", "lrf_m",
+            "frac_nat", "abertura", "rugosidad", "espesor",
         )
         required_string = (
             "lito1", "resistencia", "tipo_est1", "intemperismo", "relleno1", "agua_obs",
         )
         for key in required_numeric:
             v = data.get(key)
+            if key == "abertura" and (v == -1 or (isinstance(v, str) and v.strip() == "-1")):
+                continue  # En Excel, abertura=-1 anula el puntaje de juntas sin invalidar la fila
             if v is None or v == -1 or (isinstance(v, str) and v.strip() in ("", "-1")):
                 return {"error": "Fila incompleta: campo obligatorio vacío"}
         for key in required_string:
@@ -150,15 +166,15 @@ def calculate_row_rmr(data: Dict[str, Any], water_table_m: float = 97.0) -> Dict
         if rec_m > perf or rqd_m > rec_m:
             return {"error": "Inconsistencia de metrajes: Rec > Perf o RQD > Rec"}
             
-        rec_pct = round((rec_m / perf * 100) if perf > 0 else 0)
-        rqd_pct = round((rqd_m / perf * 100) if perf > 0 else 0)
+        rec_pct = int(round_half_up((rec_m / perf * 100) if perf > 0 else 0))
+        rqd_pct = int(round_half_up((rqd_m / perf * 100) if perf > 0 else 0))
         
         # Conteo de fracturas
         lrf_m = float(data.get("lrf_m", 0.0))
-        frf = math.floor(round(lrf_m * 100) / 5) + 1 if lrf_m > 0 else 0
+        frf = math.floor(round_half_up(lrf_m * 100) / 5) + 1 if lrf_m > 0 else 0
         frac_nat = int(data.get("frac_nat", 0))
         total_frac = frac_nat + frf
-        spacing_mm = round((perf / total_frac * 1000) if total_frac > 0 else perf * 1000)
+        spacing_mm = int(round_half_up((perf / total_frac * 1000) if total_frac > 0 else perf * 1000))
         
         strength = _norm_code(data.get("resistencia", "R4"))
         aperture = float(data.get("abertura", 0.0))
@@ -178,25 +194,41 @@ def calculate_row_rmr(data: Dict[str, Any], water_table_m: float = 97.0) -> Dict
         sp_score_89 = calculate_spacing_rating_89(spacing_mm)
         
         # 4. Condición de Juntas (Ratings parciales)
-        ab_score_76 = calculate_aperture_rating_76(aperture)
-        ab_score_89 = calculate_aperture_rating_89(aperture)
-        
-        rg_score_76 = ROUGHNESS_RATINGS_76.get(roughness, 0)
-        rg_score_89 = ROUGHNESS_RATINGS_89.get(roughness, 0)
-        
-        fl_score_76 = calculate_filling_rating_76(filling, thickness)
-        fl_score_89 = calculate_filling_rating_89(filling, thickness)
-        
-        wt_score_76 = WEATHERING_RATINGS_76.get(weathering, 0)
-        wt_score_89 = WEATHERING_RATINGS_89.get(weathering, 0)
-        
-        # Persistencia (Promedio)
-        p_score_76 = round((ab_score_76 + rg_score_76 + fl_score_76 + wt_score_76) / 4)
-        p_score_89 = round((ab_score_89 + rg_score_89 + fl_score_89 + wt_score_89) / 4)
-        
-        # Sumas de Juntas
-        j_score_76 = ab_score_76 + rg_score_76 + fl_score_76 + wt_score_76 + p_score_76
-        j_score_89 = ab_score_89 + rg_score_89 + fl_score_89 + wt_score_89 + p_score_89
+        if aperture < 0:
+            # En Excel, W2=-1 anula las celdas de juntas (AI2="", AM2="", AN2=""),
+            # aportando 0 al puntaje RMR total sin dar error al tramo.
+            ab_score_76 = 0
+            ab_score_89 = 0
+            rg_score_76 = 0
+            rg_score_89 = 0
+            fl_score_76 = 0
+            fl_score_89 = 0
+            wt_score_76 = 0
+            wt_score_89 = 0
+            p_score_76 = 0
+            p_score_89 = 0
+            j_score_76 = 0
+            j_score_89 = 0
+        else:
+            ab_score_76 = calculate_aperture_rating_76(aperture)
+            ab_score_89 = calculate_aperture_rating_89(aperture)
+            
+            rg_score_76 = ROUGHNESS_RATINGS_76.get(roughness, 0)
+            rg_score_89 = ROUGHNESS_RATINGS_89.get(roughness, 0)
+            
+            fl_score_76 = calculate_filling_rating_76(filling, thickness)
+            fl_score_89 = calculate_filling_rating_89(filling, thickness)
+            
+            wt_score_76 = WEATHERING_RATINGS_76.get(weathering, 0)
+            wt_score_89 = WEATHERING_RATINGS_89.get(weathering, 0)
+            
+            # Persistencia (Promedio) - Redondeo simétrico half-up (Excel ROUND)
+            p_score_76 = int(round_half_up((ab_score_76 + rg_score_76 + fl_score_76 + wt_score_76) / 4))
+            p_score_89 = int(round_half_up((ab_score_89 + rg_score_89 + fl_score_89 + wt_score_89) / 4))
+            
+            # Sumas de Juntas
+            j_score_76 = ab_score_76 + rg_score_76 + fl_score_76 + wt_score_76 + p_score_76
+            j_score_89 = ab_score_89 + rg_score_89 + fl_score_89 + wt_score_89 + p_score_89
         
         # 5. Agua Subterránea
         water = calculate_water_rating(a, water_table_m)

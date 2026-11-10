@@ -8,7 +8,7 @@ from app.core.engine.base_rule import BaseRule
 from app.core.engine.models import Anomaly, Severity
 from app.core.engine.context import ValidationContext
 from app.calculator import FILLING_CLASSES, _norm_code
-from app.core.engine.rules.common import is_missing_or_no_info
+from app.core.engine.rules.common import is_missing_or_no_info, safe_int
 
 # Tabla de Relleno canónica (admite códigos y nombres descriptivos)
 CANONICAL_FILLING_CLASS = {
@@ -48,7 +48,7 @@ class RMR_MandatoryFieldsRule(BaseRule):
         for taladro, rmr_runs in ctx.rmr_by_taladro.items():
             for rmr in rmr_runs:
                 r_idx = rmr.get("_fila_excel", 0)
-                corrida_num = rmr.get("corrida", 0)
+                corrida_num = safe_int(rmr.get("corrida"), 0)
                 celda_hija = f"{taladro}-RMR{corrida_num if corrida_num > 0 else r_idx}"
                 camp = str(rmr.get("campana") or "N/A")
                 tipo_est = str(rmr.get("tipo_estructura") or "").upper().strip()
@@ -100,7 +100,7 @@ class RMR_CrossCheckWithLGGRule(BaseRule):
             for rmr in rmr_runs:
                 r_idx = rmr.get("_fila_excel", 0)
                 corrida_raw = rmr.get("corrida")
-                corrida_num = corrida_raw if corrida_raw is not None else 0
+                corrida_num = safe_int(corrida_raw, 0)
                 corrida_id = corrida_raw if (corrida_raw is not None and str(corrida_raw).strip() != "") else r_idx
                 celda_hija = f"{taladro}-RMR{corrida_id}"
                 camp = str(rmr.get("campana") or "N/A")
@@ -240,7 +240,7 @@ class RMR_FormulasAndRatingsRule(BaseRule):
             for rmr in rmr_runs:
                 r_idx = rmr.get("_fila_excel", 0)
                 corrida_raw = rmr.get("corrida")
-                corrida_num = corrida_raw if corrida_raw is not None else 0
+                corrida_num = safe_int(corrida_raw, 0)
                 corrida_id = corrida_raw if (corrida_raw is not None and str(corrida_raw).strip() != "") else r_idx
                 celda_hija = f"{taladro}-RMR{corrida_id}"
                 camp = str(rmr.get("campana") or "N/A")

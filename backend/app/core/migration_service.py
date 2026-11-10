@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from fastapi import HTTPException
 from app import models
-from app.calculator import calculate_row_rmr
+from app.calculator import calculate_row_rmr, FILLING_CLASSES, _norm_code
 
 class GemaMigrationEngine:
     def __init__(self, db: Session):
@@ -351,7 +351,8 @@ class GemaMigrationEngine:
                 v_rmr.Abertura = self.sanitize_val(c.get("abertura"))
                 v_rmr.Rugosidad = self.sanitize_val(c.get("rugosidad"), str)
                 v_rmr.Relleno = self.sanitize_val(c.get("relleno1"), str)
-                v_rmr.ClasificacionRelleno = str(sc.get("relleno_76", 1))
+                f_code = _norm_code(c.get("relleno1"))
+                v_rmr.ClasificacionRelleno = str(FILLING_CLASSES.get(f_code, 1)) if f_code and f_code != "-1" else None
                 v_rmr.Intemperismo = self.sanitize_val(c.get("intemperismo"), str)
                 v_rmr.JRC10 = self.sanitize_val(c.get("jrc10"))
                 v_rmr.EspesorRelleno = self.sanitize_val(c.get("espesor"))
