@@ -84,7 +84,7 @@ export default function AuditoriaHub({ apiBase }: AuditoriaHubProps) {
                 </div>
             </div>
 
-            {/* Contenedor del Auditor Activo */}
+            {/* Contenedor del Revisor Activo */}
             <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
                 {auditMode === 'logueo' ? (
                     <BulkAuditor

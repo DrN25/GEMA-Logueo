@@ -205,7 +205,7 @@ export default function BulkAuditor({
           setStatus('loaded');
         } else {
           // Show a nice success toast that background import finished
-          setShowProgressToast(`¡Auditoría completada con éxito! La planilla "${data.nombre_archivo || 'importada'}" ya está disponible.`);
+          setShowProgressToast(`¡Revisión completada con éxito! La planilla "${data.nombre_archivo || 'importada'}" ya está disponible.`);
         }
       }
     } catch (e) {
@@ -272,7 +272,7 @@ export default function BulkAuditor({
         setHistory(data);
       }
     } catch (e) {
-      console.error("Error al cargar historial de auditorías:", e);
+      console.error("Error al cargar historial de revisiones:", e);
     }
   };
 
@@ -289,7 +289,7 @@ export default function BulkAuditor({
         const data = await resKpi.json();
         if (data.status === 'error') {
           setStatus('error');
-          setMessage(data.message || data.error_detail || 'Error cargando auditoría.');
+          setMessage(data.message || data.error_detail || 'Error cargando revisión.');
           setLoadingTable(false);
           return;
         }
@@ -345,7 +345,7 @@ export default function BulkAuditor({
   const handleWizardConfirm = async (payload: any) => {
     setIsWizardOpen(false);
     setStatus('processing');
-    setMessage('Ejecutando auditoría geotécnica cruzada en segundo plano...');
+    setMessage('Ejecutando revisión geotécnica cruzada en segundo plano...');
 
     const formData = new FormData();
     formData.append('file_lgg_est', payload.files.lgg_est);
@@ -372,7 +372,7 @@ export default function BulkAuditor({
       }
     } catch (e) {
       setStatus('error');
-      setMessage('Error de comunicación con el servidor al iniciar auditoría.');
+      setMessage('Error de comunicación con el servidor al iniciar revisión.');
     }
   };
 
@@ -472,7 +472,7 @@ export default function BulkAuditor({
         onConfirm={handleWizardConfirm}
       />
 
-      {/* HISTORIAL DE AUDITORÍAS PASADAS */}
+      {/* HISTORIAL DE REVISIONES PASADAS */}
       {status !== 'uploading' && (
         <AuditHistory
           history={history}
@@ -615,7 +615,7 @@ export default function BulkAuditor({
                   <ShieldCheck size={18} />
                 </div>
                 <div>
-                  <h1 className="text-xs font-black uppercase tracking-widest">Auditoría Geotécnica de Integridad</h1>
+                  <h1 className="text-xs font-black uppercase tracking-widest">Revisión Geotécnica de Integridad</h1>
                   <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-2">
                     <span>Planilla Activa: <span className="font-bold text-slate-100">{kpis?.nombre_archivo || 'Por Defecto'}</span></span>
                     {kpis?.formato_evaluado && (

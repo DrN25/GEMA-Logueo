@@ -238,7 +238,7 @@ export default function LggQaqcPanel({
             </div>
           </div>
 
-          {/* Auditoría QA/QC Card */}
+          {/* Revisión QA/QC Card */}
           <div className="glass-panel p-4 rounded-xl border border-navy-800/40 bg-navy-900/10 flex flex-col justify-between shadow-md">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">QA/QC en LGG</span>
@@ -474,7 +474,7 @@ export default function LggQaqcPanel({
         <div className="glass-panel p-5 rounded-xl border border-navy-800/40 bg-navy-900/10 space-y-4 shadow-xl">
           <div>
             <h3 className="text-sm font-bold text-slate-100 uppercase tracking-wide">
-              Listado Auditor de Inconsistencias (QA/QC)
+              Listado de Revisión de Inconsistencias (QA/QC)
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
               Detección reactiva de errores físicos de fragmentación y compatibilidades de litología y resistencia

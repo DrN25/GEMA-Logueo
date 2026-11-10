@@ -1,5 +1,5 @@
 /**
- * diffUtils.ts — Calculador de auditoría de cambios para Geolog Pro 2.0
+ * diffUtils.ts — Calculador de revisión de cambios para Geolog Pro 2.0
  *
  * Compara la versión original del taladro en BD (snapshot) contra el estado actual
  * en memoria (activeTaladro) y genera un desglose exacto de lo que cambió:
@@ -50,7 +50,7 @@ export interface AllTaladrosDiffSummary {
 }
 
 /**
- * Formatea valores para visualización amigable en el reporte de auditoría
+ * Formatea valores para visualización amigable en el reporte de revisión
  */
 function fmt(val: any): string {
   if (val === null || val === undefined || val === '') return '(vacío)';
@@ -149,7 +149,7 @@ export function computeTaladroDiff(before: any, after: any): TaladroDiffSummary 
   const normBefore = extractPersistible(before);
   const normAfter = extractPersistible(after);
 
-  // 1. Auditoría del Collar y Datos Generales
+  // 1. Revisión del Collar y Datos Generales
   const collarChanges: CollarChange[] = [];
   const collarFieldsMap: Record<string, string> = {
     name: 'Nombre Sondaje',
@@ -174,7 +174,7 @@ export function computeTaladroDiff(before: any, after: any): TaladroDiffSummary 
     }
   }
 
-  // 2. Auditoría de Corridas LGG
+  // 2. Revisión de Corridas LGG
   const corridasDiff = compareArrays(
     normBefore.corridas || [],
     normAfter.corridas || [],
@@ -187,7 +187,7 @@ export function computeTaladroDiff(before: any, after: any): TaladroDiffSummary 
     ]
   );
 
-  // 3. Auditoría de Discontinuidades Estructurales (EST)
+  // 3. Revisión de Discontinuidades Estructurales (EST)
   const discsDiff = compareArrays(
     normBefore.discontinuidades || [],
     normAfter.discontinuidades || [],
@@ -199,7 +199,7 @@ export function computeTaladroDiff(before: any, after: any): TaladroDiffSummary 
     ]
   );
 
-  // 4. Auditoría de Ensayos PLT
+  // 4. Revisión de Ensayos PLT
   const pltsDiff = compareArrays(
     normBefore.ensayos_plt || [],
     normAfter.ensayos_plt || [],
@@ -210,7 +210,7 @@ export function computeTaladroDiff(before: any, after: any): TaladroDiffSummary 
     ]
   );
 
-  // 5. Auditoría de Surveys
+  // 5. Revisión de Surveys
   const surveysDiff = compareArrays(
     normBefore.surveys || [],
     normAfter.surveys || [],

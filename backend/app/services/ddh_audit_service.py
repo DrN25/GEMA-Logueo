@@ -334,7 +334,7 @@ def run_revision_audit_pipeline(file_paths: dict, config: dict, audit_id: str, o
 
     except Exception as ex:
         import traceback
-        error_msg = f"Error crítico en pipeline de auditoría DDH: {str(ex)}\n{traceback.format_exc()}"
+        error_msg = f"Error crítico en pipeline de revisión DDH: {str(ex)}\n{traceback.format_exc()}"
         print(error_msg, flush=True)
         
         error_diag = {

@@ -184,7 +184,7 @@ export default function PltQaqcPanel({
                         </div>
                     </div>
 
-                    {/* Auditoría QA/QC PLT Card */}
+                    {/* Revisión QA/QC PLT Card */}
                     <div className="glass-panel p-4 rounded-xl border border-navy-800/40 bg-navy-900/10 flex flex-col justify-between shadow-md">
                         <div className="flex items-center justify-between">
                             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">QA/QC PLT</span>
@@ -317,11 +317,11 @@ export default function PltQaqcPanel({
 
                 </div>
 
-                {/* Listado Interactivo de Auditoría (PLT) */}
+                {/* Listado Interactivo de Revisión (PLT) */}
                 <div className="glass-panel p-5 rounded-xl border border-navy-800/40 bg-navy-900/10 space-y-4 shadow-xl">
                     <div>
                         <h3 className="text-sm font-bold text-slate-100 uppercase tracking-wide">
-                            Listado Auditor de Inconsistencias (QA/QC PLT)
+                            Listado de Revisión de Inconsistencias (QA/QC PLT)
                         </h3>
                         <p className="text-xs text-slate-400 mt-0.5">
                             Detección de tramos huérfanos, discrepancias litológicas y UCS, o dimensiones de probetas inadecuadas

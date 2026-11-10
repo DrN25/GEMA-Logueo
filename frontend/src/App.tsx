@@ -377,7 +377,7 @@ export default function App() {
     return null;
   });
 
-  // Modal de resultado de guardado con reporte de auditoría
+  // Modal de resultado de guardado con reporte de revisión
   const [saveResultModal, setSaveResultModal] = useState<{
     show: boolean;
     success: boolean;
@@ -646,7 +646,7 @@ export default function App() {
     return filteredTaladros.slice(start, start + pageSize);
   }, [filteredTaladros, page, pageSize, isOfflineMode]);
 
-  // Handlers para bÃºsqueda y paginaciÃ³n
+  // Handlers para búsqueda y paginación
   const handleSearchSubmit = (term: string, isGlobal: boolean) => {
     setSearchTerm(term);
     setIsGlobalSearch(isGlobal);
@@ -817,7 +817,7 @@ export default function App() {
           });
         }
 
-        // Snapshot original de la BD (fuente de verdad para auditoría y dirty detection)
+        // Snapshot original de la BD (fuente de verdad para revisión y dirty detection)
         const dbSnapshot = JSON.parse(JSON.stringify(data));
         const dbHash = computeTaladroHash(data);
         setDbSnapshotData(dbSnapshot);
@@ -1194,8 +1194,8 @@ export default function App() {
       let c_desde = r.corrida_desde !== undefined ? parseFloat(r.corrida_desde) || 0 : 0;
       let c_hasta = r.corrida_hasta !== undefined ? parseFloat(r.corrida_hasta) || 0 : 0;
 
-      // AUTOCOMPLETADO GEOLÃ“GICO:
-      // Se ignoran datos externos y se extrae la informaciÃ³n del taladro actual
+      // AUTOCOMPLETADO GEOLÓGICO:
+      // Se ignoran datos externos y se extrae la información del taladro actual
       let lito1 = 'MZB';
       let lito2 = '-';
       let lito3 = '-';
@@ -1208,7 +1208,7 @@ export default function App() {
         lito3 = (match.lito3 === "-1" || !match.lito3) ? "-" : match.lito3;
       }
 
-      // Se ejecuta la resoluciÃ³n en cascada geomecÃ¡nica oficial
+      // Se ejecuta la resolución en cascada geomecánica oficial
       const resCascade = resolveLithologyCascade(
         lito1,
         lito2,
@@ -1412,7 +1412,7 @@ export default function App() {
           discardLocalTaladro(originalName);
         }
 
-        // 5. Calcular auditoría de cambios
+        // 5. Calcular revisión de cambios
         const diffSummary = computeTaladroDiff(dbSnapshotData, activeTaladro);
 
         // 6. Actualizar snapshot hash y snapshot data
@@ -1426,9 +1426,9 @@ export default function App() {
         setSyncStatus('synced');
         removePendingTaladro(activeTaladro.name);
         setUnsavedTaladrosCount(getUnsavedTaladros().length);
-        setSyncMessage("Cambios guardados y auditados con éxito en SQL Server.");
+        setSyncMessage("Cambios guardados y revisados con éxito en SQL Server.");
 
-        // 7. Modal de éxito con reporte de auditoría
+        // 7. Modal de éxito con reporte de revisión
         setSaveResultModal({
           show: true,
           success: true,
@@ -1715,14 +1715,14 @@ export default function App() {
       validationSnapshot.ensayos_plt || [],
       true // evaluateAll: siempre evaluar todo (red de seguridad)
     );
-    // Campos obligatorios (VACIO) â€” filas vacantes ignoradas
+    // Campos obligatorios (VACIO) — filas vacantes ignoradas
     const vacios = toVacioAlerts(validateLogueoMandatory(validationSnapshot));
     return [...qaqc, ...vacios];
   }, [validationSnapshot, touchedTick]);
 
   // Mapped field focusing logic from ValidationPanel
   const handleFocusField = (fieldId: string) => {
-    // 1. Redireccionar de inmediato a la pestaÃ±a destino
+    // 1. Redireccionar de inmediato a la pestaña destino
     let targetView = 'lgg';
     let idPrefix = 'lgg-cell';
     const isStruct = fieldId.startsWith('struct-');
@@ -1742,7 +1742,7 @@ export default function App() {
 
     setCurrentView(targetView);
 
-    // 2. Extraer Ã­ndice y campo de forma genÃ©rica (ej. "plt-from_m-12" -> index: 12, fieldName: "from_m")
+    // 2. Extraer índice y campo de forma genérica (ej. "plt-from_m-12" -> index: 12, fieldName: "from_m")
     const parts = fieldId.split('-');
     let index: number | null = null;
     let fieldName = '';
@@ -1761,7 +1761,7 @@ export default function App() {
       }
     }
 
-    // Sincronizar la selecciÃ³n global de fila de inmediato para habilitar los inputs correspondientes
+    // Sincronizar la selección global de fila de inmediato para habilitar los inputs correspondientes
     if (index !== null) {
       setSelectedRowIndex(index);
     }
@@ -1781,7 +1781,7 @@ export default function App() {
         const tdElement = document.getElementById(`${idPrefix}-td-${index}-${fieldName}`);
         if (tdElement) {
           tdElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-          tdElement.click(); // Activa la fila y enfoca automÃ¡ticamente
+          tdElement.click(); // Activa la fila y enfoca automáticamente
         }
       }
     }, 100);
@@ -1793,7 +1793,7 @@ export default function App() {
     const newName = updatedCollar.name.trim().toUpperCase();
 
     if (oldName !== newName && newName.length > 0) {
-      // Siempre usar activeTaladro como base (estado mÃ¡s reciente en RAM)
+      // Siempre usar activeTaladro como base (estado más reciente en RAM)
       // NUNCA usar datos del cache localStorage que pueden estar desactualizados
       const updatedTal = { ...activeTaladro, ...updatedCollar, name: newName };
       localStorage.setItem(`geolog_taladro_${newName}`, JSON.stringify(updatedTal));
@@ -1816,25 +1816,25 @@ export default function App() {
       localStorage.setItem('geolog_taladros_summaries', JSON.stringify(updatedSummaries));
 
       setActiveTaladro(updatedTal);
-      // Dirty state se recalcula automÃ¡ticamente por el useEffect de hash
+      // Dirty state se recalcula automáticamente por el useEffect de hash
     } else {
       setActiveTaladro({
         ...activeTaladro,
         ...updatedCollar
       });
-      // Dirty state se recalcula automÃ¡ticamente por el useEffect de hash
+      // Dirty state se recalcula automáticamente por el useEffect de hash
     }
   };
 
   const handleSurveysChange = (updatedSurveys: Survey[]) => {
     if (!activeTaladro) return;
-    if (activeTaladro.surveys === updatedSurveys) return; // ComparaciÃ³n por referencia O(1)
+    if (activeTaladro.surveys === updatedSurveys) return; // Comparación por referencia O(1)
     setActiveTaladro({ ...activeTaladro, surveys: updatedSurveys });
   };
 
   const handleCorridasChange = (updatedCorridas: Corrida[]) => {
     if (!activeTaladro) return;
-    if (activeTaladro.corridas === updatedCorridas) return; // ComparaciÃ³n por referencia O(1)
+    if (activeTaladro.corridas === updatedCorridas) return; // Comparación por referencia O(1)
 
     // Auto-update structural discontinuities on depth changes
     const updatedDiscs = activeTaladro.discontinuidades.map(disc => {
@@ -1861,13 +1861,13 @@ export default function App() {
 
   const handleDiscontinuidadesChange = (updatedDiscs: Discontinuidad[]) => {
     if (!activeTaladro) return;
-    if (activeTaladro.discontinuidades === updatedDiscs) return; // ComparaciÃ³n por referencia O(1)
+    if (activeTaladro.discontinuidades === updatedDiscs) return; // Comparación por referencia O(1)
     setActiveTaladro({ ...activeTaladro, discontinuidades: updatedDiscs });
   };
 
   const handleEnsayosPltChange = (updatedPlts: EnsayoPlt[]) => {
     if (!activeTaladro) return;
-    if (activeTaladro.ensayos_plt === updatedPlts) return; // ComparaciÃ³n por referencia O(1)
+    if (activeTaladro.ensayos_plt === updatedPlts) return; // Comparación por referencia O(1)
     setActiveTaladro({ ...activeTaladro, ensayos_plt: updatedPlts });
   };
 
@@ -1953,7 +1953,7 @@ export default function App() {
             </div>
           )}
 
-          {/* 2. VISTAS CORE EN MODO KEEP-ALIVE (Toggles CSS instantÃ¡neos sin desmontar DOM) */}
+          {/* 2. VISTAS CORE EN MODO KEEP-ALIVE (Toggles CSS instantáneos sin desmontar DOM) */}
           {activeTaladro && (
             <>
               {/* Vista Collar y Survey */}
@@ -1970,7 +1970,7 @@ export default function App() {
                 />
               </div>
 
-              {/* Vista Logueo GeotÃ©cnico General (LGG) */}
+              {/* Vista Logueo Geotécnico General (LGG) */}
               <div className={currentView === 'lgg' ? "flex-1 flex flex-col min-h-0" : "hidden"}>
                 <LggView
                   corridas={activeTaladro.corridas}
@@ -2009,7 +2009,7 @@ export default function App() {
                   darkMode={darkMode}
                   sidebarCollapsed={sidebarCollapsed}
                   onFocusField={handleFocusField}
-                  // --- MEJORA: Sincronizar selecciÃ³n de fila con App.tsx ---
+                  // --- MEJORA: Sincronizar selección de fila con App.tsx ---
                   selectedRowIndex={selectedRowIndex}
                   onSelectRow={setSelectedRowIndex}
                 />
@@ -2025,7 +2025,7 @@ export default function App() {
                   alerts={activeAlerts}
                   onImportExcel={handleImportPltExcelData}
                   darkMode={darkMode}
-                  // --- MEJORA: Sincronizar selecciÃ³n de fila con App.tsx ---
+                  // --- MEJORA: Sincronizar selección de fila con App.tsx ---
                   selectedRowIndex={selectedRowIndex}
                   onSelectRow={setSelectedRowIndex}
                 />
@@ -2070,11 +2070,11 @@ export default function App() {
             <div className="flex-1 overflow-y-auto">
               <div className="glass-panel p-6 rounded-xl border border-navy-800 space-y-4 max-w-xl mx-auto text-slate-300">
                 <h2 className="text-lg font-bold text-slate-100 uppercase tracking-wide border-b border-navy-800 pb-2">
-                  ConfiguraciÃ³n de ParÃ¡metros
+                  Configuración de Parámetros
                 </h2>
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between items-center py-2 border-b border-navy-900/60">
-                    <span>CampaÃ±a</span>
+                    <span>Campaña</span>
                     <input
                       type="text"
                       value={activeTaladro.campana}
@@ -2089,12 +2089,12 @@ export default function App() {
                       onChange={(e) => handleCollarChange({ ...activeTaladro, turno: e.target.value })}
                       className="bg-navy-900 border border-navy-700 rounded px-2 py-1 text-slate-200 focus:outline-none"
                     >
-                      <option value="D">DÃ­a</option>
+                      <option value="D">Día</option>
                       <option value="N">Noche</option>
                     </select>
                   </div>
                   <div className="flex justify-between items-center py-2">
-                    <span>DiÃ¡metro Predeterminado</span>
+                    <span>Diámetro Predeterminado</span>
                     <select
                       value={activeTaladro.diametro}
                       onChange={(e) => handleCollarChange({ ...activeTaladro, diametro: e.target.value })}
@@ -2125,19 +2125,19 @@ export default function App() {
                 </div>
                 <div className="space-y-2">
                   <h2 className="text-xl font-bold text-slate-100 uppercase tracking-wider">
-                    ImportaciÃ³n y ExportaciÃ³n de Datos
+                    Importación y Exportación de Datos
                   </h2>
                   <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-500 dark:text-cyan-400 text-xs font-bold uppercase tracking-wider">
                     <Construction size={12} className="animate-spin" />
-                    MÃ³dulo En Progreso / In Progress
+                    Módulo En Progreso / In Progress
                   </div>
                 </div>
                 <p className="text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
-                  Este mÃ³dulo facilitarÃ¡ la importaciÃ³n directa de datos histÃ³ricos en formato BCP y la exportaciÃ³n unificada de registros a plantillas estructuradas de geotecnia minera para software especializado como <span className="text-slate-200 font-semibold">Leapfrog</span>, <span className="text-slate-200 font-semibold">gINT</span> y <span className="text-slate-200 font-semibold">Vulcan</span>.
+                  Este módulo facilitará la importación directa de datos históricos en formato BCP y la exportación unificada de registros a plantillas estructuradas de geotecnia minera para software especializado como <span className="text-slate-200 font-semibold">Leapfrog</span>, <span className="text-slate-200 font-semibold">gINT</span> y <span className="text-slate-200 font-semibold">Vulcan</span>.
                 </p>
                 <div className="pt-4 border-t border-navy-800/60 max-w-md mx-auto">
                   <p className="text-xs text-slate-500">
-                    La conexiÃ³n duplicada con SQL Server local se encuentra activa. Las rutinas de persistencia normalizadas ya estÃ¡n preparadas en el backend API.
+                    La conexión duplicada con SQL Server local se encuentra activa. Las rutinas de persistencia normalizadas ya están preparadas en el backend API.
                   </p>
                 </div>
               </div>
@@ -2145,7 +2145,7 @@ export default function App() {
           )}
         </div>
 
-        {/* Floating validation QA/QC panel (handles its own positioning left/right) â€” hidden on Carga para RevisiÃ³n */}
+        {/* Floating validation QA/QC panel (handles its own positioning left/right) — hidden on Carga para Revisión */}
         {activeTaladro && currentView !== 'revision' && (
           <ValidationPanel
             alerts={activeAlerts}
@@ -2188,7 +2188,7 @@ export default function App() {
         onClose={() => setShowDiscardModal(false)}
       />
 
-      {/* Modal de pre-confirmaciÃ³n de guardado */}
+      {/* Modal de pre-confirmación de guardado */}
       <SaveConfirmModal
         show={showSaveConfirmModal}
         activeTaladroName={activeTaladro?.name || ''}
@@ -2199,19 +2199,19 @@ export default function App() {
         onClose={() => setShowSaveConfirmModal(false)}
       />
 
-      {/* Modal de Carga / Bloqueo a pantalla completa durante la sincronizaciÃ³n */}
+      {/* Modal de Carga / Bloqueo a pantalla completa durante la sincronización */}
       {isLoadingTaladro && (
         <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-navy-950/85 backdrop-blur-md animate-fade-in pointer-events-auto cursor-wait">
           <div className="glass-panel p-8 rounded-2xl border border-navy-800 flex flex-col items-center gap-4 bg-navy-900/95 text-center shadow-2xl max-w-sm">
             <div className="relative w-16 h-16 flex items-center justify-center">
-              {/* Dos spinners concÃ©ntricos en direcciÃ³n opuesta */}
+              {/* Dos spinners concéntricos en dirección opuesta */}
               <div className="absolute inset-0 rounded-full border-4 border-cyan-500/10 border-t-cyan-500 animate-spin" />
               <div className="absolute inset-2 rounded-full border-4 border-emerald-500/10 border-b-emerald-500 animate-spin [animation-duration:1.2s] [animation-direction:reverse]" />
             </div>
             <div className="space-y-1.5">
               <h3 className="text-xs font-black text-slate-100 uppercase tracking-wider">Sincronizando con SQL Server</h3>
               <p className="text-xs text-slate-400 font-semibold leading-relaxed">
-                Guardando datos en la base de datos oficial. Por favor no cambie de pestaÃ±a ni cierre la aplicaciÃ³n.
+                Guardando datos en la base de datos oficial. Por favor no cambie de pestaña ni cierre la aplicación.
               </p>
             </div>
           </div>

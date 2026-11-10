@@ -241,7 +241,7 @@ export function setCachedTaladro(name: string, data: any): StorageResult {
   return safeSetItem(KEY_TALADRO(name), JSON.stringify(data), { activeTaladro: name });
 }
 
-/** Guarda el snapshot de base de datos para auditoría y dirty tracking. */
+/** Guarda el snapshot de base de datos para revisión y dirty tracking. */
 export function setCachedSnapshotData(name: string, data: any): StorageResult {
   return safeSetItem(KEY_SNAPSHOT(name), JSON.stringify(data));
 }

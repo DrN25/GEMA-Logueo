@@ -342,7 +342,7 @@ class PltRegularesValidator:
                 campaign_stats[campana]["advertencias"] += 1
 
         # =====================================================================
-        # FASE 1: AUDITORÍA DE DUPLICADOS Y MEDICIONES REPETITIVAS A NIVEL DATASET
+        # FASE 1: REVISIÓN DE DUPLICADOS Y MEDICIONES REPETITIVAS A NIVEL DATASET
         # =====================================================================
         seen_samples: Dict[Tuple[str, str], int] = {}       # (taladro, muestra) -> first_row
         seen_intervals: Dict[Tuple[str, float, float], int] = {}  # (taladro, from, to) -> first_row
@@ -414,7 +414,7 @@ class PltRegularesValidator:
                 lgg_by_dh[str(dh_name).strip().upper()] = grp
 
         # =====================================================================
-        # FASE 2: AUDITORÍA FILA A FILA (34 COLUMNAS, FACTOR K Y CRUCE CON LGG)
+        # FASE 2: REVISIÓN FILA A FILA (34 COLUMNAS, FACTOR K Y CRUCE CON LGG)
         # =====================================================================
         for idx in range(total_rows):
             row = df.iloc[idx]

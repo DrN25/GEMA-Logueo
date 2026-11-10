@@ -204,12 +204,12 @@ export default function PltBulkAuditor({
             setSelectedAuditId(data.audit_id);
             setKpis(data.metricas || data.summary);
             setStatus('loaded');
-            setMessage(data.message || 'Auditoría completada exitosamente.');
+            setMessage(data.message || 'Revisión completada exitosamente.');
             await fetchHistory();
             await fetchPaginatedIncidencias(1);
         } catch (e: any) {
             setStatus('error');
-            setMessage(e.message || 'Error durante la auditoría.');
+            setMessage(e.message || 'Error durante la revisión.');
             throw e;
         }
     };
@@ -225,7 +225,7 @@ export default function PltBulkAuditor({
     };
 
     const handleClearHistory = async () => {
-        if (!confirm('¿Deseas limpiar todo el historial de auditorías PLT?')) return;
+        if (!confirm('¿Deseas limpiar todo el historial de revisiones PLT?')) return;
         try {
             await fetch(`${apiBase}/api/auditoria/plt/historial`, { method: 'DELETE' });
             setHistory([]);
@@ -255,7 +255,7 @@ export default function PltBulkAuditor({
             const a = document.createElement('a');
             a.href = downloadUrl;
             const tag = isAll ? (selectedAuditId || 'latest') : `${selectedAuditId || 'latest'}_${activeYears.join('-')}`;
-            a.download = `Reporte_Auditoria_PLT_Regulares_${tag}.xlsx`;
+            a.download = `Reporte_Revision_PLT_Regulares_${tag}.xlsx`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -278,7 +278,7 @@ export default function PltBulkAuditor({
                     <div>
                         <div className="flex flex-wrap items-center gap-2.5">
                             <h1 className="text-base sm:text-lg font-black tracking-wider text-slate-100 uppercase">
-                                Auditoría QA/QC — Ensayos PLT Regulares (DDH)
+                                Revisión QA/QC — Ensayos PLT Regulares (DDH)
                             </h1>
                             {kpis?.has_lgg_crosscheck ? (
                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-cyan-500/15 text-cyan-400 border border-cyan-500/30">
@@ -303,7 +303,7 @@ export default function PltBulkAuditor({
                         className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black bg-cyan-500 text-slate-950 hover:bg-cyan-400 transition-all shadow-md shadow-cyan-500/20"
                     >
                         <PlusCircle size={15} />
-                        <span>Nueva Auditoría</span>
+                        <span>Nueva Revisión</span>
                     </button>
 
                     {status === 'loaded' && (
@@ -323,7 +323,7 @@ export default function PltBulkAuditor({
                 </div>
             </div>
 
-            {/* Historial de Auditorías */}
+            {/* Historial de Revisiones */}
             {history.length > 0 && (
                 <PltAuditHistory
                     history={history}
@@ -333,7 +333,7 @@ export default function PltBulkAuditor({
                 />
             )}
 
-            {/* Estado Inicial / Sin Auditoría */}
+            {/* Estado Inicial / Sin Revisión */}
             {status === 'idle' && history.length === 0 && (
                 <div className="rounded-2xl border border-dashed border-navy-800 bg-navy-900/30 p-12 flex flex-col items-center justify-center text-center space-y-4">
                     <div className="p-4 bg-navy-900 text-cyan-400 rounded-2xl border border-navy-800">
@@ -341,7 +341,7 @@ export default function PltBulkAuditor({
                     </div>
                     <div className="max-w-md space-y-1">
                         <h3 className="text-sm font-black text-slate-200 uppercase tracking-wider">
-                            No hay auditorías PLT activas
+                            No hay revisiones PLT activas
                         </h3>
                         <p className="text-xs text-slate-400">
                             Carga una planilla Excel de Ensayos PLT Regulares (DDH) para ejecutar el motor de validación geomecánica de 34 columnas.
@@ -362,7 +362,7 @@ export default function PltBulkAuditor({
                 <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <AlertTriangle size={16} className="shrink-0" />
-                        <span>{message || 'Ocurrió un error al procesar la auditoría.'}</span>
+                        <span>{message || 'Ocurrió un error al procesar la revisión.'}</span>
                     </div>
                     <button
                         onClick={() => setIsWizardOpen(true)}
@@ -376,7 +376,7 @@ export default function PltBulkAuditor({
             {/* Panel Principal cuando hay datos cargados */}
             {kpis && (
                 <>
-                    {/* Selector de Años / Campañas a Auditar */}
+                    {/* Selector de Años / Campañas a Revisar */}
                     <AuditYearSelector
                         selectedYears={activeYears}
                         onYearsChange={setActiveYears}

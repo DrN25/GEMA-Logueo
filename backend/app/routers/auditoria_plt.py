@@ -293,7 +293,7 @@ async def upload_plt_audit_file(
         return JSONResponse(
             content={
                 "status": "success",
-                "message": "Auditoría PLT ejecutada correctamente" + (" (con cruce LGG)" if df_lgg is not None else " (modo autónomo)"),
+                "message": "Revisión PLT ejecutada correctamente" + (" (con cruce LGG)" if df_lgg is not None else " (modo autónomo)"),
                 "audit_id": audit_id,
                 "filename": file.filename,
                 "lgg_filename": lgg_file.filename if lgg_file else None,
@@ -319,7 +319,7 @@ async def upload_plt_audit_file(
 def get_latest_plt_diagnostic():
     """Retorna el diagnóstico completo de la última auditoría PLT."""
     if not os.path.exists(LATEST_PLT_DIAG):
-        raise HTTPException(status_code=404, detail="No se encontró ninguna auditoría PLT activa.")
+        raise HTTPException(status_code=404, detail="No se encontró ninguna revisión PLT activa.")
     with open(LATEST_PLT_DIAG, "r", encoding="utf-8") as f:
         return JSONResponse(content=json.load(f))
 
@@ -336,7 +336,7 @@ def get_plt_resumen_ligero(
         diag_path = LATEST_PLT_DIAG
 
     if not os.path.exists(diag_path):
-        raise HTTPException(status_code=404, detail="No se encontró la auditoría solicitada.")
+        raise HTTPException(status_code=404, detail="No se encontró la revisión solicitada.")
 
     with open(diag_path, "r", encoding="utf-8") as f:
         diag = json.load(f)
@@ -448,7 +448,7 @@ def download_plt_excel_report(
             return FileResponse(
                 gen_path,
                 media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                filename=f"Reporte_Auditoria_PLT_{camps_tag}.xlsx"
+                filename=f"Reporte_Revision_PLT_{camps_tag}.xlsx"
             )
         except Exception as e:
             print(f"[QAQC PLT] Error al generar reporte filtrado: {e}")
@@ -479,9 +479,9 @@ def download_plt_excel_report(
                 raise HTTPException(status_code=500, detail=f"Error generando reporte Excel: {str(e)}")
 
     if not target_file or not os.path.exists(target_file):
-        raise HTTPException(status_code=404, detail="No se encontró el reporte Excel para la auditoría solicitada.")
+        raise HTTPException(status_code=404, detail="No se encontró el reporte Excel para la revisión solicitada.")
 
-    filename = f"Reporte_Auditoria_PLT_Regulares_{audit_id or 'ultimo'}.xlsx"
+    filename = f"Reporte_Revision_PLT_Regulares_{audit_id or 'ultimo'}.xlsx"
     return FileResponse(
         target_file,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

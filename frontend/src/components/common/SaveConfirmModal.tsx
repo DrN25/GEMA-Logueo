@@ -15,7 +15,7 @@ interface SaveConfirmModalProps {
 }
 
 /**
- * Modal de pre-confirmación de guardado (Pre-Flight Audit).
+ * Modal de pre-confirmación de guardado (Revisión Previa).
  * Permite al usuario revisar de forma amigable la información y métricas
  * antes de enviar la transacción a SQL Server.
  * El guardado se BLOQUEA si hay campos obligatorios vacíos o errores
@@ -48,7 +48,7 @@ export default function SaveConfirmModal({
 
   const isScopeActive = saveScope === 'active';
 
-  // ─── AUDITORÍA FINAL (red de seguridad): vacíos + QA/QC críticos ─────────
+  // ─── REVISIÓN FINAL (red de seguridad): vacíos + QA/QC críticos ─────────
   const blockingIssues = useMemo(() => {
     if (!activeTaladro) return { vacios: [], criticas: [], advertencias: [] };
     const vacios = validateLogueoMandatory(activeTaladro);
@@ -90,7 +90,7 @@ export default function SaveConfirmModal({
                 Confirmar Guardado de Cambios
               </h3>
               <p className="text-xs text-slate-400">
-                Auditoría previa a la sincronización oficial en la base de datos
+                Revisión previa a la sincronización oficial en la base de datos
               </p>
             </div>
           </div>
@@ -261,7 +261,7 @@ export default function SaveConfirmModal({
           {!hasBlockingErrors && (
             <div className="flex items-center gap-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-300 text-xs">
               <AlertTriangle size={16} className="shrink-0 text-amber-400" />
-              <span>Al confirmar, los datos serán guardados y auditados de forma permanente en la base de datos.</span>
+              <span>Al confirmar, los datos serán guardados y revisados de forma permanente en la base de datos.</span>
             </div>
           )}
 

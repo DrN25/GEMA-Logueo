@@ -150,7 +150,7 @@ def export_plt_regulares_to_excel(diag: Dict[str, Any], output_path: str):
     ws_dash.title = "📊 Dashboard Ejecutivo"
     ws_dash.views.sheetView[0].showGridLines = True
 
-    ws_dash.cell(row=2, column=2, value="SISTEMA DE AUDITORÍA GEOTÉCNICA — ENSAYOS PLT REGULARES").font = font_title
+    ws_dash.cell(row=2, column=2, value="SISTEMA DE REVISIÓN GEOTÉCNICA — ENSAYOS PLT REGULARES").font = font_title
     ws_dash.cell(
         row=3, column=2,
         value=f"Dashboard Ejecutivo de Control de Calidad, Consistencia Geomecánica y Diámetros de Perforación (Logueo DDH) | Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}"
@@ -325,7 +325,7 @@ def export_plt_regulares_to_excel(diag: Dict[str, Any], output_path: str):
     ws_cat.cell(row=2, column=2, value="REGISTRO MAESTRO DE REGLAS DE CONSISTENCIA PLT REGULARES").font = font_title
     ws_cat.cell(
         row=3, column=2,
-        value="Catálogo canónico de inconsistencias geomecánicas ordenadas por frecuencia. Use los hipervínculos para auditar registros."
+        value="Catálogo canónico de inconsistencias geomecánicas ordenadas por frecuencia. Use los hipervínculos para revisar registros específicos."
     ).font = font_subtitle
 
     all_campaigns = sorted(list(diag.get("campaign_stats", {}).keys()))
@@ -743,7 +743,7 @@ def export_plt_regulares_to_excel(diag: Dict[str, Any], output_path: str):
     ws_detail.cell(row=2, column=2, value="REGISTRO DETALLADO DE TODAS LAS INCIDENCIAS DETECTADAS").font = font_title
     ws_detail.cell(
         row=3, column=2,
-        value="Base de datos plana de inconsistencias. Utilice los filtros en los encabezados para auditar registros específicos."
+        value="Base de datos plana de inconsistencias. Utilice los filtros en los encabezados para revisar registros específicos."
     ).font = font_subtitle
 
     headers_detail = [
@@ -901,7 +901,7 @@ def export_plt_regulares_to_excel(diag: Dict[str, Any], output_path: str):
     except PermissionError:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         dir_name = os.path.dirname(output_path)
-        alt_path = os.path.join(dir_name, f"Reporte_Auditoria_PLT_Regulares_{timestamp}.xlsx")
+        alt_path = os.path.join(dir_name, f"Reporte_Revision_PLT_Regulares_{timestamp}.xlsx")
         wb.save(alt_path)
         print(f">> AVISO: '{output_path}' está abierto en Excel.")
         print(f">> Se guardó una copia con timestamp en: {alt_path}")

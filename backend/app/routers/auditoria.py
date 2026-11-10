@@ -185,7 +185,7 @@ def obtener_resumen_ligero(audit_id: str = None, years: str = None):
                 raw_file = os.path.join(history_dir, f"{latest_id}_diagnostico.json")
                 compact_file = os.path.join(history_dir, f"{latest_id}_compact.json")
             else:
-                return JSONResponse(status_code=202, content={"status": "procesando", "message": "Esperando inicialización de datos de auditoría..."})
+                return JSONResponse(status_code=202, content={"status": "procesando", "message": "Esperando inicialización de datos de revisión..."})
 
     # Si no hay filtro de años y ya existe el compact, retornar directamente el compact precalculado
     if (not years or years.strip().upper() in ("TODOS", "TODAS", "ALL", "")) and os.path.exists(compact_file):
@@ -278,7 +278,7 @@ def descargar_reporte_excel(audit_id: str = None):
     return FileResponse(
         path=file_path,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        filename="Reporte_Auditoria_Geotecnica_Logueo.xlsx"
+        filename="Reporte_Revision_Geotecnica_Logueo.xlsx"
     )
 
 
@@ -293,15 +293,15 @@ def descargar_reporte_markdown(audit_id: str = None, years: str = None):
     m = resumen.get("metricas_globales", {})
     correct_pct = ((m.get("total_ok", 0) / max(1, m.get("total_celdas_hija_procesadas", 0))) * 100)
     
-    md_content = f"""# REPORTE DE AUDITORÍA GEOTÉCNICA Y CONTROL DE CALIDAD (QA/QC)
+    md_content = f"""# REPORTE DE REVISIÓN GEOTÉCNICA Y CONTROL DE CALIDAD (QA/QC)
 Generado el: {resumen.get("fecha_auditoria", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))}
 Archivo evaluado: {title}
-Código de Auditoría: {resumen.get("audit_id", "default")}
+Código de Revisión: {resumen.get("audit_id", "default")}
 
 ---
 
 ## 1. RESUMEN EJECUTIVO DE INTEGRIDAD
-El sistema de auditoría ha evaluado la consistencia física de las corridas de logueo general (LGG) y la relación espacial de las discontinuidades estructurales (Logueo Estructural), cruzando durezas, litologías, e intervalos.
+El sistema de revisión ha evaluado la consistencia física de las corridas de logueo general (LGG) y la relación espacial de las discontinuidades estructurales (Logueo Estructural), cruzando durezas, litologías, e intervalos.
 
 *   **Total de Taladros Evaluados:** {resumen.get("familia1", {}).get("num_celdas_padre", 0)}
 *   **Total de Registros de Logueo Procesados:** {resumen.get("familia1", {}).get("total_discontinuidades", 0)}
@@ -334,10 +334,10 @@ A continuación se detalla la cantidad de desviaciones encontradas agrupadas por
         
     md_content += """
 ---
-*Fin del Reporte Técnico de Auditoría. Geolog Pro 2.0.*
+*Fin del Reporte Técnico de Revisión. Geolog Pro 2.0.*
 """
     headers = {
-        'Content-Disposition': f'attachment; filename="Reporte_Auditoria_{resumen.get("audit_id", "logueo")}.md"'
+        'Content-Disposition': f'attachment; filename="Reporte_Revision_{resumen.get("audit_id", "logueo")}.md"'
     }
     return StreamingResponse(io.BytesIO(md_content.encode("utf-8")), media_type="text/markdown", headers=headers)
 

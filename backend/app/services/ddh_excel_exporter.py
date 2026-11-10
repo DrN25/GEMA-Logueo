@@ -394,7 +394,7 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
     ws_dash.title = "📊 Dashboard Ejecutivo"
     ws_dash.views.sheetView[0].showGridLines = True
     
-    ws_dash.cell(row=2, column=2, value="SISTEMA DE REVISIÓN Y AUDITORÍA").font = font_title
+    ws_dash.cell(row=2, column=2, value="SISTEMA DE REVISIÓN GEOTÉCNICA").font = font_title
     ws_dash.cell(row=3, column=2, value="Dashboard de Control de Calidad y Consistencia Geomecánica").font = font_subtitle
     
     total_filas = compact.get("familia1", {}).get("total_discontinuidades", 0)

@@ -70,7 +70,7 @@ export default function PltImportWizard({
                     <div className="flex justify-between items-center p-5">
                         <div>
                             <h2 className="text-lg font-black text-slate-100 uppercase tracking-wider">
-                                Asistente de Auditoría PLT Regulares (DDH)
+                                Asistente de Revisión PLT Regulares (DDH)
                             </h2>
                             <p className="text-xs text-slate-400 mt-1">
                                 Carga la planilla de ensayos de carga puntual y opcionalmente la base de logueo general para validaciones cruzadas.
@@ -216,12 +216,12 @@ export default function PltImportWizard({
                             {isUploading ? (
                                 <>
                                     <RefreshCw size={14} className="animate-spin" />
-                                    <span>Auditando...</span>
+                                    <span>Revisando...</span>
                                 </>
                             ) : (
                                 <>
                                     <UploadCloud size={14} />
-                                    <span>{fileLgg ? 'Ejecutar con Cruce LGG' : 'Ejecutar Auditoría PLT'}</span>
+                                    <span>{fileLgg ? 'Ejecutar con Cruce LGG' : 'Ejecutar Revisión PLT'}</span>
                                 </>
                             )}
                         </button>

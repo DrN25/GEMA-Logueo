@@ -703,7 +703,7 @@ def crear_hoja_analisis_vacios(wb, result, index=3):
     _grafico_ranking(ws, r1, 2, pareto_oblig)
     r2 = r1 + h_r1 + 1
     _seccion_ranking(ws, r2, 2, "VISTA 2 · SOLO CAMPOS NO OBLIGATORIOS",
-                     "Ranking exclusivo de campos no obligatorios (no auditados como "
+                     "Ranking exclusivo de campos no obligatorios (no revisados como "
                      "obligatorios en el Catálogo de Errores). Rosa: afectan al RMR "
                      "(p. ej. FRF) · Ámbar: no obligatorios.", chips_no_oblig,
                      pareto_no_oblig, result.no_oblig_total,
@@ -723,7 +723,7 @@ def crear_hoja_analisis_vacios(wb, result, index=3):
     nota_rmr = ("Los campos en ROSA son parámetros que alimentan el cálculo del RMR "
                 "(Bieniawski): provienen del Logueo General (LGG) y de la orientación "
                 "estructural (Dip/Azimut). En VERDE: campos obligatorios. En ÁMBAR: "
-                "campos no obligatorios (no auditados). Su ausencia impide obtener una "
+                "campos no obligatorios (no revisados). Su ausencia impide obtener una "
                 "clasificación geomecánica válida del macizo rocoso.")
     cel = _put(ws, r_nota, 2, nota_rmr, font=font_italic, align=alignment_wrap)
     ws.merge_cells(start_row=r_nota, start_column=2, end_row=r_nota, end_column=15)

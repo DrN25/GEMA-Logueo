@@ -277,7 +277,7 @@ export default function BulkImportWizard({ isOpen, onClose, onConfirm }: BulkImp
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
                                         <Layers size={16} className="text-cyan-400" />
-                                        <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">Formato de Plantilla a Auditar:</span>
+                                        <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">Formato de Plantilla a Revisar:</span>
                                     </div>
                                     <span className="text-[11px] font-bold text-cyan-400 font-mono">
                                         {formato === '2026' ? 'Reglas 2026 activas' : formato === 'tradicional' ? 'Reglas Tradicionales activas' : 'Detección Automática'}

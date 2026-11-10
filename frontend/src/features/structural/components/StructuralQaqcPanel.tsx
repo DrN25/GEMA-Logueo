@@ -164,7 +164,7 @@ export default function StructuralQaqcPanel({
             </div>
           </div>
 
-          {/* Auditor Alerts Card */}
+          {/* Review Alerts Card */}
           <div className="glass-panel p-4 rounded-xl border border-navy-800/40 bg-navy-900/10 flex flex-col justify-between shadow-md">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Calidad Estructural</span>
@@ -198,7 +198,7 @@ export default function StructuralQaqcPanel({
           <div className="glass-panel p-6 rounded-2xl border border-navy-800/40 bg-navy-950/20 shadow-xl space-y-4">
             <div className="flex justify-between items-center border-b border-navy-800/40 pb-3">
               <div>
-                <h3 className="text-sm font-bold text-slate-100 uppercase tracking-wider">Reporte de Auditoría QA/QC (Discontinuidades)</h3>
+                <h3 className="text-sm font-bold text-slate-100 uppercase tracking-wider">Reporte de Revisión QA/QC (Discontinuidades)</h3>
                 <p className="text-[11px] text-slate-400">Verificaciones de consistencia espacial y física aplicadas a cada junta</p>
               </div>
               <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-navy-900 border border-navy-800 text-slate-400">

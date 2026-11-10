@@ -30,7 +30,7 @@ export default function AuditHistory({
       </h3>
       <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
         {history.length === 0 ? (
-          <span className="text-xs text-slate-500 italic px-2">No hay auditorías registradas previamente.</span>
+          <span className="text-xs text-slate-500 italic px-2">No hay revisiones registradas previamente.</span>
         ) : (
           history.map((audit) => {
             const isActive = selectedAuditId === audit.audit_id;

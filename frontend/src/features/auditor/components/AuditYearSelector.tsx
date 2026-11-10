@@ -15,7 +15,7 @@ export default function AuditYearSelector({
     onYearsChange,
     className = '',
     compact = false,
-    title = 'Campañas / Años a Auditar:'
+    title = 'Campañas / Años a Revisar:'
 }: AuditYearSelectorProps) {
     const isAllSelected = selectedYears.length === ALL_AUDIT_YEARS.length;
     const isNoneSelected = selectedYears.length === 0;
@@ -120,7 +120,7 @@ export default function AuditYearSelector({
                             <button
                                 type="button"
                                 onClick={handleSelectRecent}
-                                title="Auditar solo 2025 y 2026"
+                                title="Revisar solo 2025 y 2026"
                                 className="px-2 py-1 rounded-lg text-[11px] font-black bg-navy-950 text-slate-400 hover:text-slate-200 hover:bg-navy-800 border border-navy-800 transition-all cursor-pointer"
                             >
                                 2025-2026
@@ -129,7 +129,7 @@ export default function AuditYearSelector({
                             <button
                                 type="button"
                                 onClick={handleSelectOnly2026}
-                                title="Auditar solo 2026 (Chalcobamba)"
+                                title="Revisar solo 2026 (Chalcobamba)"
                                 className="px-2 py-1 rounded-lg text-[11px] font-black bg-navy-950 text-amber-400 hover:bg-amber-500/10 border border-amber-500/30 transition-all cursor-pointer flex items-center gap-1"
                             >
                                 <Sparkles size={11} />

@@ -534,7 +534,7 @@ export default function FormulasModal({ isOpen, onClose }: FormulasModalProps) {
 
         {/* Footer */}
         <div className="p-4 border-t border-navy-800 text-xs text-slate-500 text-center bg-navy-900/20">
-          Usa estas reglas y especificaciones para auditar e interpretar el cálculo del macizo rocoso RMR de forma reactiva.
+          Usa estas reglas y especificaciones para revisar e interpretar el cálculo del macizo rocoso RMR de forma reactiva.
         </div>
 
       </div>

@@ -12,7 +12,7 @@ interface SaveResultModalProps {
 }
 
 /**
- * Modal de resultado de guardado con reporte de auditoría (Geolog Pro 2.0 style)
+ * Modal de resultado de guardado con reporte de revisión (Geolog Pro 2.0 style)
  * Muestra feedback glassmorphic estructurado con el desglose exacto de lo que cambió.
  * Tamaño mínimo de letra: 12px (text-xs).
  */
@@ -101,14 +101,14 @@ export default function SaveResultModal({
           </div>
 
           {/* ───────────────────────────────────────────────────────────── */}
-          {/* REPORTE DE AUDITORÍA Y ESTRUCTURA DE CAMBIOS (Solo en éxito) */}
+          {/* REPORTE DE REVISIÓN Y ESTRUCTURA DE CAMBIOS (Solo en éxito) */}
           {/* ───────────────────────────────────────────────────────────── */}
           {success && diffSummary && (
             <div className="space-y-3 pt-1 border-t border-navy-800/80">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
                   <Activity size={15} className="text-cyan-400" />
-                  Auditoría de Cambios Sincronizados
+                  Revisión de Cambios Sincronizados
                 </span>
                 <span className="text-xs text-slate-400 font-medium">
                   {diffSummary.isNewTaladro ? 'Creación de Registro' : 'Actualización de Celdas'}
