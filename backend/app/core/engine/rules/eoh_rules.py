@@ -2,6 +2,7 @@
 app.core.engine.rules.eoh_rules
 Reglas de cruce EOH (End of Hole) entre módulos (LGG, Estructural, Collar y Survey).
 """
+from app.services.audit_artifact_store import new_sequence
 
 from typing import List, Dict, Any, Optional
 from app.core.engine.base_rule import BaseRule
@@ -19,7 +20,7 @@ class CrossModule_EOHRule(BaseRule):
     group = "Cruce General"
 
     def evaluate(self, ctx: ValidationContext) -> List[Anomaly]:
-        anomalies: List[Anomaly] = []
+        anomalies: List[Anomaly] = new_sequence()
 
         max_lgg = ctx.max_lgg_by_taladro or ctx.metadata.get("max_lgg", {})
         max_est = ctx.max_est_by_taladro or ctx.metadata.get("max_est", {})

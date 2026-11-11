@@ -7,6 +7,13 @@ Incorpora:
   3. Cruce geomecánico opcional con Logueo General (LGG) para corridas, profundidades, litología y dureza ISRM.
 """
 
+from bisect import bisect_left, bisect_right
+from contextlib import closing
+from itertools import chain, islice
+from pathlib import Path
+
+from app.services.audit_artifact_store import new_sequence
+
 from collections import defaultdict, Counter
 from datetime import datetime, date
 import io
@@ -170,89 +177,91 @@ def extract_lgg_dataframe(lgg_source: Any) -> Optional[pd.DataFrame]:
         return lgg_source
 
     try:
-        # Intentar lectura ultrarrápida con Calamine
-        try:
+        candidate_sheets = ("BD LGG", "LGG", "BD_LGG", "LOGUEO GENERAL",
+                            "BD LG EST", "LG EST.", "ESTRUCTURAL")
+        if isinstance(lgg_source, (str, Path)) and Path(lgg_source).suffix.lower() == ".xls":
             from python_calamine import CalamineWorkbook
-            if isinstance(lgg_source, (bytes, io.BytesIO)):
-                data_bytes = lgg_source.getvalue() if isinstance(lgg_source, io.BytesIO) else lgg_source
-                wb = CalamineWorkbook.from_filelike(io.BytesIO(data_bytes))
-            else:
-                wb = CalamineWorkbook.from_path(str(lgg_source))
+            wb = CalamineWorkbook.from_path(str(lgg_source))
+            name = next((s for s in candidate_sheets if s in wb.sheet_names), wb.sheet_names[0])
+            return _project_lgg_rows(iter(wb.get_sheet_by_name(name).to_python()))
 
-            candidate_sheets = ["BD LGG", "LGG", "BD_LGG", "LOGUEO GENERAL", "BD LG EST", "LG EST.", "ESTRUCTURAL"]
-            sheet_name = next((s for s in candidate_sheets if s in wb.sheet_names), wb.sheet_names[0])
-            sheet = wb.get_sheet_by_name(sheet_name)
-            raw_rows = sheet.to_python()
-        except Exception:
-            import openpyxl
-            wb_file = io.BytesIO(lgg_source) if isinstance(lgg_source, bytes) else lgg_source
-            wb_px = openpyxl.load_workbook(wb_file, data_only=True)
-            candidate_sheets = ["BD LGG", "LGG", "BD_LGG", "LOGUEO GENERAL", "BD LG EST", "LG EST.", "ESTRUCTURAL"]
-            sheet_name = next((s for s in candidate_sheets if s in wb_px.sheetnames), wb_px.sheetnames[0])
-            ws = wb_px[sheet_name]
-            raw_rows = [[cell.value for cell in row] for row in ws.iter_rows()]
-
-        if not raw_rows or len(raw_rows) < 2:
-            return None
-
-        # Detectar fila de cabecera buscando celdas exactas 'taladro', 'de'/'desde' y 'a'/'hasta'
-        header_idx = -1
-        for i in range(min(15, len(raw_rows))):
-            cells = [str(c or "").lower().strip().replace(":", "").replace(" ", "") for c in raw_rows[i]]
-            if "taladro" in cells and ("de" in cells or "desde" in cells) and ("a" in cells or "hasta" in cells):
-                header_idx = i
-                break
-
-        if header_idx == -1:
-            header_idx = 0
-
-        raw_headers = [str(c or "").replace("\n", " ").strip() for c in raw_rows[header_idx]]
-        df_lgg = pd.DataFrame(raw_rows[header_idx + 1:], columns=raw_headers)
-
-        col_taladro = None
-        col_desde = None
-        col_hasta = None
-        col_l1 = None
-        col_l2 = None
-        col_l3 = None
-        col_isrm = None
-
-        for col in df_lgg.columns:
-            c_norm = strip_accents(str(col).lower().replace(" ", "").replace("_", "").replace(":", ""))
-            if not col_taladro and any(p in c_norm for p in ("taladro", "sondaje", "drillhole")):
-                col_taladro = col
-            elif not col_desde and c_norm in ("de", "desde", "dem", "desdem", "from"):
-                col_desde = col
-            elif not col_hasta and c_norm in ("a", "hasta", "am", "hastam", "to"):
-                col_hasta = col
-            elif not col_l1 and any(p in c_norm for p in ("lito1", "litologia1", "lito12023")):
-                col_l1 = col
-            elif not col_l2 and any(p in c_norm for p in ("lito2", "litologia2", "lito22023")):
-                col_l2 = col
-            elif not col_l3 and any(p in c_norm for p in ("lito3", "litologia3", "lito32023")):
-                col_l3 = col
-            elif not col_isrm and any(p in c_norm for p in ("resistestimada", "isrm", "resistencia", "resistmax")):
-                col_isrm = col
-
-        if not col_taladro or not col_desde or not col_hasta:
-            return None
-
-        res_df = pd.DataFrame()
-        res_df["taladro"] = df_lgg[col_taladro].astype(str).str.strip().str.upper()
-        res_df["desde_m"] = pd.to_numeric(df_lgg[col_desde].astype(str).str.replace(",", "."), errors="coerce")
-        res_df["hasta_m"] = pd.to_numeric(df_lgg[col_hasta].astype(str).str.replace(",", "."), errors="coerce")
-        res_df["lito1"] = df_lgg[col_l1].astype(str).str.strip().str.upper() if col_l1 else ""
-        res_df["lito2"] = df_lgg[col_l2].astype(str).str.strip().str.upper() if col_l2 else ""
-        res_df["lito3"] = df_lgg[col_l3].astype(str).str.strip().str.upper() if col_l3 else ""
-        res_df["isrm"] = df_lgg[col_isrm].astype(str).str.strip().str.upper() if col_isrm else ""
-
-        res_df = res_df[res_df["taladro"].notna() & (res_df["taladro"] != "") & (res_df["taladro"] != "NAN")].copy()
-        res_df = res_df[res_df["desde_m"].notna() & res_df["hasta_m"].notna()].copy()
-        return res_df
-
+        import openpyxl
+        source = io.BytesIO(lgg_source) if isinstance(lgg_source, bytes) else lgg_source
+        with closing(openpyxl.load_workbook(source, read_only=True, data_only=True)) as wb:
+            name = next((s for s in candidate_sheets if s in wb.sheetnames), wb.sheetnames[0])
+            return _project_lgg_rows(wb[name].values)
     except Exception as e:
         print(f"[!] Error al extraer DataFrame de LGG: {e}")
         return None
+
+def _project_lgg_rows(rows):
+    raw_rows = list(islice(rows, 15))
+    if not raw_rows:
+        return None
+    # Detectar fila de cabecera buscando celdas exactas 'taladro', 'de'/'desde' y 'a'/'hasta'
+    header_idx = -1
+    for i in range(min(15, len(raw_rows))):
+        cells = [str(c or "").lower().strip().replace(":", "").replace(" ", "") for c in raw_rows[i]]
+        if "taladro" in cells and ("de" in cells or "desde" in cells) and ("a" in cells or "hasta" in cells):
+            header_idx = i
+            break
+
+    if header_idx == -1:
+        header_idx = 0
+
+    raw_headers = [str(c or "").replace("\n", " ").strip() for c in raw_rows[header_idx]]
+
+    col_taladro = None
+    col_desde = None
+    col_hasta = None
+    col_l1 = None
+    col_l2 = None
+    col_l3 = None
+    col_isrm = None
+
+    for col in raw_headers:
+        c_norm = strip_accents(str(col).lower().replace(" ", "").replace("_", "").replace(":", ""))
+        if not col_taladro and any(p in c_norm for p in ("taladro", "sondaje", "drillhole")):
+            col_taladro = col
+        elif not col_desde and c_norm in ("de", "desde", "dem", "desdem", "from"):
+            col_desde = col
+        elif not col_hasta and c_norm in ("a", "hasta", "am", "hastam", "to"):
+            col_hasta = col
+        elif not col_l1 and any(p in c_norm for p in ("lito1", "litologia1", "lito12023")):
+            col_l1 = col
+        elif not col_l2 and any(p in c_norm for p in ("lito2", "litologia2", "lito22023")):
+            col_l2 = col
+        elif not col_l3 and any(p in c_norm for p in ("lito3", "litologia3", "lito32023")):
+            col_l3 = col
+        elif not col_isrm and any(p in c_norm for p in ("resistestimada", "isrm", "resistencia", "resistmax")):
+            col_isrm = col
+
+    if not col_taladro or not col_desde or not col_hasta:
+        return None
+
+    selected = tuple(dict.fromkeys(c for c in
+        (col_taladro, col_desde, col_hasta, col_l1, col_l2, col_l3, col_isrm) if c))
+    indices = tuple(raw_headers.index(c) for c in selected)
+    records = (
+        tuple(row[i] if i < len(row) else None for i in indices)
+        for row in chain(raw_rows[header_idx + 1:], rows)
+    )
+    df_lgg = pd.DataFrame.from_records(records, columns=selected)
+    if df_lgg.empty:
+        return None
+
+    res_df = pd.DataFrame()
+    res_df["taladro"] = df_lgg[col_taladro].astype(str).str.strip().str.upper()
+    res_df["desde_m"] = pd.to_numeric(df_lgg[col_desde].astype(str).str.replace(",", "."), errors="coerce")
+    res_df["hasta_m"] = pd.to_numeric(df_lgg[col_hasta].astype(str).str.replace(",", "."), errors="coerce")
+    res_df["lito1"] = df_lgg[col_l1].astype(str).str.strip().str.upper() if col_l1 else ""
+    res_df["lito2"] = df_lgg[col_l2].astype(str).str.strip().str.upper() if col_l2 else ""
+    res_df["lito3"] = df_lgg[col_l3].astype(str).str.strip().str.upper() if col_l3 else ""
+    res_df["isrm"] = df_lgg[col_isrm].astype(str).str.strip().str.upper() if col_isrm else ""
+
+    res_df = res_df[res_df["taladro"].notna() & (res_df["taladro"] != "") & (res_df["taladro"] != "NAN")].copy()
+    res_df = res_df[res_df["desde_m"].notna() & res_df["hasta_m"].notna()].copy()
+    return res_df
 
 class Counter_custom(dict):
     def __missing__(self, key):
@@ -284,8 +293,8 @@ class PltRegularesValidator:
         df = df.rename(columns=col_map)
 
         total_rows = len(df)
-        anomalies: List[Dict[str, Any]] = []
-        unique_samples_plt: List[Dict[str, Any]] = []
+        anomalies: List[Dict[str, Any]] = new_sequence()
+        unique_samples_plt: List[Dict[str, Any]] = new_sequence()
         row_anomalies_count = [0] * total_rows
 
         drillhole_stats = defaultdict(lambda: {"total": 0, "alertas": 0, "advertencias": 0, "vacios": 0})
@@ -854,7 +863,14 @@ class PltRegularesValidator:
         quality_idx = (valid_count / total_rows * 100.0) if total_rows > 0 else 100.0
 
         # Resumir corridas únicas de LGG si vino el archivo
-        unique_runs_lgg = []
+        sample_starts = defaultdict(list)
+        if has_lgg:
+            for sample in unique_samples_plt:
+                if sample["from_m"] is not None:
+                    sample_starts[sample["taladro"]].append(sample["from_m"])
+            for starts in sample_starts.values():
+                starts.sort()
+        unique_runs_lgg = new_sequence()
         if has_lgg and df_lgg is not None and not df_lgg.empty:
             # Mapear conteo de muestras por corrida
             plt_counts = Counter()
@@ -871,7 +887,8 @@ class PltRegularesValidator:
                 h_lgg = to_float(l_row.get("hasta_m"))
                 m_count = 0
                 if d_lgg is not None and h_lgg is not None:
-                    m_count = sum(1 for s in unique_samples_plt if s["taladro"] == t_lgg and s["from_m"] is not None and d_lgg <= s["from_m"] <= h_lgg)
+                    starts = sample_starts.get(t_lgg, ())
+                    m_count = max(0, bisect_right(starts, h_lgg) - bisect_left(starts, d_lgg))
 
                 unique_runs_lgg.append({
                     "taladro": t_lgg,

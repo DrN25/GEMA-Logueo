@@ -1,3 +1,6 @@
+from app.services.audit_artifact_store import new_sequence, write_json_atomic
+from contextlib import ExitStack
+from app.core.adapters.excel.stream_reader import open_read_workbook
 """
 app.validator
 Orquestador central del pipeline de validación y auditoría geomecánica DDH y PLT.
@@ -5,7 +8,6 @@ Arquitectura Limpia desacoplada: delega I/O a app.core.adapters.excel y lógica 
 """
 
 import os
-import json
 import math
 import openpyxl
 from collections import defaultdict
@@ -200,7 +202,7 @@ def validate_lgg_sheet_data(
 
     l_counters["total_ok"] += (total_lgg_filas - len(rows_with_alert))
 
-    unique_lgg_runs = []
+    unique_lgg_runs = new_sequence()
     for run in lgg_runs:
         r = run["_fila_excel"]
         has_err = r in rows_with_alert
@@ -300,7 +302,7 @@ def validate_est_sheet_data(
 
     e_counters["total_ok"] += (total_est_filas - len(rows_with_alert))
 
-    unique_est_structures = []
+    unique_est_structures = new_sequence()
     for s in est_structures:
         r = s["_fila_excel"]
         has_err = r in rows_with_alert
@@ -419,21 +421,24 @@ def validate_logueo_bulk_sheets(file_path: str, lgg_sheet: str, est_sheet: str, 
 
 
 def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: str):
+    """Read worksheets lazily and close every archive, including on validation failure."""
+    with ExitStack() as stack:
+        wb_main = open_read_workbook(stack, file_paths["lgg_est"])
+        wb_col = open_read_workbook(stack, file_paths["collar"]) if file_paths.get("collar") else None
+        wb_sur = open_read_workbook(stack, file_paths["survey"]) if file_paths.get("survey") else None
+        return _validate_revision_workbooks(wb_main, wb_col, wb_sur, config, output_json_path)
+
+
+def _validate_revision_workbooks(wb_main, wb_col, wb_sur, config, output_json_path):
     """
     Versión 2.0 desacoplada: coordina la ingesta de archivos Excel (LGG/EST, Collar y Survey)
     y ejecuta el pipeline de validación geomecánica modular.
     """
-    import time
-
-    wb_main = openpyxl.load_workbook(file_paths["lgg_est"], data_only=True)
-    wb_col = openpyxl.load_workbook(file_paths["collar"], data_only=True) if file_paths.get("collar") else None
-    wb_sur = openpyxl.load_workbook(file_paths["survey"], data_only=True) if file_paths.get("survey") else None
-
-    incidencias = []
-    lgg_runs = []
-    lgg_runs_by_taladro = defaultdict(list)
-    unique_lgg_runs = []
-    unique_est_structures = []
+    incidencias = new_sequence()
+    lgg_runs = new_sequence()
+    lgg_runs_by_taladro = defaultdict(new_sequence)
+    unique_lgg_runs = new_sequence()
+    unique_est_structures = new_sequence()
     total_lgg_filas = 0
     total_est_filas = 0
     total_rmr_filas = 0
@@ -589,7 +594,6 @@ def validate_revision_bulk_v2(file_paths: dict, config: dict, output_json_path: 
     }
 
     if output_json_path:
-        with open(output_json_path, "w", encoding="utf-8") as f:
-            json.dump(diag, f, ensure_ascii=False, indent=2)
+        write_json_atomic(output_json_path, diag)
 
     return diag

@@ -3,6 +3,7 @@ app.services.ddh_audit_service
 Servicio de orquestación de auditoría geomecánica DDH (Logueo General y Estructural).
 Maneja la ejecución en background de los pipelines de auditoría y la compilación de métricas compactas/KPIs.
 """
+from app.services.audit_artifact_store import bounded_audit, copy_file_atomic, new_sequence
 
 import os
 import json
@@ -75,7 +76,7 @@ def build_ddh_compact_metrics(
     
     if years_filter and years_filter.strip().upper() not in ("TODOS", "TODAS", "ALL", ""):
         years_list = [y.strip() for y in years_filter.split(",") if y.strip()]
-        incidencias = [i for i in incidencias if is_year_match(i.get("campania"), years_list)]
+        incidencias = new_sequence(i for i in incidencias if is_year_match(i.get("campania"), years_list))
         resumen_celdas = {k: v for k, v in resumen_celdas_raw.items() if is_year_match(v.get("campania"), years_list)}
         total_filas = sum(safe_int(diag.get("distribucion_filas_campana", {}).get(y, 0)) for y in years_list)
         if total_filas == 0 and incidencias:
@@ -264,6 +265,7 @@ def pregenerate_ddh_excel(diag: dict, compact: dict, incidencias: list, excel_ou
         print(f"[-] [ERROR PRE-GENERACIÓN DDH] Error al pre-generar Excel: {e}", flush=True)
 
 
+@bounded_audit
 def run_logueo_audit_pipeline(file_path: str, lgg_sheet: str, est_sheet: str, audit_id: str, formato: str = "auto"):
     """Pipeline de background para la importación simple/mono-archivo de Logueo."""
     raw_json_out = os.path.join(history_dir, f"{audit_id}_diagnostico.json")
@@ -276,13 +278,11 @@ def run_logueo_audit_pipeline(file_path: str, lgg_sheet: str, est_sheet: str, au
     t_str = lambda: datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     print(f"[*] [{t_str()}] Inicio de validación física y cruzada DDH para el reporte {audit_id}", flush=True)
-    validate_logueo_bulk_sheets(file_path, lgg_sheet, est_sheet, raw_json_out, formato=formato)
+    diag = validate_logueo_bulk_sheets(file_path, lgg_sheet, est_sheet, raw_json_out, formato=formato)
     print(f"[+] [{t_str()}] Validación y guardado de diagnóstico finalizados ({round(time.time() - start_time, 2)}s)", flush=True)
     
-    shutil.copyfile(raw_json_out, os.path.join(uploads_dir, "diagnostico_geomecanico.json"))
+    copy_file_atomic(raw_json_out, os.path.join(uploads_dir, "diagnostico_geomecanico.json"))
     
-    with open(raw_json_out, "r", encoding="utf-8") as f:
-        diag = json.load(f)
         
     compact = build_ddh_compact_metrics(diag, audit_id=audit_id, file_name=file_path)
     
@@ -298,6 +298,7 @@ def run_logueo_audit_pipeline(file_path: str, lgg_sheet: str, est_sheet: str, au
     pregenerate_ddh_excel(diag, compact, diag.get("incidencias", []), excel_pregenerated_out, public_excel)
 
 
+@bounded_audit
 def run_revision_audit_pipeline(file_paths: dict, config: dict, audit_id: str, original_filename: str):
     """Pipeline de background para la revisión multi-archivo V2 (LGG, Estructural, RMR, Collar, Survey)."""
     raw_json_out = os.path.join(history_dir, f"{audit_id}_diagnostico.json")
@@ -311,13 +312,11 @@ def run_revision_audit_pipeline(file_paths: dict, config: dict, audit_id: str, o
     
     try:
         print(f"[*] [{t_str()}] Inicio de revisión geotécnica cruzada (V2) para el reporte {audit_id}", flush=True)
-        validate_revision_bulk_v2(file_paths, config, raw_json_out)
+        diag = validate_revision_bulk_v2(file_paths, config, raw_json_out)
         print(f"[+] [{t_str()}] Validación y guardado de diagnóstico finalizados ({round(time.time() - start_time, 2)}s)", flush=True)
         
-        shutil.copyfile(raw_json_out, os.path.join(uploads_dir, "diagnostico_geomecanico.json"))
+        copy_file_atomic(raw_json_out, os.path.join(uploads_dir, "diagnostico_geomecanico.json"))
         
-        with open(raw_json_out, "r", encoding="utf-8") as f:
-            diag = json.load(f)
             
         compact = build_ddh_compact_metrics(diag, audit_id=audit_id, file_name=original_filename)
         

@@ -1,7 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import * as XLSX from 'xlsx';
+import { utils as excelUtils } from 'xlsx';
+import type { WorkbookPreview } from './ddhWorkbookPreview';
+import type { WorkbookPreviewResult } from './ddhWorkbookPreview.worker';
+import type { MappingField } from '../../utils/excelMapper';
 import {
-    X, UploadCloud, FileSpreadsheet, Map, Compass,
+    X, UploadCloud, FileSpreadsheet, Map as MapIcon, Compass,
     ChevronRight, CheckCircle2, ChevronDown, ChevronUp, AlertCircle, RefreshCw, Layers
 } from 'lucide-react';
 import {
@@ -10,10 +13,12 @@ import {
     findHeaderRowGeneric, suggestMappingGeneric
 } from '../../utils/excelMapper';
 
+type FileKind = 'LGG_EST' | 'COLLAR' | 'SURVEY';
+
 interface FileState {
     file: File | null;
     sheets: string[];
-    workbook: XLSX.WorkBook | null;
+    preview: WorkbookPreview | null;
 }
 
 interface MappingState {
@@ -48,9 +53,9 @@ export default function BulkImportWizard({ isOpen, onClose, onConfirm }: BulkImp
     const [loadingFiles, setLoadingFiles] = useState({ LGG_EST: false, COLLAR: false, SURVEY: false });
 
     // Estados de Archivos
-    const [fileLggEst, setFileLggEst] = useState<FileState>({ file: null, sheets: [], workbook: null });
-    const [fileCollar, setFileCollar] = useState<FileState>({ file: null, sheets: [], workbook: null });
-    const [fileSurvey, setFileSurvey] = useState<FileState>({ file: null, sheets: [], workbook: null });
+    const [fileLggEst, setFileLggEst] = useState<FileState>({ file: null, sheets: [], preview: null });
+    const [fileCollar, setFileCollar] = useState<FileState>({ file: null, sheets: [], preview: null });
+    const [fileSurvey, setFileSurvey] = useState<FileState>({ file: null, sheets: [], preview: null });
 
     // Estados de Asignación (Mapeo)
     const [mapLgg, setMapLgg] = useState<MappingState>({ sheetName: '', headerRowIdx: 0, headers: [], mappings: {}, isExpanded: false });
@@ -58,6 +63,8 @@ export default function BulkImportWizard({ isOpen, onClose, onConfirm }: BulkImp
     const [mapRmr, setMapRmr] = useState<MappingState>({ sheetName: '', headerRowIdx: 0, headers: [], mappings: {}, isExpanded: false });
     const [mapCollar, setMapCollar] = useState<MappingState>({ sheetName: '', headerRowIdx: 0, headers: [], mappings: {}, isExpanded: false });
     const [mapSurvey, setMapSurvey] = useState<MappingState>({ sheetName: '', headerRowIdx: 0, headers: [], mappings: {}, isExpanded: false });
+
+    const activeReaders = useRef(new Map<FileKind, Worker>());
 
     const inputLggRef = useRef<HTMLInputElement>(null);
     const inputCollarRef = useRef<HTMLInputElement>(null);
@@ -67,75 +74,97 @@ export default function BulkImportWizard({ isOpen, onClose, onConfirm }: BulkImp
         if (!isOpen) {
             setStep(1);
             setFormato('2026');
-            setFileLggEst({ file: null, sheets: [], workbook: null });
-            setFileCollar({ file: null, sheets: [], workbook: null });
-            setFileSurvey({ file: null, sheets: [], workbook: null });
+            setFileLggEst({ file: null, sheets: [], preview: null });
+            setFileCollar({ file: null, sheets: [], preview: null });
+            setFileSurvey({ file: null, sheets: [], preview: null });
             setLoadingFiles({ LGG_EST: false, COLLAR: false, SURVEY: false });
             setMapRmr({ sheetName: '', headerRowIdx: 0, headers: [], mappings: {}, isExpanded: false });
         }
     }, [isOpen]);
 
+    useEffect(() => {
+        const readers = activeReaders.current;
+        return () => {
+            for (const worker of readers.values()) worker.terminate();
+            readers.clear();
+        };
+    }, [isOpen]);
+
     if (!isOpen) return null;
 
-    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'LGG_EST' | 'COLLAR' | 'SURVEY') => {
+    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: FileKind) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
         e.target.value = '';
+        const readers = activeReaders.current;
+        readers.get(type)?.terminate();
+        readers.delete(type);
         setLoadingFiles(prev => ({ ...prev, [type]: true }));
 
-        const reader = new FileReader();
-        reader.onload = (evt) => {
-            setTimeout(() => {
-                try {
-                    const data = new Uint8Array(evt.target?.result as ArrayBuffer);
-                    const workbook = XLSX.read(data, { type: 'array' });
-                    const sheets = workbook.SheetNames;
+        let worker: Worker;
+        try {
+            worker = new Worker(new URL('./ddhWorkbookPreview.worker.ts', import.meta.url), { type: 'module' });
+        } catch {
+            setLoadingFiles(prev => ({ ...prev, [type]: false }));
+            alert('No se pudo iniciar la lectura del archivo Excel.');
+            return;
+        }
+        readers.set(type, worker);
 
-                    if (type === 'LGG_EST') {
-                        setFileLggEst({ file, sheets, workbook });
-                        const lggSheet = sheets.find(s => s.toLowerCase().includes('lgg') || s.toLowerCase().includes('general')) || sheets[0];
-                        const estSheet = sheets.find(s => s.toLowerCase().includes('est')) || (sheets.length > 1 ? sheets[1] : sheets[0]);
-                        const rmrSheet = sheets.find(s => {
-                            const lower = s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-                            return lower.includes('validacion');
-                        }) || sheets.find(s => {
-                            const lower = s.toLowerCase().trim();
-                            return lower === 'rmr' || lower === 'bd rmr' || lower === 'bd_rmr' || lower === 'logueo_rmr';
-                        });
-
-                        analyzeSheet(workbook, lggSheet, EXPECTED_FIELDS, setMapLgg);
-                        analyzeSheet(workbook, estSheet, EXPECTED_STRUCT_FIELDS, setMapEst);
-                        if (rmrSheet) {
-                            analyzeSheet(workbook, rmrSheet, EXPECTED_RMR_FIELDS, setMapRmr);
-                        } else {
-                            setMapRmr({ sheetName: '', headerRowIdx: 0, headers: [], mappings: {}, isExpanded: false });
-                        }
-                    } else if (type === 'COLLAR') {
-                        setFileCollar({ file, sheets, workbook });
-                        analyzeSheet(workbook, sheets[0], EXPECTED_COLLAR_FIELDS, setMapCollar);
-                    } else if (type === 'SURVEY') {
-                        setFileSurvey({ file, sheets, workbook });
-                        analyzeSheet(workbook, sheets[0], EXPECTED_SURVEY_FIELDS, setMapSurvey);
-                    }
-                } catch (err) {
-                    alert('Error al leer el archivo Excel. Asegúrate de que sea un formato válido.');
-                } finally {
-                    setLoadingFiles(prev => ({ ...prev, [type]: false }));
-                }
-            }, 100);
+        const finish = () => {
+            if (readers.get(type) !== worker) return false;
+            readers.delete(type);
+            worker.terminate();
+            setLoadingFiles(prev => ({ ...prev, [type]: false }));
+            return true;
         };
-        reader.readAsArrayBuffer(file);
+        const showError = () => {
+            if (finish()) alert('Error al leer el archivo Excel. Asegúrate de que sea un formato válido.');
+        };
+        worker.onerror = showError;
+        worker.onmessageerror = showError;
+        worker.onmessage = ({ data: result }: MessageEvent<WorkbookPreviewResult>) => {
+            if (!result.ok) {
+                showError();
+                return;
+            }
+            if (!finish()) return;
+
+            const { preview } = result;
+            const sheets = [...preview.keys()];
+            const fileState = { file, sheets, preview };
+            if (type === 'LGG_EST') {
+                setFileLggEst(fileState);
+                const lggSheet = sheets.find(s => /lgg|general/i.test(s)) || sheets[0];
+                const estSheet = sheets.find(s => /est/i.test(s)) || sheets[1] || sheets[0];
+                const rmrSheet = sheets.find(s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes('validacion'))
+                    || sheets.find(s => ['rmr', 'bd rmr', 'bd_rmr', 'logueo_rmr'].includes(s.toLowerCase().trim()));
+
+                analyzeSheet(preview, lggSheet, EXPECTED_FIELDS, setMapLgg);
+                analyzeSheet(preview, estSheet, EXPECTED_STRUCT_FIELDS, setMapEst);
+                analyzeSheet(preview, rmrSheet ?? '', EXPECTED_RMR_FIELDS, setMapRmr);
+            } else if (type === 'COLLAR') {
+                setFileCollar(fileState);
+                analyzeSheet(preview, sheets[0], EXPECTED_COLLAR_FIELDS, setMapCollar);
+            } else {
+                setFileSurvey(fileState);
+                analyzeSheet(preview, sheets[0], EXPECTED_SURVEY_FIELDS, setMapSurvey);
+            }
+        };
+        worker.postMessage(file);
     };
 
-    const analyzeSheet = (wb: XLSX.WorkBook, sheetName: string, expectedFields: any[], setMapState: React.Dispatch<React.SetStateAction<MappingState>>) => {
-        if (!sheetName || !wb.Sheets[sheetName]) return;
-        const dataGrid: any[][] = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: null });
-        if (dataGrid.length === 0) return;
-
+    const analyzeSheet = (
+        preview: WorkbookPreview,
+        sheetName: string,
+        expectedFields: MappingField[],
+        setMapState: React.Dispatch<React.SetStateAction<MappingState>>
+    ) => {
+        const dataGrid = preview.get(sheetName) ?? [];
         const headerIdx = findHeaderRowGeneric(dataGrid, expectedFields);
         const headerRow = dataGrid[headerIdx] || [];
-        const headers = headerRow.map((val, idx) => val ? `${XLSX.utils.encode_col(idx)}: ${String(val).trim()}` : `${XLSX.utils.encode_col(idx)}: [Vacía]`);
+        const headers = headerRow.map((val, idx) => val ? `${excelUtils.encode_col(idx)}: ${String(val).trim()}` : `${excelUtils.encode_col(idx)}: [Vacía]`);
         const rawHeaders = headerRow.map(c => c ? String(c) : '');
         const mappings = suggestMappingGeneric(rawHeaders, expectedFields);
 
@@ -148,7 +177,7 @@ export default function BulkImportWizard({ isOpen, onClose, onConfirm }: BulkImp
         fileState: FileState,
         mapState: MappingState,
         setMapState: React.Dispatch<React.SetStateAction<MappingState>>,
-        expectedFields: any[]
+        expectedFields: MappingField[]
     ) => {
         if (!fileState.file || !mapState.sheetName) return null;
 
@@ -190,7 +219,7 @@ export default function BulkImportWizard({ isOpen, onClose, onConfirm }: BulkImp
                                 <label className="text-xs font-bold text-slate-400 uppercase">Hoja de cálculo:</label>
                                 <select
                                     value={mapState.sheetName}
-                                    onChange={(e) => analyzeSheet(fileState.workbook!, e.target.value, expectedFields, setMapState)}
+                                    onChange={(e) => analyzeSheet(fileState.preview!, e.target.value, expectedFields, setMapState)}
                                     className="bg-navy-950 border border-navy-700 text-slate-200 text-xs px-3 py-1.5 rounded-lg focus:outline-none focus:border-cyan-500"
                                 >
                                     {fileState.sheets.map(s => <option key={s} value={s}>{s}</option>)}
@@ -363,7 +392,7 @@ export default function BulkImportWizard({ isOpen, onClose, onConfirm }: BulkImp
                                     <h3 className="text-sm font-bold text-slate-200">Archivo Base: LGG, Estructural y Validación RMR <span className="text-red-400">*</span></h3>
                                     <p className="text-xs text-slate-400 mt-1">{loadingFiles.LGG_EST ? 'Procesando...' : fileLggEst.file ? fileLggEst.file.name : 'Haz clic para explorar o arrastra aquí'}</p>
                                     {fileLggEst.file && !loadingFiles.LGG_EST && (
-                                        <button onClick={(e) => { e.stopPropagation(); setFileLggEst({ file: null, sheets: [], workbook: null }); setMapRmr({ sheetName: '', headerRowIdx: 0, headers: [], mappings: {}, isExpanded: false }); }} className="mt-3 text-xs text-red-400 hover:underline">Eliminar archivo</button>
+                                        <button onClick={(e) => { e.stopPropagation(); setFileLggEst({ file: null, sheets: [], preview: null }); setMapRmr({ sheetName: '', headerRowIdx: 0, headers: [], mappings: {}, isExpanded: false }); }} className="mt-3 text-xs text-red-400 hover:underline">Eliminar archivo</button>
                                     )}
                                 </div>
 
@@ -373,11 +402,11 @@ export default function BulkImportWizard({ isOpen, onClose, onConfirm }: BulkImp
                                         onClick={() => !loadingFiles.COLLAR && inputCollarRef.current?.click()}
                                     >
                                         <input type="file" className="hidden" accept=".xlsx, .xls" ref={inputCollarRef} onChange={(e) => handleFileUpload(e, 'COLLAR')} />
-                                        {loadingFiles.COLLAR ? <RefreshCw size={24} className="animate-spin text-cyan-500 mb-2" /> : <Map size={24} className={fileCollar.file ? 'text-emerald-400 mb-2' : 'text-slate-500 mb-2'} />}
+                                        {loadingFiles.COLLAR ? <RefreshCw size={24} className="animate-spin text-cyan-500 mb-2" /> : <MapIcon size={24} className={fileCollar.file ? 'text-emerald-400 mb-2' : 'text-slate-500 mb-2'} />}
                                         <h3 className="text-xs font-bold text-slate-300">Archivo de Collar</h3>
                                         <p className="text-[10px] text-slate-500 mt-1">{loadingFiles.COLLAR ? 'Leyendo...' : fileCollar.file ? fileCollar.file.name : 'Haz clic para explorar'}</p>
                                         {fileCollar.file && !loadingFiles.COLLAR && (
-                                            <button onClick={(e) => { e.stopPropagation(); setFileCollar({ file: null, sheets: [], workbook: null }); }} className="mt-2 text-[10px] text-red-400 hover:underline">Eliminar</button>
+                                            <button onClick={(e) => { e.stopPropagation(); setFileCollar({ file: null, sheets: [], preview: null }); }} className="mt-2 text-[10px] text-red-400 hover:underline">Eliminar</button>
                                         )}
                                     </div>
 
@@ -390,7 +419,7 @@ export default function BulkImportWizard({ isOpen, onClose, onConfirm }: BulkImp
                                         <h3 className="text-xs font-bold text-slate-300">Archivo de Survey</h3>
                                         <p className="text-[10px] text-slate-500 mt-1">{loadingFiles.SURVEY ? 'Leyendo...' : fileSurvey.file ? fileSurvey.file.name : 'Haz clic para explorar'}</p>
                                         {fileSurvey.file && !loadingFiles.SURVEY && (
-                                            <button onClick={(e) => { e.stopPropagation(); setFileSurvey({ file: null, sheets: [], workbook: null }); }} className="mt-2 text-[10px] text-red-400 hover:underline">Eliminar</button>
+                                            <button onClick={(e) => { e.stopPropagation(); setFileSurvey({ file: null, sheets: [], preview: null }); }} className="mt-2 text-[10px] text-red-400 hover:underline">Eliminar</button>
                                         )}
                                     </div>
                                 </div>
@@ -407,7 +436,7 @@ export default function BulkImportWizard({ isOpen, onClose, onConfirm }: BulkImp
                             {renderMappingSection('Logueo General (LGG)', <FileSpreadsheet size={18} />, fileLggEst, mapLgg, setMapLgg, EXPECTED_FIELDS)}
                             {renderMappingSection('Logueo Estructural (EST)', <Compass size={18} />, fileLggEst, mapEst, setMapEst, EXPECTED_STRUCT_FIELDS)}
                             {mapRmr.sheetName && renderMappingSection('Validación RMR (RMR)', <FileSpreadsheet size={18} />, fileLggEst, mapRmr, setMapRmr, EXPECTED_RMR_FIELDS)}
-                            {fileCollar.file && renderMappingSection('Metadatos de Collar', <Map size={18} />, fileCollar, mapCollar, setMapCollar, EXPECTED_COLLAR_FIELDS)}
+                            {fileCollar.file && renderMappingSection('Metadatos de Collar', <MapIcon size={18} />, fileCollar, mapCollar, setMapCollar, EXPECTED_COLLAR_FIELDS)}
                             {fileSurvey.file && renderMappingSection('Trayectorias de Survey', <Compass size={18} />, fileSurvey, mapSurvey, setMapSurvey, EXPECTED_SURVEY_FIELDS)}
                         </div>
                     )}

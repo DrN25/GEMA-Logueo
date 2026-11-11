@@ -3,6 +3,10 @@ app.core.adapters.excel.rmr_reader
 Extractor y adaptador de datos de la hoja Validación RMR en libros Excel Openpyxl.
 """
 
+from app.services.audit_artifact_store import append_grouped, new_sequence
+from app.core.adapters.excel.stream_reader import iter_mapped_rows, header_values
+
+
 from collections import defaultdict
 from typing import Dict, List, Any, Optional, Tuple, Set
 from app.core.report_config import CAMPOS_EXTRA_A_CAPTURAR
@@ -26,8 +30,7 @@ def resolve_rmr_subratings_from_sheet(ws_rmr, h_idx: int) -> Dict[str, int]:
 
     max_c = getattr(ws_rmr, "max_column", 100) or 100
     headers = {}
-    for c in range(1, max_c + 1):
-        cell_v = ws_rmr.cell(row=h_idx, column=c).value
+    for c, cell_v in enumerate(header_values(ws_rmr, h_idx), start=1):
         if cell_v is not None and str(cell_v).strip():
             h_norm = normalize_text(cell_v)
             headers[c] = h_norm
@@ -158,8 +161,8 @@ def read_rmr_sheet(
 
     rmr_extra = list(CAMPOS_EXTRA_A_CAPTURAR.get("Validación RMR", []))
 
-    rmr_by_taladro = defaultdict(list)
-    all_rmr_runs = []
+    rmr_by_taladro = defaultdict(new_sequence)
+    all_rmr_runs = new_sequence()
     empty_streak = 0
     current_taladro = None
     total_rmr_filas = 0
@@ -197,8 +200,7 @@ def read_rmr_sheet(
                     pass
                 break
 
-    for r in range(h_idx + 1, ws_rmr.max_row + 1):
-        row_dict, is_empty = get_row_dict(ws_rmr, r, rmr_map)
+    for r, row_dict, is_empty in iter_mapped_rows(ws_rmr, h_idx + 1, rmr_map):
 
         t_val = row_dict.get("sondaje") or row_dict.get("taladro")
         if t_val is not None and str(t_val).strip() != "":
@@ -257,7 +259,6 @@ def read_rmr_sheet(
             celda_padre, celda_hija, row_dict.get("campana"), row_dict.get("logueador")
         )
 
-        all_rmr_runs.append(row_dict)
-        rmr_by_taladro[taladro].append(row_dict)
+        append_grouped(all_rmr_runs, rmr_by_taladro[taladro], row_dict)
 
     return total_rmr_filas, all_rmr_runs, rmr_by_taladro, rmr_map, dry_thresh, nf_thresh

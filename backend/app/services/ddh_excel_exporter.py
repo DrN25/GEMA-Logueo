@@ -4,6 +4,10 @@ Generador y exportador de reportes ejecutivos y técnicos en Excel (.xlsx) para 
 Desacoplado de la capa de routers para seguir los principios de Clean Architecture y SRP.
 """
 
+from app.services.audit_artifact_store import new_sequence
+
+from app.reportes.stream_writer import StreamingReportWorkbook
+
 import os
 import math
 import openpyxl
@@ -331,6 +335,15 @@ def get_module_label(rule):
     return "LGG"
 
 def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
+    wb = StreamingReportWorkbook()
+    try:
+        return _build_ddh_report(wb, diag, compact, filtered)
+    except BaseException:
+        wb.close()
+        raise
+
+
+def _build_ddh_report(wb, diag: dict, compact: dict, filtered: list):
     font_title = Font(name="Segoe UI", size=16, bold=True, color="1B365D")
     font_subtitle = Font(name="Segoe UI", size=10, italic=True, color="555555")
     font_section = Font(name="Segoe UI", size=11, bold=True, color="1B365D")
@@ -369,7 +382,6 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
     alignment_left = Alignment(horizontal="left", vertical="center")
     alignment_right = Alignment(horizontal="right", vertical="center")
 
-    wb = openpyxl.Workbook()
     
     def write_kpi_card_opt(ws, start_row, start_col, label, value, bg_fill, val_font):
         c1 = ws.cell(row=start_row, column=start_col, value=label)
@@ -600,7 +612,7 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
         cell.alignment = alignment_center
         cell.border = border_thin
 
-    incidencias_por_error = defaultdict(list)
+    incidencias_por_error = defaultdict(new_sequence)
     for inc in filtered:
         msg_simplificado = simplify_message(inc.get("mensaje", ""))
         incidencias_por_error[msg_simplificado].append(inc)
@@ -1020,10 +1032,7 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
             simplify_message(inc_item.get("mensaje"))
         ]
         ws_detail.append(row_data)
-        
-    end_detail_row = ws_detail.max_row
-    
-    for r_idx in range(start_detail_row, end_detail_row + 1):
+        r_idx = ws_detail.max_row
         if r_idx <= start_detail_row + 300:
             ws_detail.cell(row=r_idx, column=2).alignment = alignment_center
             ws_detail.cell(row=r_idx, column=3).alignment = alignment_center
@@ -1053,7 +1062,8 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
         
         for col_idx in range(2, 12):
             ws_detail.cell(row=r_idx, column=col_idx).border = border_thin
-            
+
+    end_detail_row = ws_detail.max_row
     ws_detail.auto_filter.ref = f"B{grid_heading_row}:K{end_detail_row}"
 
     # --- HOJAS 4+: DETALLES ESPECÍFICOS POR REGLA ---
@@ -1148,10 +1158,7 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
                 inc_item.get("mensaje")
             ]
             ws_err.append(row_data)
-            
-        end_data_row = ws_err.max_row
-        
-        for r_idx in range(start_data_row, end_data_row + 1):
+            r_idx = ws_err.max_row
             if r_idx <= start_data_row + 150:
                 ws_err.cell(row=r_idx, column=2).alignment = alignment_center
                 ws_err.cell(row=r_idx, column=3).alignment = alignment_center
@@ -1172,7 +1179,8 @@ def generar_excel_reporte_core(diag: dict, compact: dict, filtered: list):
                 
             for col_idx in range(2, 11):
                 ws_err.cell(row=r_idx, column=col_idx).border = border_thin
-                
+
+        end_data_row = ws_err.max_row
         ws_err.auto_filter.ref = f"B{header_row_idx}:J{end_data_row}"
 
     # --- HOJA ESPECIAL: ANÁLISIS DE DATOS FALTANTES ---

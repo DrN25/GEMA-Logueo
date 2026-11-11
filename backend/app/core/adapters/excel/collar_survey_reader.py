@@ -3,6 +3,9 @@ app.core.adapters.excel.collar_survey_reader
 Extractores y adaptadores de datos para las hojas Collar y Survey en libros Excel Openpyxl.
 """
 
+from app.core.adapters.excel.stream_reader import iter_mapped_rows
+
+
 from typing import Dict, Any, Optional
 from app.core.engine.rules.common import sanitize_val, safe_str, safe_float
 from app.core.adapters.excel.patterns import COLLAR_PATTERNS, SURVEY_PATTERNS
@@ -20,8 +23,7 @@ def read_collar_sheet(wb_col, conf_col: Optional[Dict[str, Any]] = None) -> Dict
         return eoh_collar
 
     h_idx, c_map = find_header_row_and_mapping(ws_col, COLLAR_PATTERNS)
-    for r in range(h_idx + 1, ws_col.max_row + 1):
-        row_dict, _ = get_row_dict(ws_col, r, c_map)
+    for r, row_dict, _ in iter_mapped_rows(ws_col, h_idx + 1, c_map):
         t_val = row_dict.get("taladro")
         e_val = row_dict.get("eoh")
         if not t_val:
@@ -44,8 +46,7 @@ def read_survey_sheet(wb_sur, conf_sur: Optional[Dict[str, Any]] = None) -> Dict
         return max_survey
 
     h_idx, s_map = find_header_row_and_mapping(ws_sur, SURVEY_PATTERNS)
-    for r in range(h_idx + 1, ws_sur.max_row + 1):
-        row_dict, _ = get_row_dict(ws_sur, r, s_map)
+    for r, row_dict, _ in iter_mapped_rows(ws_sur, h_idx + 1, s_map):
         t_val = row_dict.get("taladro")
         d_val = row_dict.get("depth")
         if not t_val:

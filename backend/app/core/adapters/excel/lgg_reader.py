@@ -3,6 +3,10 @@ app.core.adapters.excel.lgg_reader
 Extractor y adaptador de datos de la hoja Logueo General (LGG) en libros Excel Openpyxl.
 """
 
+from app.services.audit_artifact_store import append_grouped, new_sequence
+from app.core.adapters.excel.stream_reader import iter_mapped_rows
+
+
 from collections import defaultdict
 from typing import Dict, List, Any, Optional, Tuple, Set
 from app.core.report_config import CAMPOS_EXTRA_A_CAPTURAR
@@ -38,16 +42,15 @@ def read_lgg_sheet(
 
     lgg_extra = [k for k in CAMPOS_EXTRA_A_CAPTURAR.get("LGG", []) if k in lgg_claves_detectadas]
 
-    lgg_runs = []
-    lgg_runs_by_taladro = defaultdict(list)
+    lgg_runs = new_sequence()
+    lgg_runs_by_taladro = defaultdict(new_sequence)
     if max_lgg is None:
         max_lgg = {}
     empty_streak = 0
     current_taladro = None
     total_lgg_filas = 0
 
-    for r in range(h_idx + 1, ws_lgg.max_row + 1):
-        row_dict, is_empty = get_row_dict(ws_lgg, r, l_map)
+    for r, row_dict, is_empty in iter_mapped_rows(ws_lgg, h_idx + 1, l_map):
 
         t_val = row_dict.get("taladro")
         if t_val is not None and str(t_val).strip() != "":
@@ -159,7 +162,6 @@ def read_lgg_sheet(
             "campana": camp,
             "geologo": geo
         }
-        lgg_runs.append(lgg_run_entry)
-        lgg_runs_by_taladro[taladro].append(lgg_run_entry)
+        append_grouped(lgg_runs, lgg_runs_by_taladro[taladro], lgg_run_entry)
 
     return total_lgg_filas, lgg_runs, lgg_runs_by_taladro, max_lgg, l_map

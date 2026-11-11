@@ -73,7 +73,7 @@ export function findHeaderRow(rows: any[][]): number {
   let maxMatches = -1;
 
   // Scan top 15 rows
-  const maxScanRows = Math.min(15, rows.length);
+  const maxScanRows = Math.min(HEADER_SCAN_ROWS, rows.length);
   for (let r = 0; r < maxScanRows; r++) {
     const row = rows[r];
     if (!row || row.length === 0) continue;
@@ -339,11 +339,13 @@ export const EXPECTED_COLLAR_FIELDS: MappingField[] = [
   { key: 'eoh', label: 'Prof. Final (EOH)', required: true, synonyms: ['eoh', 'profundidad_final', 'prof_final', 'max_depth', 'total_depth'] },
 ];
 
+export const HEADER_SCAN_ROWS = 15;
+
 export function findHeaderRowGeneric(rows: any[][], expectedFields: MappingField[]): number {
   let bestRowIndex = 0;
   let maxMatches = -1;
 
-  const maxScanRows = Math.min(15, rows.length);
+  const maxScanRows = Math.min(HEADER_SCAN_ROWS, rows.length);
   for (let r = 0; r < maxScanRows; r++) {
     const row = rows[r];
     if (!row || row.length === 0) continue;

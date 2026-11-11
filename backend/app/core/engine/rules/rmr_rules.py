@@ -2,6 +2,7 @@
 app.core.engine.rules.rmr_rules
 Reglas de concordancia geomecánica, cruce de corridas y cálculos matemáticos para Validación RMR.
 """
+from app.services.audit_artifact_store import new_sequence
 
 from typing import List, Dict, Any, Optional
 from app.core.engine.base_rule import BaseRule
@@ -44,7 +45,7 @@ class RMR_MandatoryFieldsRule(BaseRule):
     ]
 
     def evaluate(self, ctx: ValidationContext) -> List[Anomaly]:
-        anomalies: List[Anomaly] = []
+        anomalies: List[Anomaly] = new_sequence()
         for taladro, rmr_runs in ctx.rmr_by_taladro.items():
             for rmr in rmr_runs:
                 r_idx = rmr.get("_fila_excel", 0)
@@ -82,7 +83,7 @@ class RMR_CrossCheckWithLGGRule(BaseRule):
     group = "Validación RMR"
 
     def evaluate(self, ctx: ValidationContext) -> List[Anomaly]:
-        anomalies: List[Anomaly] = []
+        anomalies: List[Anomaly] = new_sequence()
 
         # 1. Regla global de cantidad total de corridas
         for taladro, lgg_runs in ctx.lgg_by_taladro.items():
@@ -234,7 +235,7 @@ class RMR_FormulasAndRatingsRule(BaseRule):
     group = "Validación RMR"
 
     def evaluate(self, ctx: ValidationContext) -> List[Anomaly]:
-        anomalies: List[Anomaly] = []
+        anomalies: List[Anomaly] = new_sequence()
 
         for taladro, rmr_runs in ctx.rmr_by_taladro.items():
             for rmr in rmr_runs:

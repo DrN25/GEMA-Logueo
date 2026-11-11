@@ -8,6 +8,11 @@ Incluye:
 - Pestañas individuales dedicadas por categoría de error con botones de navegación '⬅ Volver al Catálogo'.
 """
 
+from app.services.audit_artifact_store import new_sequence
+
+import tempfile
+from app.reportes.stream_writer import StreamingReportWorkbook
+
 from collections import Counter, defaultdict
 from datetime import datetime
 import os
@@ -107,6 +112,14 @@ def write_kpi_card(ws, start_row, start_col, label, value, bg_fill, val_font, s)
 
 
 def export_plt_regulares_to_excel(diag: Dict[str, Any], output_path: str):
+    wb = StreamingReportWorkbook()
+    try:
+        _build_plt_report(wb, diag, output_path)
+    finally:
+        wb.close()
+
+
+def _build_plt_report(wb, diag: Dict[str, Any], output_path: str):
     """Genera el libro Excel (.xlsx) completo de auditoría QA/QC idéntico a Mapeo."""
     s = get_styles()
     font_title = s["font_title"]
@@ -134,7 +147,6 @@ def export_plt_regulares_to_excel(diag: Dict[str, Any], output_path: str):
     alignment_left = s["align_left"]
     alignment_right = s["align_right"]
 
-    wb = openpyxl.Workbook()
 
     total_filas = diag.get("total_rows", 0)
     total_alertas = diag.get("severity_counts", {}).get("ALERTA", 0)
@@ -339,7 +351,7 @@ def export_plt_regulares_to_excel(diag: Dict[str, Any], output_path: str):
         cell.border = border_thin
 
     anomalies = diag.get("anomalies", [])
-    incidencias_por_cat = defaultdict(list)
+    incidencias_por_cat = defaultdict(new_sequence)
     for anom in anomalies:
         incidencias_por_cat[anom["category_code"]].append(anom)
 
@@ -883,25 +895,22 @@ def export_plt_regulares_to_excel(diag: Dict[str, Any], output_path: str):
 
         ws_err.auto_filter.ref = f"B{r_indiv + 1}:K{r_indiv_cur - 1}"
 
-    # Auto-ajuste de ancho de columnas para todas las pestañas
+    # Recorrer solo celdas existentes, sin reconstruir columnas en memoria.
     for ws in wb.worksheets:
-        for col in ws.columns:
-            max_len = 0
-            for cell in col:
-                val_str = str(cell.value or '')
-                if not val_str.startswith("=") and len(val_str) < 60:
-                    max_len = max(max_len, len(val_str))
-            col_letter = get_column_letter(col[0].column)
-            ws.column_dimensions[col_letter].width = max(max_len + 3, 13)
+        ws.fit_report_columns()
 
-    # Guardar Libro Excel con tolerancia a bloqueo por apertura
+    # Emitir una sola vez; reemplazar el destino solo cuando el ZIP esté completo.
+    fd, temporary = tempfile.mkstemp(suffix=".xlsx", dir=os.path.dirname(os.path.abspath(output_path)))
+    os.close(fd)
     try:
-        wb.save(output_path)
-        print(f">> Reporte Excel 100% idéntico a Mapeo generado con éxito en: {output_path}")
-    except PermissionError:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        dir_name = os.path.dirname(output_path)
-        alt_path = os.path.join(dir_name, f"Reporte_Revision_PLT_Regulares_{timestamp}.xlsx")
-        wb.save(alt_path)
-        print(f">> AVISO: '{output_path}' está abierto en Excel.")
-        print(f">> Se guardó una copia con timestamp en: {alt_path}")
+        wb.save(temporary)
+        try:
+            os.replace(temporary, output_path)
+        except PermissionError:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            alt_path = os.path.join(os.path.dirname(output_path), f"Reporte_Revision_PLT_Regulares_{timestamp}.xlsx")
+            os.replace(temporary, alt_path)
+            print(f">> AVISO: '{output_path}' está abierto en Excel. Copia: {alt_path}")
+    finally:
+        if os.path.exists(temporary):
+            os.remove(temporary)

@@ -2,11 +2,13 @@
 app/routers/auditoria_plt.py — Endpoints API para Auditoría QA/QC de Ensayos PLT Regulares (DDH).
 Soporta subida de archivos Excel, validación geomecánica, consulta de KPIs, paginación de anomalías y descarga de reportes Excel.
 """
+from app.services.audit_artifact_store import audit_page, bounded_audit, copy_file_atomic, diagnostic_items, load_diagnostic, new_sequence, write_json_atomic
 
 import os
 import io
 import json
 import shutil
+from itertools import chain
 from datetime import datetime
 from typing import Optional, List, Any
 from collections import defaultdict, Counter
@@ -35,7 +37,7 @@ def _pregenerate_plt_excel(diag: dict, excel_out_path: str, public_out_path: str
     try:
         export_plt_regulares_to_excel(diag, excel_out_path)
         try:
-            shutil.copyfile(excel_out_path, public_out_path)
+            copy_file_atomic(excel_out_path, public_out_path)
         except Exception:
             pass
         size_kb = os.path.getsize(excel_out_path) / 1024.0
@@ -68,7 +70,7 @@ def _build_compact_metrics(diag: dict, campania_filter: Optional[str] = None) ->
     # Aplicar filtro de campaña si se especifica
     if campania_filter and campania_filter.strip().upper() not in ("", "TODAS", "NONE", "NULL", "TODOS", "ALL"):
         camps = [c.strip().upper() for c in campania_filter.split(",") if c.strip()]
-        filtered_anomalies = [a for a in anomalies if _matches_campaign(a.get("campana"), camps)]
+        filtered_anomalies = new_sequence(a for a in anomalies if _matches_campaign(a.get("campana"), camps))
     else:
         camps = []
         filtered_anomalies = anomalies
@@ -191,6 +193,21 @@ def _build_compact_metrics(diag: dict, campania_filter: Optional[str] = None) ->
     }
 
 
+def _read_plt_input(temp_path):
+    """Retain the existing parser and dtype behavior without retaining its raw rows."""
+    try:
+        from python_calamine import CalamineWorkbook
+        wb_cal = CalamineWorkbook.from_path(temp_path)
+        sheet_names = wb_cal.sheet_names
+        target_sheet = "ENSAYO PLT" if "ENSAYO PLT" in sheet_names else sheet_names[0]
+        s0 = wb_cal.get_sheet_by_name(target_sheet)
+        rows = s0.to_python()
+        header = [str(c).replace("\n", " ").strip() if c is not None else f"COL_{idx}" for idx, c in enumerate(rows[0])]
+        return pd.DataFrame(rows[1:], columns=header)
+    except Exception:
+        return pd.read_excel(temp_path, sheet_name=0)
+
+
 @router.post("/auditoria/plt/upload")
 @router.post("/audit/plt/upload-and-audit")
 async def upload_plt_audit_file(
@@ -203,6 +220,13 @@ async def upload_plt_audit_file(
     ejecuta la validación integral (autónoma o cruzada) y pre-genera el reporte Excel.
     Soporta selección de proyecto ('ferrobamba', 'chalco' o autodetección).
     """
+    return await _process_plt_audit(file, lgg_file, proyecto)
+
+
+@bounded_audit
+async def _process_plt_audit(
+    file: UploadFile, lgg_file: Optional[UploadFile], proyecto: Optional[str]
+):
     if not file.filename.lower().endswith(('.xlsx', '.xlsm', '.xls')):
         raise HTTPException(status_code=400, detail="Formato no soportado. Debe ser un archivo Excel (.xlsx, .xlsm, .xls).")
 
@@ -218,36 +242,26 @@ async def upload_plt_audit_file(
         temp_lgg_path = os.path.join(plt_history_dir, f"temp_lgg_{audit_id}_{lgg_file.filename}")
 
     try:
-        content = await file.read()
         with open(temp_path, "wb") as f:
-            f.write(content)
+            while chunk := await file.read(1024 * 1024):
+                f.write(chunk)
         shutil.copyfile(temp_path, saved_excel_path)
 
         df_lgg = None
         if lgg_file and temp_lgg_path:
-            content_lgg = await lgg_file.read()
             with open(temp_lgg_path, "wb") as f:
-                f.write(content_lgg)
+                while chunk := await lgg_file.read(1024 * 1024):
+                    f.write(chunk)
             df_lgg = extract_lgg_dataframe(temp_lgg_path)
             if df_lgg is not None:
                 print(f"[QAQC PLT] Archivo LGG cargado y procesado: {len(df_lgg)} corridas extraídas.")
 
-        # Cargar DataFrame con Calamine o Pandas
-        try:
-            from python_calamine import CalamineWorkbook
-            wb_cal = CalamineWorkbook.from_path(temp_path)
-            sheet_names = wb_cal.sheet_names
-            target_sheet = "ENSAYO PLT" if "ENSAYO PLT" in sheet_names else sheet_names[0]
-            s0 = wb_cal.get_sheet_by_name(target_sheet)
-            rows = s0.to_python()
-            header = [str(c).replace("\n", " ").strip() if c is not None else f"COL_{idx}" for idx, c in enumerate(rows[0])]
-            df = pd.DataFrame(rows[1:], columns=header)
-        except Exception:
-            df = pd.read_excel(temp_path, sheet_name=0)
+        df = _read_plt_input(temp_path)
 
         # Validar
         validator = PltRegularesValidator()
         diag = validator.audit_dataframe(df, df_lgg=df_lgg, project=proyecto)
+        del df
 
         diag["nombre_archivo"] = file.filename
         diag["lgg_archivo"] = lgg_file.filename if lgg_file else None
@@ -257,11 +271,13 @@ async def upload_plt_audit_file(
 
         # Asegurar equivalencia de claves para anomalies / incidencias
         anomalies_list = diag.get("anomalies", [])
-        for a in anomalies_list:
+        for idx, a in enumerate(anomalies_list):
             if "muestra" not in a and "sample_code" in a:
                 a["muestra"] = a["sample_code"]
             if "sample_code" not in a and "muestra" in a:
                 a["sample_code"] = a["muestra"]
+            if "sample_code" in a or "muestra" in a:
+                anomalies_list[idx] = a
         diag["incidencias"] = anomalies_list
 
         # Métricas compactas
@@ -277,15 +293,10 @@ async def upload_plt_audit_file(
         hist_comp = os.path.join(plt_history_dir, f"{audit_id}_compact.json")
         hist_excel = os.path.join(plt_history_dir, f"{audit_id}_reporte.xlsx")
 
-        with open(LATEST_PLT_DIAG, "w", encoding="utf-8") as f:
-            json.dump(diag, f, ensure_ascii=False, indent=2)
-        with open(LATEST_PLT_COMPACT, "w", encoding="utf-8") as f:
-            json.dump(metricas, f, ensure_ascii=False, indent=2)
-
-        with open(hist_diag, "w", encoding="utf-8") as f:
-            json.dump(diag, f, ensure_ascii=False)
-        with open(hist_comp, "w", encoding="utf-8") as f:
-            json.dump(metricas, f, ensure_ascii=False)
+        write_json_atomic(hist_diag, diag)
+        write_json_atomic(hist_comp, metricas)
+        copy_file_atomic(hist_diag, LATEST_PLT_DIAG)
+        copy_file_atomic(hist_comp, LATEST_PLT_COMPACT)
 
         # Pre-generar Excel
         _pregenerate_plt_excel(diag, hist_excel, LATEST_PLT_EXCEL)
@@ -320,11 +331,11 @@ def get_latest_plt_diagnostic():
     """Retorna el diagnóstico completo de la última auditoría PLT."""
     if not os.path.exists(LATEST_PLT_DIAG):
         raise HTTPException(status_code=404, detail="No se encontró ninguna revisión PLT activa.")
-    with open(LATEST_PLT_DIAG, "r", encoding="utf-8") as f:
-        return JSONResponse(content=json.load(f))
+    return FileResponse(LATEST_PLT_DIAG, media_type="application/json")
 
 
 @router.get("/auditoria/plt/resumen-ligero")
+@bounded_audit
 def get_plt_resumen_ligero(
     audit_id: Optional[str] = Query(None),
     campania: Optional[str] = Query(None)
@@ -338,8 +349,7 @@ def get_plt_resumen_ligero(
     if not os.path.exists(diag_path):
         raise HTTPException(status_code=404, detail="No se encontró la revisión solicitada.")
 
-    with open(diag_path, "r", encoding="utf-8") as f:
-        diag = json.load(f)
+    diag = load_diagnostic(diag_path)
 
     metricas = _build_compact_metrics(diag, campania_filter=campania)
     metricas["nombre_archivo"] = diag.get("nombre_archivo", "")
@@ -368,46 +378,31 @@ def get_plt_paginated_incidencias(
     if not os.path.exists(diag_path):
         return JSONResponse(content={"items": [], "total_items": 0, "page": 1, "total_pages": 1})
 
-    with open(diag_path, "r", encoding="utf-8") as f:
-        diag = json.load(f)
+    severity = (tipo_incidencia or "").strip().upper()
+    campaigns = ([c.strip().upper() for c in campania.split(",") if c.strip()]
+                 if campania and campania.strip().upper() not in ("", "TODAS", "ALL", "TODOS") else None)
+    hole = (taladro or "").strip().upper()
+    rule = (rule_code or "").strip().upper()
+    term = (search or "").strip().upper()
 
-    items = diag.get("anomalies") or diag.get("incidencias") or []
+    def matches(item):
+        if severity not in ("", "TODOS", "ALL") and str(item.get("severity", "")).strip().upper() != severity:
+            return False
+        if campaigns is not None and not _matches_campaign(item.get("campana"), campaigns):
+            return False
+        if hole and hole not in str(item.get("taladro", "")).strip().upper():
+            return False
+        if rule and str(item.get("category_code", "")).strip().upper() != rule:
+            return False
+        return (not term
+                or term in str(item.get("sample_code", item.get("muestra", ""))).upper()
+                or any(term in str(item.get(key, "")).upper()
+                       for key in ("taladro", "columna", "message", "category_code")))
 
-    # Filtrar por severidad
-    if tipo_incidencia and tipo_incidencia.strip().upper() not in ("", "TODOS", "ALL"):
-        items = [i for i in items if str(i.get("severity", "")).strip().upper() == tipo_incidencia.strip().upper()]
-
-    # Filtrar por campaña
-    if campania and campania.strip().upper() not in ("", "TODAS", "ALL", "TODOS"):
-        camps = [c.strip().upper() for c in campania.split(",") if c.strip()]
-        items = [i for i in items if _matches_campaign(i.get("campana"), camps)]
-
-    # Filtrar por taladro
-    if taladro and taladro.strip():
-        t_query = taladro.strip().upper()
-        items = [i for i in items if t_query in str(i.get("taladro", "")).strip().upper()]
-
-    # Filtrar por código de categoría
-    if rule_code and rule_code.strip():
-        rc = rule_code.strip().upper()
-        items = [i for i in items if str(i.get("category_code", "")).strip().upper() == rc]
-
-    # Búsqueda libre
-    if search and search.strip():
-        q = search.strip().upper()
-        items = [
-            i for i in items
-            if q in str(i.get("taladro", "")).upper()
-            or q in str(i.get("sample_code", i.get("muestra", ""))).upper()
-            or q in str(i.get("columna", "")).upper()
-            or q in str(i.get("message", "")).upper()
-            or q in str(i.get("category_code", "")).upper()
-        ]
-
-    total_items = len(items)
-    total_pages = max(1, (total_items + limit - 1) // limit)
-    start_idx = (page - 1) * limit
-    page_items = items[start_idx:start_idx + limit]
+    primary = diagnostic_items(diag_path, "anomalies")
+    first = next(primary, None)
+    items = chain((first,), primary) if first is not None else diagnostic_items(diag_path, "incidencias")
+    page_items, total_items, page, total_pages = audit_page(items, matches, page, limit)
 
     # Garantizar que los nombres de campos sean consistentes para el frontend
     for a in page_items:
@@ -425,6 +420,7 @@ def get_plt_paginated_incidencias(
 
 
 @router.get("/auditoria/plt/reporte-excel")
+@bounded_audit
 def download_plt_excel_report(
     audit_id: Optional[str] = Query(None),
     campania: Optional[str] = Query(None)
@@ -435,12 +431,11 @@ def download_plt_excel_report(
 
     if camps and os.path.exists(diag_path):
         try:
-            with open(diag_path, "r", encoding="utf-8") as f:
-                diag = json.load(f)
+            diag = load_diagnostic(diag_path)
             filtered_diag = dict(diag)
-            filtered_diag["anomalies"] = [a for a in (diag.get("anomalies") or []) if _matches_campaign(a.get("campana"), camps)]
+            filtered_diag["anomalies"] = new_sequence(a for a in (diag.get("anomalies") or []) if _matches_campaign(a.get("campana"), camps))
             filtered_diag["incidencias"] = filtered_diag["anomalies"]
-            filtered_diag["unique_samples_plt"] = [s for s in (diag.get("unique_samples_plt") or []) if _matches_campaign(s.get("campana"), camps)]
+            filtered_diag["unique_samples_plt"] = new_sequence(s for s in (diag.get("unique_samples_plt") or []) if _matches_campaign(s.get("campana"), camps))
             
             camps_tag = "_".join(camps[:3]) + (f"_y_{len(camps)-3}_mas" if len(camps) > 3 else "")
             gen_path = os.path.join(plt_history_dir, f"{audit_id or 'latest'}_reporte_{camps_tag}.xlsx")
@@ -470,8 +465,7 @@ def download_plt_excel_report(
         diag_path = os.path.join(plt_history_dir, f"{audit_id}_diag.json") if audit_id else LATEST_PLT_DIAG
         if os.path.exists(diag_path):
             try:
-                with open(diag_path, "r", encoding="utf-8") as f:
-                    diag = json.load(f)
+                diag = load_diagnostic(diag_path)
                 gen_path = os.path.join(plt_history_dir, f"{audit_id or 'latest'}_reporte.xlsx")
                 export_plt_regulares_to_excel(diag, gen_path)
                 target_file = gen_path

@@ -2,7 +2,9 @@
 app.core.adapters.excel.helpers
 Funciones auxiliares para inspección, búsqueda de cabeceras, extracción de celdas y captura de faltantes en Openpyxl.
 """
+from app.services.audit_artifact_store import new_sequence
 
+from app.core.adapters.excel.stream_reader import header_rows
 import re
 import unicodedata
 from typing import Dict, List, Any, Optional, Tuple, Set
@@ -50,11 +52,10 @@ def find_header_row_and_mapping(sheet, keyword_maps: Dict[str, List[str]]) -> Tu
     for key, patterns in keyword_maps.items():
         cleaned_maps[key] = [normalize_text(p) for p in patterns if p]
 
-    for r in range(1, 21):
+    for r, values in enumerate(header_rows(sheet), start=1):
         matches = 0
         mapping = {}
-        for c in range(1, sheet.max_column + 1):
-            val = sheet.cell(row=r, column=c).value
+        for c, val in enumerate(values, start=1):
             if val is None:
                 continue
             norm_val = normalize_text(str(val))
@@ -89,9 +90,9 @@ def get_row_dict(ws, row_idx: int, mapping: Dict[str, int]) -> Tuple[Dict[str, A
 
 
 class FaltantesCollector:
-    """Recolector en memoria para campos no obligatorios faltantes o con código de no información (-1)."""
+    """Recolector para campos no obligatorios faltantes o con código de no información (-1)."""
     def __init__(self):
-        self._registros: List[Dict[str, Any]] = []
+        self._registros: List[Dict[str, Any]] = new_sequence()
 
     def registrar(self, modulo: str, fila_excel: int, celda_padre: str, celda_hija: str,
                   columna: str, valor_raw: Any, campania: Any, geotecnico: Any):
@@ -118,7 +119,7 @@ class FaltantesCollector:
         })
 
     def dump(self) -> List[Dict[str, Any]]:
-        return list(self._registros)
+        return new_sequence(self._registros)
 
 
 def capturar_faltantes_extra(collector: Optional[FaltantesCollector], modulo: str, row_dict: Dict[str, Any],

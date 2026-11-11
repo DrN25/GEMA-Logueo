@@ -2,6 +2,7 @@
 app.core.engine.rules.est_rules
 Reglas de consistencia geomecánica, ángulos 3D y contención espacial para Logueo Estructural.
 """
+from app.services.audit_artifact_store import new_sequence
 
 from typing import List, Dict, Any, Optional, Set
 from app.core.engine.base_rule import BaseRule
@@ -22,7 +23,7 @@ class Estructural_MandatoryFieldsRule(BaseRule):
     group = "Estructural"
 
     def evaluate(self, ctx: ValidationContext) -> List[Anomaly]:
-        anomalies: List[Anomaly] = []
+        anomalies: List[Anomaly] = new_sequence()
         est_cols = ctx.metadata.get("est_columns")
 
         if ctx.is_2026:
@@ -76,7 +77,7 @@ class Estructural_GeometryAndAnglesRule(BaseRule):
     group = "Estructural"
 
     def evaluate(self, ctx: ValidationContext) -> List[Anomaly]:
-        anomalies: List[Anomaly] = []
+        anomalies: List[Anomaly] = new_sequence()
         exceptions = {"F", "RF", "VN", "SZ", "F+10", "BED"}
         seen_structures_by_taladro: Dict[str, Dict[tuple, int]] = {}
 
@@ -198,7 +199,7 @@ class Estructural_SpatialContainmentRule(BaseRule):
     group = "Estructural"
 
     def evaluate(self, ctx: ValidationContext) -> List[Anomaly]:
-        anomalies: List[Anomaly] = []
+        anomalies: List[Anomaly] = new_sequence()
 
         for taladro, structures in ctx.est_by_taladro.items():
             lgg_runs = ctx.get_lgg_runs(taladro)
@@ -257,7 +258,7 @@ class Estructural_CrossCheckWithLGGRule(BaseRule):
     group = "Estructural"
 
     def evaluate(self, ctx: ValidationContext) -> List[Anomaly]:
-        anomalies: List[Anomaly] = []
+        anomalies: List[Anomaly] = new_sequence()
         r_levels = {"R0": 0, "R1": 1, "R2": 2, "R3": 3, "R4": 4, "R5": 5, "R6": 6}
 
         for taladro, structures in ctx.est_by_taladro.items():

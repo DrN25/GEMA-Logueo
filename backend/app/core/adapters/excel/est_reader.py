@@ -3,6 +3,10 @@ app.core.adapters.excel.est_reader
 Extractor y adaptador de datos de la hoja Estructural (EST) en libros Excel Openpyxl.
 """
 
+from app.services.audit_artifact_store import append_grouped, new_sequence
+from app.core.adapters.excel.stream_reader import iter_mapped_rows
+
+
 from collections import defaultdict
 from typing import Dict, List, Any, Optional, Tuple, Set
 from app.core.report_config import CAMPOS_EXTRA_A_CAPTURAR
@@ -36,16 +40,15 @@ def read_est_sheet(
 
     est_extra = [k for k in CAMPOS_EXTRA_A_CAPTURAR.get("Estructural", []) if k in est_claves_detectadas]
 
-    est_structures = []
-    est_by_taladro = defaultdict(list)
+    est_structures = new_sequence()
+    est_by_taladro = defaultdict(new_sequence)
     if max_est is None:
         max_est = {}
     empty_streak = 0
     current_taladro_est = None
     total_est_filas = 0
 
-    for r in range(h_idx + 1, ws_est.max_row + 1):
-        row_dict, is_empty = get_row_dict(ws_est, r, e_map)
+    for r, row_dict, is_empty in iter_mapped_rows(ws_est, h_idx + 1, e_map):
 
         t_val = row_dict.get("taladro")
         if t_val is not None and str(t_val).strip() != "":
@@ -139,7 +142,6 @@ def read_est_sheet(
             "lito2": safe_str(row_dict.get("lito2")),
             "lito3": safe_str(row_dict.get("lito3")),
         }
-        est_structures.append(est_entry)
-        est_by_taladro[taladro].append(est_entry)
+        append_grouped(est_structures, est_by_taladro[taladro], est_entry)
 
     return total_est_filas, est_structures, est_by_taladro, max_est, e_map

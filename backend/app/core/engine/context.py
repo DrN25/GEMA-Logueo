@@ -1,7 +1,7 @@
 """
 app.core.engine.context
 Contexto de datos en memoria para la evaluación desacoplada de reglas geomecánicas.
-Indexa los datos por sondaje, corrida e intervalo espacial para consultas rápidas O(1).
+Indexa los datos por sondaje, corrida e intervalo espacial para consultas sin releer todas las filas completas.
 """
 
 from collections import defaultdict
@@ -46,6 +46,8 @@ class ValidationContext:
         self.max_lgg_by_taladro: Dict[str, float] = {}
         self.max_est_by_taladro: Dict[str, float] = {}
 
+        self._lgg_intervals = {}
+        self._lgg_corridas = {}
         self._build_indices()
 
     def _build_indices(self):
@@ -56,13 +58,22 @@ class ValidationContext:
                 if t:
                     self.lgg_by_taladro[t].append(run)
 
-        # Calcular máximas profundidades y ordenar corridas por 'de' ascendentemente
+        # Retain scalar search keys, and read a complete row only for a match.
+        # The original worksheet order decides ties and overlapping runs.
         for t, runs in self.lgg_by_taladro.items():
-            for run in runs:
-                a = run.get("a", 0.0) or 0.0
+            runs.sort(key=lambda r: (r.get("_fila_excel", 0) if "_fila_excel" in r else (r.get("de", 0.0) or 0.0)))
+            intervals, corridas = [], {}
+            for index, run in enumerate(runs):
+                start, end = run.get("de"), run.get("a")
+                a = end or 0.0
                 if t not in self.max_lgg_by_taladro or a > self.max_lgg_by_taladro[t]:
                     self.max_lgg_by_taladro[t] = a
-            runs.sort(key=lambda r: (r.get("_fila_excel", 0) if "_fila_excel" in r else (r.get("de", 0.0) or 0.0)))
+                intervals.append((start, end))
+                corrida = run.get("corrida")
+                if corrida is not None:
+                    corridas.setdefault(corrida, index)
+            self._lgg_intervals[t] = intervals
+            self._lgg_corridas[t] = corridas
 
         if not self.est_by_taladro and self.est_structures:
             for struct in self.est_structures:
@@ -103,58 +114,37 @@ class ValidationContext:
         if not runs:
             return None
 
-        # Coincidencia por número correlativo
         if corrida_num is not None and corrida_num > 0:
-            for r in runs:
-                if r.get("corrida") == corrida_num:
-                    return r
+            index = self._lgg_corridas[taladro].get(corrida_num)
+            if index is not None:
+                return runs[index]
 
-        # Coincidencia espacial por tramo
         if de is not None and a is not None:
-            for r in runs:
-                r_de = r.get("de", 0.0) or 0.0
-                r_a = r.get("a", 0.0) or 0.0
-                if abs(r_de - de) <= tol and abs(r_a - a) <= tol:
-                    return r
-
+            for index, (start, end) in enumerate(self._lgg_intervals[taladro]):
+                if abs((start or 0.0) - de) <= tol and abs((end or 0.0) - a) <= tol:
+                    return runs[index]
         return None
 
     def find_lgg_run_containing_depth(self, taladro: str, depth: float) -> Optional[Dict[str, Any]]:
-        """Encuentra la corrida de LGG en cuyo intervalo cae una profundidad determinada (de <= depth <= a)."""
-        runs = self.lgg_by_taladro.get(taladro, [])
-        for r in runs:
-            r_de = r.get("de")
-            r_a = r.get("a")
-            if r_de is not None and r_a is not None and r_de <= depth <= r_a:
-                return r
+        """Devuelve el primer intervalo, en orden de origen, que contiene la profundidad."""
+        for index, (start, end) in enumerate(self._lgg_intervals.get(taladro, ())):
+            if start is not None and end is not None and start <= depth <= end:
+                return self.lgg_by_taladro[taladro][index]
+        return None
+
+    def _exact_lgg_index(self, taladro, de, a, tol):
+        for index, (start, end) in enumerate(self._lgg_intervals.get(taladro, ())):
+            if start is not None and end is not None and abs(start - de) < tol and abs(end - a) < tol:
+                return index
         return None
 
     def find_lgg_run_for_structure(self, taladro: str, de: Optional[float], a: Optional[float], depth: Optional[float]) -> Optional[Dict[str, Any]]:
-        """Encuentra la corrida asociada a una estructura según tramo exacto (de/a) o profundidad contenida."""
-        runs = self.lgg_by_taladro.get(taladro, [])
+        """Prefiere el tramo exacto; si no existe, busca una profundidad contenida."""
         if de is not None and a is not None:
-            for r in runs:
-                r_de = r.get("de")
-                r_a = r.get("a")
-                if r_de is not None and r_a is not None:
-                    if abs(r_de - de) < 0.01 and abs(r_a - a) < 0.01:
-                        return r
-        if depth is not None:
-            for r in runs:
-                r_de = r.get("de")
-                r_a = r.get("a")
-                if r_de is not None and r_a is not None:
-                    if r_de <= depth <= r_a:
-                        return r
-        return None
+            index = self._exact_lgg_index(taladro, de, a, 0.01)
+            if index is not None:
+                return self.lgg_by_taladro[taladro][index]
+        return self.find_lgg_run_containing_depth(taladro, depth) if depth is not None else None
 
     def has_exact_lgg_run(self, taladro: str, de: float, a: float, tol: float = 0.001) -> bool:
-        """Verifica si existe una corrida con coincidencia estricta en Desde y Hasta."""
-        runs = self.lgg_by_taladro.get(taladro, [])
-        for r in runs:
-            r_de = r.get("de")
-            r_a = r.get("a")
-            if r_de is not None and r_a is not None:
-                if abs(r_de - de) < tol and abs(r_a - a) < tol:
-                    return True
-        return False
+        return self._exact_lgg_index(taladro, de, a, tol) is not None

@@ -8,13 +8,19 @@ import os
 import io
 import json
 import shutil
-import math
 from datetime import datetime
 from typing import Optional, Any, List
 
 import openpyxl
 from fastapi import APIRouter, HTTPException, UploadFile, File, BackgroundTasks, Form
 from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
+
+from starlette.background import BackgroundTask
+from pathlib import Path
+from tempfile import mkstemp
+from app.services.audit_artifact_store import (
+    audit_page, bounded_audit, diagnostic_items, load_diagnostic, write_json_atomic,
+)
 
 from app.validator import safe_float, safe_int, safe_str
 from app.services.ddh_excel_exporter import (
@@ -157,8 +163,24 @@ def listar_auditorias():
 
 
 @router.get("/logueo/resumen-ligero")
+@bounded_audit
 def obtener_resumen_ligero(audit_id: str = None, years: str = None):
-    """Retorna las métricas ejecutivas para las tarjetas KPI y gráficos de DDH."""
+    result = _obtener_resumen(audit_id, years, as_file=True)
+    if isinstance(result, (FileResponse, JSONResponse)):
+        return result
+    fd, path = mkstemp(prefix="gema-summary-", suffix=".json")
+    os.close(fd)
+    try:
+        write_json_atomic(path, result)
+    except BaseException:
+        Path(path).unlink(missing_ok=True)
+        raise
+    return FileResponse(path, media_type="application/json",
+                        background=BackgroundTask(Path(path).unlink, missing_ok=True))
+
+
+def _obtener_resumen(audit_id, years, *, as_file=False):
+    """Resuelve el mismo resumen para la API JSON y el informe Markdown."""
     if audit_id:
         raw_file = os.path.join(history_dir, f"{audit_id}_diagnostico.json")
         compact_file = os.path.join(history_dir, f"{audit_id}_compact.json")
@@ -189,11 +211,11 @@ def obtener_resumen_ligero(audit_id: str = None, years: str = None):
 
     # Si no hay filtro de años y ya existe el compact, retornar directamente el compact precalculado
     if (not years or years.strip().upper() in ("TODOS", "TODAS", "ALL", "")) and os.path.exists(compact_file):
-        with open(compact_file, "r", encoding="utf-8") as f:
-            return json.load(f)
+        if as_file:
+            return FileResponse(compact_file, media_type="application/json")
+        return load_diagnostic(compact_file)
 
-    with open(raw_file, "r", encoding="utf-8") as f:
-        diag = json.load(f)
+    diag = load_diagnostic(raw_file)
 
     if diag.get("status") == "error":
         return diag
@@ -221,41 +243,31 @@ def obtener_incidencias_paginadas(
             else:
                 return {"data": [], "page": 1, "total_pages": 1, "total_records": 0}
 
-    with open(raw_file, "r", encoding="utf-8") as f:
-        diag = json.load(f)
-        
-    incidencias = diag.get("incidencias", [])
-    
-    if tipo:
-        incidencias = [i for i in incidencias if i.get("tipo_incidencia") == tipo]
-    if celda:
-        incidencias = [i for i in incidencias if i.get("celda_padre") == celda]
-    if columna:
-        incidencias = [i for i in incidencias if i.get("columna") == columna]
-    if campania and campania not in ("TODOS", "TODAS", "ALL", ""):
-        c_list = [c.strip() for c in campania.split(",") if c.strip()]
-        incidencias = [i for i in incidencias if is_year_match(i.get("campania"), c_list)]
-    if geotecnico:
-        incidencias = [i for i in incidencias if i.get("geotecnico") == geotecnico]
-    if search:
-        search_lower = search.lower()
-        incidencias = [
-            i for i in incidencias 
-            if search_lower in str(i.get("mensaje", "")).lower() 
-            or search_lower in simplify_message(i.get("mensaje", "")).lower()
-            or search_lower in str(i.get("columna", "")).lower()
-            or search_lower in str(i.get("celda_padre", "")).lower()
-            or search_lower in str(i.get("celda_hija", "")).lower()
-        ]
-        
-    total_records = len(incidencias)
-    total_pages = max(1, math.ceil(total_records / limit))
-    page = max(1, min(page, total_pages))
-    
-    start_idx = (page - 1) * limit
-    end_idx = start_idx + limit
-    paginated = incidencias[start_idx:end_idx]
-    
+    if limit < 1:
+        raise HTTPException(status_code=422, detail="El límite debe ser mayor que cero.")
+    campaigns = ([c.strip() for c in campania.split(",") if c.strip()]
+                 if campania and campania not in ("TODOS", "TODAS", "ALL", "") else None)
+    term = search.lower() if search else None
+
+    def matches(item):
+        if tipo and item.get("tipo_incidencia") != tipo:
+            return False
+        if celda and item.get("celda_padre") != celda:
+            return False
+        if columna and item.get("columna") != columna:
+            return False
+        if campaigns is not None and not is_year_match(item.get("campania"), campaigns):
+            return False
+        if geotecnico and item.get("geotecnico") != geotecnico:
+            return False
+        return (not term
+                or any(term in str(item.get(key, "")).lower()
+                       for key in ("mensaje", "columna", "celda_padre", "celda_hija"))
+                or term in simplify_message(item.get("mensaje", "")).lower())
+
+    paginated, total_records, page, total_pages = audit_page(
+        diagnostic_items(raw_file, "incidencias"), matches, page, limit, clamp=True)
+
     return {
         "data": paginated,
         "page": page,
@@ -283,9 +295,10 @@ def descargar_reporte_excel(audit_id: str = None):
 
 
 @router.get("/logueo/reporte-markdown")
+@bounded_audit
 def descargar_reporte_markdown(audit_id: str = None, years: str = None):
     """Genera y descarga un informe ejecutivo en formato Markdown."""
-    resumen = obtener_resumen_ligero(audit_id, years)
+    resumen = _obtener_resumen(audit_id, years)
     if isinstance(resumen, JSONResponse):
         return resumen
         

@@ -2,6 +2,7 @@
 app.core.engine.rules.lgg_rules
 Reglas de consistencia geomecánica para el módulo Logueo General (LGG).
 """
+from app.services.audit_artifact_store import new_sequence
 
 import math
 from typing import List, Dict, Any, Optional, Set
@@ -24,7 +25,7 @@ class LGG_MandatoryFieldsRule(BaseRule):
     group = "LGG"
 
     def evaluate(self, ctx: ValidationContext) -> List[Anomaly]:
-        anomalies: List[Anomaly] = []
+        anomalies: List[Anomaly] = new_sequence()
         lgg_cols = ctx.metadata.get("lgg_columns")
 
         if ctx.is_2026:
@@ -80,7 +81,7 @@ class LGG_CatalogsAndFormatsRule(BaseRule):
     group = "LGG"
 
     def evaluate(self, ctx: ValidationContext) -> List[Anomaly]:
-        anomalies: List[Anomaly] = []
+        anomalies: List[Anomaly] = new_sequence()
 
         for run in ctx.lgg_runs:
             r_idx = run.get("_fila_excel", 0)
@@ -167,7 +168,7 @@ class LGG_PhysicalAndGeometricRule(BaseRule):
     group = "LGG"
 
     def evaluate(self, ctx: ValidationContext) -> List[Anomaly]:
-        anomalies: List[Anomaly] = []
+        anomalies: List[Anomaly] = new_sequence()
         skip_max_advance = ctx.metadata.get("skip_lgg_max_advance", False)
 
         for taladro, runs in ctx.lgg_by_taladro.items():
@@ -371,7 +372,7 @@ class LGG_FracturesAndFRFRule(BaseRule):
     group = "LGG"
 
     def evaluate(self, ctx: ValidationContext) -> List[Anomaly]:
-        anomalies: List[Anomaly] = []
+        anomalies: List[Anomaly] = new_sequence()
         lgg_cols = ctx.metadata.get("lgg_columns")
 
         for taladro, runs in ctx.lgg_by_taladro.items():
@@ -437,7 +438,7 @@ class LGG_GeomechanicalCompatibilityRule(BaseRule):
     group = "LGG"
 
     def evaluate(self, ctx: ValidationContext) -> List[Anomaly]:
-        anomalies: List[Anomaly] = []
+        anomalies: List[Anomaly] = new_sequence()
         exceptions = {"F", "RF", "VN", "SZ", "F+10", "BED"}
 
         for run in ctx.lgg_runs:

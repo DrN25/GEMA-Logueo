@@ -272,9 +272,10 @@ def _stats_modulos(grupos, filas, tabla_c):
 
 
 def compute_analysis(diag, incidencias, faltantes_extra=None):
-    registros = [r for r in (incidencias or []) if r.get("tipo_incidencia") in TIPOS_FALTANTE]
+    from app.services.audit_artifact_store import new_sequence
+    registros = new_sequence(r for r in (incidencias or []) if r.get("tipo_incidencia") in TIPOS_FALTANTE)
     if faltantes_extra:
-        registros += [r for r in faltantes_extra if r.get("tipo_incidencia") in TIPOS_FALTANTE]
+        registros.extend(r for r in faltantes_extra if r.get("tipo_incidencia") in TIPOS_FALTANTE)
 
     grupos = _agrupar(registros)
     filas_main = _filas_campo(grupos, incluir_subratings=False)
