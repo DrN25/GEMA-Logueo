@@ -523,18 +523,21 @@ def _validate_revision_workbooks(wb_main, wb_col, wb_sur, config, output_json_pa
         total_ok += r_counters["total_ok"]
 
     # 4. PROCESAR COLLAR Y SURVEY
-    eoh_collar = read_collar_sheet(wb_col, config.get("collar"))
-    max_survey = read_survey_sheet(wb_sur, config.get("survey"))
+    eoh_collar, collar_meta = read_collar_sheet(wb_col, config.get("collar"))
+    max_survey, survey_meta = read_survey_sheet(wb_sur, config.get("survey"))
 
     # 5. REGLA DESACOPLADA DE CRUCE CUÁDRUPLE (EOH)
     eoh_ctx = ValidationContext(
         collar_data=eoh_collar,
         survey_data=max_survey,
+        lgg_by_taladro=lgg_runs_by_taladro,
         metadata={
             "max_lgg": max_lgg,
             "max_est": max_est,
             "has_collar": bool(wb_col),
-            "has_survey": bool(wb_sur)
+            "has_survey": bool(wb_sur),
+            "collar_meta": collar_meta,
+            "survey_meta": survey_meta
         }
     )
     eoh_rule = CrossModule_EOHRule()
@@ -550,10 +553,21 @@ def _validate_revision_workbooks(wb_main, wb_col, wb_sur, config, output_json_pa
             "campania": anom.campania,
             "geotecnico": anom.geotecnico,
             "sector_geotecnico": anom.sector_geotecnico,
-            "modulo": anom.modulo
+            "modulo": anom.modulo,
+            "rule_code": anom.rule_code
         })
         if anom.severity == Severity.ALERTA:
             total_alertas += 1
+            if anom.celda_padre in resumen_celdas:
+                resumen_celdas[anom.celda_padre]["alertas"] += 1
+        elif anom.severity == Severity.ADVERTENCIA:
+            total_advertencias += 1
+            if anom.celda_padre in resumen_celdas:
+                resumen_celdas[anom.celda_padre]["advertencias"] += 1
+        elif anom.severity == Severity.VACIO:
+            total_vacios += 1
+            if anom.celda_padre in resumen_celdas:
+                resumen_celdas[anom.celda_padre]["vacios"] += 1
 
     # 6. RESOLUCIÓN DE ESTADOS POR CELDA PADRE
     total_celdas_ok = 0
@@ -570,6 +584,7 @@ def _validate_revision_workbooks(wb_main, wb_col, wb_sur, config, output_json_pa
     pct_ok = round((total_ok / total_filas) * 100, 2) if total_filas > 0 else 0.0
 
     diag = {
+        "cruce_collar_survey": eoh_ctx.metadata.get("cruce_collar_survey", {}),
         "resumen_celdas": resumen_celdas,
         "incidencias": incidencias,
         "faltantes_extra": collector.dump() if collector else [],

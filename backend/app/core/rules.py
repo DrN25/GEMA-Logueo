@@ -381,6 +381,42 @@ MASTER_ERROR_RULES = [
         "group": "Cruce General"
     },
     {
+        "code": "R302",
+        "msg": "No existe Collar para el taladro logueado en LGG.",
+        "severity": "ALERTA",
+        "group": "Cruce General"
+    },
+    {
+        "code": "R303",
+        "msg": "No existe Survey para el taladro logueado en LGG.",
+        "severity": "ALERTA",
+        "group": "Cruce General"
+    },
+    {
+        "code": "R304",
+        "msg": "Profundidad final (EOH) vacía o no numérica en Collar.",
+        "severity": "VACIO",
+        "group": "Cruce General"
+    },
+    {
+        "code": "R305",
+        "msg": "Todas las profundidades (Depth) están vacías o no son numéricas en Survey.",
+        "severity": "VACIO",
+        "group": "Cruce General"
+    },
+    {
+        "code": "R306",
+        "msg": "Taladro duplicado en Collar con profundidades EOH discrepantes.",
+        "severity": "ALERTA",
+        "group": "Cruce General"
+    },
+    {
+        "code": "R307",
+        "msg": "Taladro sin LGG: el taladro registra datos en módulos secundarios pero no en Logueo General.",
+        "severity": "ALERTA",
+        "group": "Cruce General"
+    },
+    {
         "code": "R216",
         "msg": "La profundidad en logueo estructural excede el límite final registrado en LGG.",
         "severity": "ALERTA",
