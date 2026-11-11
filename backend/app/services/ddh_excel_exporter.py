@@ -993,6 +993,186 @@ def _build_ddh_report(wb, diag: dict, compact: dict, filtered: list):
         col_letter = get_column_letter(col[0].column)
         ws_est_taladros.column_dimensions[col_letter].width = max(12, min(max_len + 3, 30))
 
+    # =========================================================================
+    # --- HOJA: CRUCE COLLAR-SURVEY (D7, D8, D9) ---
+    # =========================================================================
+    cruce_data = diag.get("cruce_collar_survey", {})
+    archivos_cruce = cruce_data.get("archivos", {})
+    has_collar_file = bool(archivos_cruce.get("collar", {}).get("cargado", False))
+    has_survey_file = bool(archivos_cruce.get("survey", {}).get("cargado", False))
+
+    # D7: Si no se cargó Collar ni Survey: NO se crea la hoja
+    if has_collar_file or has_survey_file:
+        ws_cruce = wb.create_sheet(title="Cruce Collar-Survey")
+        ws_cruce.views.sheetView[0].showGridLines = True
+
+        ws_cruce.cell(row=2, column=2, value="CRUCE DE PROFUNDIDADES FINALES (COLLAR / SURVEY / LGG / ESTRUCTURAL)").font = font_title
+        ws_cruce.cell(
+            row=3, column=2,
+            value="Evaluación de concordancia y consistencia espacial entre módulos para la profundidad final (EOH)."
+        ).font = font_subtitle
+
+        # D7: Definición dinámica de columnas según archivos cargados
+        headers_cruce = ["Taladro", "Campaña", "LGG Máx (m)", "Estructural Máx (m)"]
+        if has_collar_file:
+            headers_cruce.append("Collar EOH (m)")
+        if has_survey_file:
+            headers_cruce.append("Survey Máx (m)")
+        if has_collar_file:
+            headers_cruce.append("Δ LGG-Collar")
+        if has_survey_file:
+            headers_cruce.append("Δ LGG-Survey")
+        headers_cruce.append("Δ LGG-Estructural")
+        headers_cruce.append("Estado")
+        headers_cruce.append("Observación")
+
+        header_col_start = 2
+        for idx_h, h_text in enumerate(headers_cruce, start=header_col_start):
+            cell = ws_cruce.cell(row=5, column=idx_h, value=h_text)
+            cell.font = font_header
+            cell.fill = fill_primary
+            cell.alignment = alignment_center
+            cell.border = border_thin
+
+        back_col_idx = header_col_start + len(headers_cruce) - 1
+        c_back_cruce = ws_cruce.cell(row=2, column=back_col_idx)
+        c_back_cruce.value = '=HYPERLINK("#' + "'❌ Catálogo de Errores'" + '!B2", "⬅ Volver al Catálogo de Errores")'
+        c_back_cruce.font = Font(name="Segoe UI", size=10, bold=True, color="1B365D", underline="single")
+        c_back_cruce.alignment = alignment_right
+
+        # D8: Filas = todos los taladros evaluados por la regla (LGG ∪ Estructural) + inventario informativo Collar/Survey
+        taladros_dict = cruce_data.get("taladros", {})
+        taladros_evaluados = [
+            t for t, d in taladros_dict.items()
+            if d.get("estado_global") != "SOLO EN COLLAR/SURVEY"
+        ]
+        taladros_inventario = [
+            t for t, d in taladros_dict.items()
+            if d.get("estado_global") == "SOLO EN COLLAR/SURVEY"
+        ]
+        todos_taladros_ordenados = sorted(taladros_evaluados) + sorted(taladros_inventario)
+
+        r_cruce = 6
+        for t_name in todos_taladros_ordenados:
+            t_info = taladros_dict[t_name]
+            estado = t_info.get("estado_global", "")
+            if estado == "SIN_REFERENCIA":
+                estado = "SIN REFERENCIA"
+
+            campania = t_info.get("campania")
+            # D9: Campaña: año o vacío (D4)
+            camp_val = int(campania) if (campania is not None and str(campania).isdigit()) else (str(campania) if (campania is not None and str(campania).strip() not in ("", "None", "N/A")) else None)
+
+            lgg_m = t_info.get("lgg_max")
+            # D9: Celdas sin dato: VACÍAS (nunca "N/A", "No Cargado" ni 0)
+            lgg_val = float(lgg_m) if (lgg_m is not None and lgg_m > 0.0) else None
+
+            est_m = t_info.get("est_max")
+            est_val = float(est_m) if (est_m is not None and est_m > 0.0) else None
+
+            col_m = t_info.get("collar_eoh") if has_collar_file else None
+            col_val = float(col_m) if col_m is not None else None
+
+            sur_m = t_info.get("survey_max") if has_survey_file else None
+            sur_val = float(sur_m) if sur_m is not None else None
+
+            # Deltas (D9: números reales formato 0.00, vacío si falta dato)
+            delta_col = round(lgg_val - col_val, 2) if (lgg_val is not None and col_val is not None) else None
+            delta_sur = round(lgg_val - sur_val, 2) if (lgg_val is not None and sur_val is not None) else None
+            delta_est = round(lgg_val - est_val, 2) if (lgg_val is not None and est_val is not None) else None
+
+            # Observación contextual
+            obs_parts = []
+            if estado == "COINCIDE":
+                obs_parts.append("Profundidades finales concordantes dentro de la tolerancia (0.05m).")
+            elif estado == "DISCREPANCIA":
+                if delta_col is not None and abs(delta_col) > 0.05:
+                    obs_parts.append(f"Discrepancia LGG vs Collar ({delta_col:+.2f}m)")
+                if delta_sur is not None and abs(delta_sur) > 0.05:
+                    obs_parts.append(f"Discrepancia LGG vs Survey ({delta_sur:+.2f}m)")
+                if delta_est is not None and abs(delta_est) > 0.05:
+                    obs_parts.append(f"Discrepancia LGG vs Estructural ({delta_est:+.2f}m)")
+                if not obs_parts:
+                    obs_parts.append("Discrepancia detectada en profundidad final entre módulos.")
+            elif estado == "SIN REFERENCIA":
+                comp = t_info.get("comparaciones", {})
+                if lgg_val is None and est_val is not None:
+                    obs_parts.append("Taladro registrado en Estructural/RMR sin Logueo General (LGG).")
+                elif has_collar_file and comp.get("lgg_vs_collar", {}).get("estado") == "SIN_REFERENCIA" and has_survey_file and comp.get("lgg_vs_survey", {}).get("estado") == "SIN_REFERENCIA":
+                    obs_parts.append("Taladro de LGG ausente en Collar y Survey.")
+                elif has_collar_file and comp.get("lgg_vs_collar", {}).get("estado") == "SIN_REFERENCIA":
+                    obs_parts.append("Taladro de LGG ausente en archivo Collar.")
+                elif has_survey_file and comp.get("lgg_vs_survey", {}).get("estado") == "SIN_REFERENCIA":
+                    obs_parts.append("Taladro de LGG ausente en archivo Survey.")
+                elif comp.get("lgg_vs_collar", {}).get("estado") == "DISCREPANTE_DUPLICADO":
+                    obs_parts.append("Taladro con valores EOH duplicados discrepantes en Collar.")
+                else:
+                    obs_parts.append("Sin datos suficientes para contrastar profundidad final.")
+            elif estado == "SOLO EN COLLAR/SURVEY":
+                obs_parts.append("Inventario informativo: taladro presente en Collar/Survey pero no registrado en LGG.")
+
+            obs_text = " | ".join(obs_parts) if obs_parts else None
+
+            # Construir tupla de valores de la fila
+            row_data = [t_name, camp_val, lgg_val, est_val]
+            if has_collar_file:
+                row_data.append(col_val)
+            if has_survey_file:
+                row_data.append(sur_val)
+            if has_collar_file:
+                row_data.append(delta_col)
+            if has_survey_file:
+                row_data.append(delta_sur)
+            row_data.append(delta_est)
+            row_data.append(estado)
+            row_data.append(obs_text)
+
+            is_zebra = (r_cruce % 2 == 0)
+            for c_idx, val in enumerate(row_data, start=header_col_start):
+                cell = ws_cruce.cell(row=r_cruce, column=c_idx, value=val)
+                cell.border = border_thin
+                if is_zebra:
+                    cell.fill = fill_zebra
+
+                h_name = headers_cruce[c_idx - header_col_start]
+                if h_name == "Taladro":
+                    cell.alignment = alignment_left
+                    cell.font = font_bold
+                elif h_name == "Campaña":
+                    cell.alignment = alignment_center
+                    cell.font = font_regular
+                elif "Máx" in h_name or "EOH" in h_name or "Δ" in h_name:
+                    cell.alignment = alignment_right
+                    cell.font = font_regular
+                    if isinstance(val, (int, float)):
+                        cell.number_format = '0.00'
+                elif h_name == "Estado":
+                    cell.alignment = alignment_center
+                    cell.font = font_bold
+                    if val == "COINCIDE":
+                        cell.fill = fill_accent_green
+                    elif val == "DISCREPANCIA":
+                        cell.fill = fill_accent_red
+                    elif val == "SIN REFERENCIA":
+                        cell.fill = fill_accent_yellow
+                    elif val == "SOLO EN COLLAR/SURVEY":
+                        cell.fill = fill_kpi_gray
+                elif h_name == "Observación":
+                    cell.alignment = alignment_left
+                    cell.font = font_regular
+
+            r_cruce += 1
+
+        end_col_idx = header_col_start + len(headers_cruce) - 1
+        end_col_letter = get_column_letter(end_col_idx)
+        if r_cruce > 6:
+            ws_cruce.auto_filter.ref = f"B5:{end_col_letter}{r_cruce - 1}"
+
+        for col in ws_cruce.iter_cols(min_col=header_col_start, max_col=end_col_idx, min_row=5, max_row=min(r_cruce, 100)):
+            max_len = max(len(str(cell.value or '')) for cell in col)
+            col_letter = get_column_letter(col[0].column)
+            ws_cruce.column_dimensions[col_letter].width = max(13, min(max_len + 3, 45))
+
     # --- HOJA: DETALLE COMPLETO DE INCIDENCIAS ---
     ws_detail = wb.create_sheet(title="📋 Detalle de Incidencias")
     ws_detail.views.sheetView[0].showGridLines = True

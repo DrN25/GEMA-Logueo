@@ -135,7 +135,7 @@ class CrossModule_EOHRule(BaseRule):
                 cruce_dict["taladros"][t_aux] = {
                     "taladro": t_aux,
                     "campania": None,
-                    "lgg_max": 0.0,
+                    "lgg_max": None,
                     "est_max": max_est.get(t_aux),
                     "collar_eoh": eoh_collar.get(t_aux) if has_collar_file else None,
                     "survey_max": max_survey.get(t_aux) if has_survey_file else None,
@@ -361,6 +361,30 @@ class CrossModule_EOHRule(BaseRule):
                     geotecnico=geotecnico_res,
                     sector_geotecnico="N/A"
                 ))
+
+        # D8: Exponer inventario informativo de taladros presentes en Collar y/o Survey pero ausentes en LGG
+        taladros_en_collar = set(eoh_collar.keys()) if has_collar_file else set()
+        taladros_en_survey = set(max_survey.keys()) if has_survey_file else set()
+        taladros_ya_en_cruce = set(cruce_dict["taladros"].keys())
+        taladros_solo_cs = sorted((taladros_en_collar | taladros_en_survey) - taladros_ya_en_cruce)
+
+        for t_cs in taladros_solo_cs:
+            c_val_cs = eoh_collar.get(t_cs) if (has_collar_file and t_cs in eoh_collar) else None
+            s_val_cs = max_survey.get(t_cs) if (has_survey_file and t_cs in max_survey) else None
+            cruce_dict["taladros"][t_cs] = {
+                "taladro": t_cs,
+                "campania": None,
+                "lgg_max": None,
+                "est_max": None,
+                "collar_eoh": c_val_cs,
+                "survey_max": s_val_cs,
+                "comparaciones": {
+                    "lgg_vs_collar": {"estado": "SOLO_EN_COLLAR_SURVEY", "delta_m": None},
+                    "lgg_vs_survey": {"estado": "SOLO_EN_COLLAR_SURVEY", "delta_m": None},
+                    "lgg_vs_est": {"estado": "SOLO_EN_COLLAR_SURVEY", "delta_m": None}
+                },
+                "estado_global": "SOLO EN COLLAR/SURVEY"
+            }
 
         ctx.metadata["cruce_collar_survey"] = cruce_dict
         return anomalies
