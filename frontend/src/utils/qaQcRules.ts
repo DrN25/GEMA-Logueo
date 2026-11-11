@@ -132,12 +132,36 @@ const RULES: QaQcRuleDef[] = [
     fieldId: 'survey-depth',
     section: SECTION_COLLAR,
     evalua: (ctx, row) => {
-      const eoh = num(ctx.collar?.prof_final_eoh);
+      const eoh = num(ctx.collar?.prof_final_eoh ?? (ctx.collar as any)?.collar_eoh);
       const d = num(row?.depth);
       if (eoh === null || d === null) return null;
       return d > eoh
         ? `Lectura de Survey (${d}m) excede la profundidad final EOH oficial (${eoh}m).`
         : null;
+    },
+  },
+  {
+    id: 'COLLAR_EOH_DISCREPA_LGG',
+    severity: 'ADVERTENCIA',
+    enabled: true,
+    global: true,
+    fieldId: 'header-prof_final_eoh',
+    section: SECTION_COLLAR,
+    evalua: (ctx) => {
+      const eoh = num(ctx.collar?.prof_final_eoh ?? (ctx.collar as any)?.collar_eoh);
+      if (eoh === null || !ctx.corridas || ctx.corridas.length === 0) return null;
+      let maxLgg = 0;
+      for (const r of ctx.corridas) {
+        const a = num(r?.a);
+        if (a !== null && a > maxLgg) maxLgg = a;
+      }
+      if (maxLgg <= 0) return null;
+      const diff = Math.abs(maxLgg - eoh);
+      if (diff > 0.05) {
+        const delta = Number((maxLgg - eoh).toFixed(2));
+        return `Discrepancia EOH: Collar (${eoh.toFixed(2)}m) difiere del avance final en LGG (${maxLgg.toFixed(2)}m) [Δ = ${delta > 0 ? '+' : ''}${delta.toFixed(2)}m, tol 0.05m].`;
+      }
+      return null;
     },
   },
   {

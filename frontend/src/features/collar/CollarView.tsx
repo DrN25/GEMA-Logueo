@@ -189,51 +189,23 @@ export default function CollarSurveyForm({
     onSurveysChange(updated);
   };
 
-  // --- Autocorrector de cascada al perder el foco (onBlur) en el EOH ---
+  // --- Manejo de pérdida de foco (onBlur) en el EOH ---
   const handleEOHBlur = () => {
-    const eoh = Number(safeCollar.prof_final_eoh);
-    if (!isCollarEmptyValue(eoh) && !isNaN(eoh)) {
-      // Coerción a Number estricta para evitar fallas de tipado de Javascript en comparaciones
-      const needsClamping = safeSurveys.some(survey => {
-        const currentDepth = Number(survey.depth);
-        return currentDepth !== -1 && !isNaN(currentDepth) && currentDepth > eoh;
-      });
-
-      if (needsClamping) {
-        const updatedSurveys = safeSurveys.map(survey => {
-          const currentDepth = Number(survey.depth);
-          if (currentDepth !== -1 && !isNaN(currentDepth) && currentDepth > eoh) {
-            return { ...survey, depth: eoh }; // Reducimos al valor límite válido
-          }
-          return survey;
-        });
-        onSurveysChange(updatedSurveys);
-      }
-    }
+    // Se preservan los surveys reales sin truncamiento artificial,
+    // permitiendo que el motor QA/QC y el banner de inconsistencia alerten si un survey excede el EOH.
   };
 
-  // --- Autocorrector al perder el foco (onBlur) en las celdas de la tabla ---
+  // --- Manejo de pérdida de foco (onBlur) en las celdas de la tabla de survey ---
   const handleSurveyBlur = (index: number, field: keyof Survey) => {
     const survey = safeSurveys[index];
     if (!survey || survey[field] === -1) return;
 
-    let value = Number(survey[field]);
+    const value = Number(survey[field]);
     if (isNaN(value)) return;
 
-    if (field === 'depth') {
-      if (value < 0) value = 0;
-      const eoh = Number(safeCollar.prof_final_eoh);
-      if (!isCollarEmptyValue(eoh) && value > eoh) {
-        value = eoh; // Autocorrige al valor del EOH
-      }
-    } else if (field === 'dip') {
-      if (value < 0) value = 0;
-      if (value > 90) value = 90; // Autocorrige al límite de 90°
-    } else if (field === 'azimuth') {
-      if (value < 0) value = 0;
-      if (value > 360) value = 360; // Autocorrige al límite de 360°
-    }
-
+    // Se preserva el valor real ingresado sin clamping para que las reglas QA/QC
+    // (SURVEY_DEPTH_EXCEDE_EOH, SURVEY_DIP_RANGO, SURVEY_AZIMUTH_RANGO) puedan
+    // evaluar la entrada y mostrar las alertas rojas y advertencias correspondientes.
     const updated = [...safeSurveys];
     updated[index] = { ...updated[index], [field]: value };
     onSurveysChange(updated);
@@ -274,7 +246,8 @@ export default function CollarSurveyForm({
     if (!parentAlert) {
       return 'border-navy-800 bg-navy-950/80 focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 text-slate-100';
     }
-    if (parentAlert.type === 'CRITICAL') {
+    const isCritical = parentAlert.type === 'CRITICAL' || (parentAlert.type as string) === 'CRITICA';
+    if (isCritical) {
       return 'border-rose-500/80 text-rose-300 focus:border-rose-500 focus:ring-1 focus:ring-rose-500/20 bg-rose-500/10';
     }
     return 'border-amber-500/80 text-amber-300 focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 bg-amber-500/10';
